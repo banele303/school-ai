@@ -55,5 +55,10 @@ env_list.txt
 # Cloudflare Wrangler cache
 .wrangler/
 
+# Cloudflare secrets
+cloudflare/gemini-sa.json
+cloudflare/*.pem
+cloudflare/*.key
+
 # Convex
 frontend/convex/_generated/

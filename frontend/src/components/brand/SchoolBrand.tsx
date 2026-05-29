@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { GraduationCap } from "lucide-react";
 
 type SchoolBrandProps = {
   to?: string;
@@ -7,18 +8,22 @@ type SchoolBrandProps = {
 
 export function SchoolBrand({ to = "/", compact = false }: SchoolBrandProps) {
   const content = (
-    <img
-      src="/logo-school.jpeg"
-      alt="Vhembe Rising Star Academy logo"
-      className={compact ? "w-12 h-12 rounded-md object-cover" : "w-20 h-20 rounded-md object-cover"}
-    />
+    <div className={`flex items-center gap-2 ${compact ? "" : ""}`}>
+      <div className={`${compact ? "w-9 h-9" : "w-11 h-11"} rounded-xl bg-gradient-to-br from-red-600 to-red-500 flex items-center justify-center shadow-lg shadow-red-500/20`}>
+        <GraduationCap className={`${compact ? "w-5 h-5" : "w-6 h-6"} text-white`} />
+      </div>
+      <div>
+        <span className={`font-extrabold tracking-tight text-gray-900 dark:text-white ${compact ? "text-lg" : "text-xl"}`}>
+          Edu<span className="text-red-500">Nexus</span>
+        </span>
+        {!compact && <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">Learn Without Limits</p>}
+      </div>
+    </div>
   );
 
   if (!to) {
     return <div>{content}</div>;
   }
 
-  return (
-    <Link to={to}>{content}</Link>
-  );
+  return <Link to={to}>{content}</Link>;
 }

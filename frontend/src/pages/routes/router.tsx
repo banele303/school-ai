@@ -38,6 +38,12 @@ import ReportCardGenerator from "@/pages/academics/ReportCard";
 import AssignmentDetails from "@/pages/lms/AssignmentDetails";
 import ResourceLibrary from "@/pages/ResourceLibrary";
 import AdminResources from "@/pages/admin/ResourceManagement";
+import LiveClassesPage from "@/pages/lives/LiveClasses";
+import VideoLibraryPage from "@/pages/videos/VideoLibrary";
+import HomeworkCheckerPage from "@/pages/ai/HomeworkChecker";
+import StudyGroupsPage from "@/pages/groups/StudyGroups";
+import PeerTutoringPage from "@/pages/tutoring/PeerTutoring";
+import SchoolOnboarding from "@/pages/admin/SchoolOnboarding";
 
 export const router = createBrowserRouter([
   { path: "/", element: <Home /> },
@@ -96,6 +102,14 @@ export const router = createBrowserRouter([
       { path: "finance/fees", element: <FeesPage /> },
       { path: "finance/expenses", element: <ExpensesPage /> },
       { path: "finance/salary", element: <SalaryPage /> },
+
+      // ── NEW FEATURES ──
+      { path: "lives", element: <LiveClassesPage /> },
+      { path: "videos", element: <VideoLibraryPage /> },
+      { path: "ai/homework", element: <HomeworkCheckerPage /> },
+      { path: "groups", element: <StudyGroupsPage /> },
+      { path: "tutoring", element: <PeerTutoringPage /> },
+      { path: "admin/onboarding", element: <SchoolOnboarding /> },
     ],
   },
 ]);

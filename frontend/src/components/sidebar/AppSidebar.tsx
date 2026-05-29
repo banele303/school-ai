@@ -9,6 +9,7 @@ import {
   Banknote,
   Megaphone,
   BookOpen,
+  Video,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -53,7 +54,7 @@ export const sidebardata = {
     {
       name: "Vhembe Rising Star Academy",
       logo: School,
-      logoSrc: "/logo-school.jpeg",
+      logoSrc: "",
     },
   ],
   navMain: [
@@ -72,15 +73,18 @@ export const sidebardata = {
       ],
     },
     {
-      title: "Resources",
-      url: "/resources",
-      icon: GraduationCap,
-      roles: ["admin", "teacher", "student", "parent"],
+      title: "Learning Hub",
+      url: "#",
+      icon: Video,
+      roles: ["admin", "teacher", "student"],
       items: [
-        { title: "Resource Library", url: "/resources", roles: ["admin", "teacher", "student", "parent"] },
+        { title: "Live Classes", url: "/lives", roles: ["admin", "teacher", "student"] },
+        { title: "Video Library", url: "/videos", roles: ["admin", "teacher", "student"] },
         { title: "Study Buddy AI", url: "/study-buddy", roles: ["admin", "teacher", "student"] },
-        { title: "Past Papers", url: "/resources?type=past-papers", roles: ["admin", "teacher", "student", "parent"] },
-        { title: "Study Materials", url: "/resources?type=study-materials", roles: ["admin", "teacher", "student", "parent"] },
+        { title: "AI Homework", url: "/ai/homework", roles: ["admin", "teacher", "student"] },
+        { title: "Study Groups", url: "/groups", roles: ["admin", "teacher", "student"] },
+        { title: "Peer Tutoring", url: "/tutoring", roles: ["admin", "teacher", "student"] },
+        { title: "Resource Library", url: "/resources", roles: ["admin", "teacher", "student", "parent"] },
       ],
     },
     {

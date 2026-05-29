@@ -471,4 +471,237 @@ export default defineSchema({
     isFinalized: v.boolean(),
   }).index("by_grade_subject", ["grade", "subject"])
     .index("by_generated_by", ["generatedBy"]),
+
+  // ─── LIVE CLASSES ──────────────────────────────────────────────
+
+  liveClasses: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    subject: v.id("subjects"),
+    class: v.optional(v.id("classes")),
+    teacher: v.id("users"),
+    // When the class starts
+    startTime: v.number(), // epoch ms
+    endTime: v.optional(v.number()), // epoch ms
+    // Platform: "youtube", "zoom", "jitsi", "stream"
+    platform: v.string(),
+    // Join link (public for students)
+    joinUrl: v.string(),
+    // Recording URL (after class ends)
+    recordingUrl: v.optional(v.string()),
+    // Status: "scheduled", "live", "ended", "cancelled"
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("live"),
+      v.literal("ended"),
+      v.literal("cancelled")
+    ),
+    // Which grades can see this (empty = all)
+    targetGrades: v.optional(v.array(v.number())),
+    // Max participants (0 = unlimited)
+    maxParticipants: v.optional(v.number()),
+    // Auto-notify
+    notifyEnrolled: v.boolean(),
+  }).index("by_status", ["status"])
+    .index("by_subject", ["subject"])
+    .index("by_start_time", ["startTime"])
+    .index("by_teacher", ["teacher"]),
+
+  // Student attendance for live classes
+  liveClassAttendance: defineTable({
+    liveClass: v.id("liveClasses"),
+    student: v.id("users"),
+    joinedAt: v.optional(v.number()),
+    leftAt: v.optional(v.number()),
+    duration: v.optional(v.number()), // ms
+    watchPercentage: v.optional(v.number()), // for recordings
+  }).index("by_class", ["liveClass"])
+    .index("by_student", ["student"]),
+
+  // ─── VIDEO LIBRARY ─────────────────────────────────────────────
+
+  videoLibrary: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    subject: v.id("subjects"),
+    teacher: v.id("users"),
+    // Video URL (YouTube embed, R2 direct, or external)
+    videoUrl: v.string(),
+    videoType: v.union(v.literal("youtube"), v.literal("r2"), v.literal("external")),
+    thumbnailUrl: v.optional(v.string()),
+    duration: v.optional(v.number()), // seconds
+    grade: v.optional(v.number()),
+    topic: v.optional(v.string()),
+    // Tags for search
+    tags: v.array(v.string()),
+    // Syllabus topic link
+    syllabusTopic: v.optional(v.id("syllabusTopics")),
+    // Playlist / series
+    playlist: v.optional(v.string()),
+    playlistOrder: v.optional(v.number()),
+    viewCount: v.number(),
+    isPublished: v.boolean(),
+  }).index("by_subject", ["subject"])
+    .index("by_grade", ["grade"])
+    .index("by_teacher", ["teacher"])
+    .index("by_playlist", ["playlist"])
+    .index("by_published", ["isPublished"]),
+
+  // Student video watch progress
+  videoProgress: defineTable({
+    video: v.id("videoLibrary"),
+    student: v.id("users"),
+    progress: v.number(), // seconds watched
+    percentage: v.number(), // 0-100
+    completed: v.boolean(),
+    lastWatchedAt: v.number(),
+  }).index("by_video", ["video"])
+    .index("by_student", ["student"]),
+
+  // ─── GAMIFICATION ──────────────────────────────────────────────
+
+  // XP and level per student
+  studentXP: defineTable({
+    student: v.id("users"),
+    totalXP: v.number(),
+    level: v.number(),
+    currentStreak: v.number(), // consecutive days
+    longestStreak: v.number(),
+    lastActivityDate: v.optional(v.string()), // "YYYY-MM-DD"
+    // Weekly XP for leaderboards
+    weeklyXP: v.number(),
+    weeklyResetAt: v.number(),
+    // Custom avatar/theme unlocks
+    unlockedItems: v.array(v.string()),
+    // Student-chosen display title
+    displayTitle: v.optional(v.string()),
+  }).index("by_student", ["student"])
+    .index("by_total_xp", ["totalXP"]),
+
+  // XP transaction log
+  xpLog: defineTable({
+    student: v.id("users"),
+    amount: v.number(),
+    reason: v.string(),
+    source: v.string(), // "video_watch", "class_attend", "exam_complete", "daily_login", "streak_badge"
+    referenceId: v.optional(v.string()), // e.g. video ID or class ID
+  }).index("by_student", ["student"]),
+
+  // Achievements / extended badges
+  achievements: defineTable({
+    student: v.id("users"),
+    achievementId: v.string(), // "first_video", "streak_7", "top_of_class", etc.
+    title: v.string(),
+    description: v.string(),
+    icon: v.string(),
+    xpReward: v.number(),
+    unlockedAt: v.number(),
+    tier: v.union(v.literal("bronze"), v.literal("silver"), v.literal("gold"), v.literal("platinum")),
+  }).index("by_student", ["student"]),
+  // leaderboard snapshots (weekly)
+  leaderboard: defineTable({
+    period: v.string(), // "weekly_2026_W22"
+    category: v.string(), // "global", "grade_10", "class_id"
+    entries: v.array(v.object({
+      student: v.id("users"),
+      name: v.string(),
+      xp: v.number(),
+      level: v.number(),
+      rank: v.number(),
+    })),
+    computedAt: v.number(),
+  }).index("by_period", ["period"]),
+
+  // ─── STUDY GROUPS ──────────────────────────────────────────────
+
+  studyGroups: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    subject: v.id("subjects"),
+    creator: v.id("users"),
+    members: v.array(v.id("users")),
+    maxMembers: v.number(),
+    isPrivate: v.boolean(),
+    inviteCode: v.optional(v.string()),
+    grade: v.optional(v.number()),
+  }).index("by_subject", ["subject"])
+    .index("by_creator", ["creator"])
+    .index("by_grade", ["grade"]),
+
+  studyGroupMessages: defineTable({
+    group: v.id("studyGroups"),
+    sender: v.id("users"),
+    content: v.string(),
+    // Teacher can pin messages
+    isPinned: v.boolean(),
+    // For shared files/resources
+    attachmentUrl: v.optional(v.string()),
+    attachmentName: v.optional(v.string()),
+  }).index("by_group", ["group"]),
+
+  // ─── USER PREFERENCES ──────────────────────────────────────────
+
+  userPreferences: defineTable({
+    student: v.id("users"),
+    language: v.string(), // "en", "nso", "ts", "ve", "zu", "af"
+    // Data saver mode for low bandwidth
+    dataSaverMode: v.boolean(),
+    lowBandwidthMode: v.boolean(),
+    // Notification prefs
+    emailNotifications: v.boolean(),
+    pushNotifications: v.boolean(),
+    whatsappNotifications: v.boolean(),
+    whatsappNumber: v.optional(v.string()),
+    // Theme: "light", "dark", "system"
+    theme: v.string(),
+    // Grade info for students
+    grade: v.optional(v.number()),
+    province: v.optional(v.string()), // "limpopo"
+    schoolName: v.optional(v.string()),
+  }).index("by_student", ["student"]),
+
+  // ─── NOTIFICATIONS QUEUE (for WA/SMS) ──────────────────────────
+
+  notificationQueue: defineTable({
+    recipient: v.id("users"),
+    type: v.string(), // "class_reminder", "assignment_due", "fee_balance", "study_tip"
+    channel: v.string(), // "in_app", "whatsapp", "sms", "email"
+    content: v.string(),
+    scheduledFor: v.number(),
+    sentAt: v.optional(v.number()),
+    status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+  }).index("by_status", ["status"])
+    .index("by_recipient", ["recipient"]),
+
+  // ─── PEER TUTORING ─────────────────────────────────────────────
+
+  tutoringRequests: defineTable({
+    student: v.id("users"),
+    subject: v.id("subjects"),
+    topic: v.string(),
+    description: v.string(),
+    status: v.union(v.literal("open"), v.literal("matched"), v.literal("closed")),
+    matchedTutor: v.optional(v.id("users")),
+    grade: v.number(),
+  }).index("by_status", ["status"])
+    .index("by_subject", ["subject"]),
+
+  // ─── AI HOMEWORK CHECKER ───────────────────────────────────────
+
+  homeworkSubmissions: defineTable({
+    student: v.id("users"),
+    subject: v.id("subjects"),
+    question: v.string(),
+    // Photo upload URL
+    imageUrl: v.optional(v.string()),
+    // Student's written answer
+    studentAnswer: v.optional(v.string()),
+    // AI-generated feedback
+    aiScore: v.optional(v.number()),
+    aiFeedback: v.optional(v.string()),
+    aiCorrectAnswer: v.optional(v.string()),
+    status: v.union(v.literal("pending"), v.literal("graded")),
+    teacherReview: v.optional(v.string()),
+  }).index("by_student", ["student"])
+    .index("by_subject", ["subject"]),
 });

@@ -2,19 +2,25 @@ name = "edunexus-ai"
 main = "src/index.ts"
 compatibility_date = "2024-04-05"
 
-# R2 Bucket for Study Materials and Assignments
-# [[r2_buckets]]
-# binding = "STORAGE"
-# bucket_name = "edunexus-storage"
+# R2 Bucket for Study Materials, Videos, and Assignments
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "edunexus-storage"
 
 # Vectorize Index for RAG Search
 [[vectorize]]
 binding = "VECTOR_INDEX"
 index_name = "edunexus-materials"
 
-# AI Binding for Llama 3 / Embeddings
+# AI Binding (Workers AI for embeddings + fallback)
 [ai]
 binding = "AI"
 
-# [vars]
-# CONVEX_URL = "your-convex-url"
+# Environment Variables
+[vars]
+CONVEX_URL = ""
+R2_PUBLIC_URL = "https://pub-edunexus.r2.dev"
+
+# Secrets to set via CLI:
+# wrangler secret put GEMINI_API_KEY
+# wrangler secret put GEMINI_SA_JSON
