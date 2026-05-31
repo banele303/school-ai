@@ -489,6 +489,16 @@ export default defineSchema({
     joinUrl: v.string(),
     // Recording URL (after class ends)
     recordingUrl: v.optional(v.string()),
+    streamVideoUid: v.optional(v.string()),
+    playbackUrl: v.optional(v.string()),
+    roomId: v.optional(v.string()),
+    accessMode: v.optional(v.union(
+      v.literal("school-only"),
+      v.literal("school-and-public"),
+      v.literal("public-support")
+    )),
+    resourceUrls: v.optional(v.array(v.string())),
+    lessonPlan: v.optional(v.string()),
     // Status: "scheduled", "live", "ended", "cancelled"
     status: v.union(
       v.literal("scheduled"),
