@@ -107,7 +107,7 @@ export default defineSchema({
     dueDate: v.string(),
     isActive: v.boolean(),
     // "quiz" = self-paced student practice, "exam" = formal timed assessment
-    examType: v.union(v.literal("quiz"), v.literal("exam")),
+    examType: v.optional(v.union(v.literal("quiz"), v.literal("exam"))),
     // For quizzes: allow multiple attempts
     maxAttempts: v.optional(v.number()),
     // For quizzes: show instant feedback after each question
