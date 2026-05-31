@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx convex deploy --cmd \"npm run build\"",
+  "buildCommand": "node ../scripts/vercel-build.mjs",
   "installCommand": "npm install --include=dev",
   "env": {
     "NPM_CONFIG_PRODUCTION": "false"

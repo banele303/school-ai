@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc -b",
-    "vercel-build": "convex deploy --cmd \"npm run build\"",
+    "vercel-build": "node ../scripts/vercel-build.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "convex:dev": "convex dev",
