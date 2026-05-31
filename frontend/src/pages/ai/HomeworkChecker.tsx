@@ -14,8 +14,6 @@ import { Sparkles, Upload, Camera, CheckCircle, XCircle, Clock, History, Send, F
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-declare const process: { env: Record<string, string | undefined }>;
-
 export default function HomeworkCheckerPage() {
   const { user } = useAuth();
   const [question, setQuestion] = useState("");
