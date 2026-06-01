@@ -497,6 +497,9 @@ export default defineSchema({
       v.literal("school-and-public"),
       v.literal("public-support")
     )),
+    whepUrl: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    streamInputId: v.optional(v.string()),
     resourceUrls: v.optional(v.array(v.string())),
     lessonPlan: v.optional(v.string()),
     // Status: "scheduled", "live", "ended", "cancelled"
