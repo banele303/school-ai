@@ -49,16 +49,7 @@ import {
   uploadFileToR2,
   uploadVideoToStream,
 } from "@/lib/cloudflareWorker";
-import { useNavigate } from "react-router";
-import { CLOUDFLARE_WORKER_URL } from "@/lib/cloudflareWorker";
-=======
-import {
-  createStreamDirectUpload,
-  markScannedWork,
-  uploadFileToR2,
-  uploadVideoToStream,
-} from "@/lib/cloudflareWorker";
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
+
 
 const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
   scheduled: { color: "bg-blue-50 text-blue-700 border-blue-200", icon: Calendar, label: "Scheduled" },
@@ -74,14 +65,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   stream: "Live Stream",
   native: "Native Classroom",
 };
-const PLATFORM_LABELS: Record<string, string> = {
-  youtube: "YouTube Live",
-  zoom: "Zoom Meeting",
-  jitsi: "Jitsi Meet",
-  stream: "Live Stream",
-  native: "Native Classroom",
-};
-=======
 const studioTools = [
   { icon: Video, title: "In-app live classroom", detail: "Camera, mic, screen share, learner chat, attendance and replay flow." },
   { icon: Cloud, title: "Cloudflare Stream archive", detail: "Upload lesson recordings to Stream and keep playback inside EduNexus." },
@@ -101,7 +84,6 @@ const capabilityCards = [
   { icon: Brain, label: "Personal study actions", copy: "Generate next-step revision ideas from class content and learner performance." },
   { icon: Gauge, label: "Engagement signals", copy: "See readiness, watch progress, submissions and learners needing support." },
 ];
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
 
 export default function LiveClassesPage() {
   const { user } = useAuth();
@@ -149,46 +131,6 @@ export default function LiveClassesPage() {
         // Attendance may already exist; opening the lesson is still fine.
       }
     }
-const openLesson = async (classItem: any) => {
-  setSelectedClass(classItem);
-  if (user?.role === "student") {
-    try {
-      await joinClass({ liveClassId: classItem._id });
-    } catch {
-      // Attendance may already exist; opening the lesson is still fine.
-    }
-  }
-  if (classItem.platform === "native") {
-    navigate(`/lives/room/${classItem._id}`);
-  } else {
-    window.open(classItem.joinUrl, "_blank");
-  }
-};
-
-const handleStatusChange = async (classItem: any, newStatus: string) => {
-  try {
-    await updateStatus({ liveClassId: classItem._id, status: newStatus });
-    toast.success(`Class marked as ${newStatus}`);
-    if (classItem.platform === "native" && newStatus === "live") {
-      navigate(`/lives/room/${classItem._id}`);
-    }
-  } catch (e: any) {
-    toast.error(e.message);
-  }
-};
-
-const changeStatus = async (
-  classId: any,
-  status: "scheduled" | "live" | "ended" | "cancelled",
-  recordingUrl?: string
-) => {
-  try {
-    await updateStatus({ liveClassId: classId, status, recordingUrl });
-    toast.success(status === "live" ? "Live class started" : `Class marked as ${status}`);
-  } catch (error: any) {
-    toast.error(error.message || "Could not update class status");
-  }
-};
     if (classItem.platform === "native") {
       navigate(`/lives/room/${classItem._id}`);
     } else {
@@ -205,7 +147,7 @@ const changeStatus = async (
       }
     } catch (e: any) {
       toast.error(e.message);
-=======
+    }
   };
 
   const changeStatus = async (
@@ -218,7 +160,6 @@ const changeStatus = async (
       toast.success(status === "live" ? "Live class started" : `Class marked as ${status}`);
     } catch (error: any) {
       toast.error(error.message || "Could not update class status");
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
     }
   };
 
@@ -316,71 +257,6 @@ const changeStatus = async (
           </Card>
 
 
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>{format(startTime, "EEE, d MMM yyyy")}</span>
-                        <Clock className="h-3.5 w-3.5 ml-2" />
-                        <span>{format(startTime, "h:mm a")}</span>
-                      </div>
-
-                      {subject && (
-                        <Badge variant="secondary" className="text-xs">{subject.name}</Badge>
-                      )}
-
-                      {classItem.maxParticipants && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Users className="h-3 w-3" />
-                          <span>Max {classItem.maxParticipants} participants</span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-2">
-                        {(classItem.status === "live" || classItem.status === "scheduled") && (
-                          <Button
-                            className={cn(
-                              "flex-1 gap-2",
-                              classItem.status === "live"
-                                ? "bg-red-600 hover:bg-red-700"
-                                : "bg-blue-600 hover:bg-blue-700"
-                            )}
-                            onClick={() => handleJoinClass(classItem)}
-                          >
-                            <Play className="h-4 w-4" />
-                            {classItem.status === "live" ? "Join Now" : "Join"}
-                          </Button>
-                        )}
-                        {classItem.status === "ended" && classItem.recordingUrl && (
-                          <Button variant="outline" className="flex-1 gap-2" onClick={() => window.open(classItem.recordingUrl, "_blank")}>
-                            <Play className="h-4 w-4" />
-                            Watch Recording
-                          </Button>
-                        )}
-                        {classItem.status === "ended" && !classItem.recordingUrl && (
-                          <span className="text-xs text-muted-foreground flex-1 text-center py-2">Recording pending</span>
-                        )}
-
-                        {/* Teacher controls */}
-                        {isTeacher && (classItem.teacher === user?._id || user?.role === "admin") && (
-                          <div className="flex gap-1">
-                            {classItem.status === "scheduled" && (
-                              <Button size="sm" variant="ghost" onClick={() => handleStatusChange(classItem, "live")} className="text-red-600">
-                                <Radio className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {classItem.status === "live" && (
-                              <Button size="sm" variant="ghost" onClick={() => handleStatusChange(classItem, "ended")}>
-                                <CheckCircle className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-=======
           <Tabs value={activeFilter} onValueChange={setActiveFilter}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-flex">
@@ -394,7 +270,6 @@ const changeStatus = async (
                   My classes
                 </Button>
               )}
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
             </div>
 
             <TabsContent value={activeFilter} className="mt-4">
@@ -900,18 +775,15 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [accessMode, setAccessMode] = useState("school-and-public");
+  const [platform, setPlatform] = useState("native");
+  const [joinUrl, setJoinUrl] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
-<<<<<<< HEAD
-    if (!title || !date || !time || (platform !== "native" && !joinUrl)) {
-      toast.error("Please fill in all required fields");
-=======
-    if (!title || !date || !time || !subjectId) {
-      toast.error("Please complete the title, subject, date and time.");
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
+    if (!title || !date || !time || !subjectId || (platform !== "native" && !joinUrl)) {
+      toast.error("Please complete all required fields.");
       return;
     }
     setCreating(true);
@@ -952,29 +824,20 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
         description: resourceUrl ? `${description}\n\nResource: ${resourceUrl}` : description,
         subject: subjectId,
         startTime,
-<<<<<<< HEAD
         platform,
-        joinUrl: finalJoinUrl,
+        joinUrl: platform === "native" ? finalJoinUrl : joinUrl,
+        accessMode,
+        resourceUrls: resourceUrl ? [resourceUrl] : undefined,
+        lessonPlan: description,
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
         notifyEnrolled: true,
         streamInputId: streamData.uid,
         whipUrl: streamData.whipUrl,
         whepUrl: streamData.whepUrl,
         playbackUrl: streamData.playbackUrl,
-      });
-
-      toast.success("Live class scheduled!");
-=======
-        platform: "edunexus",
-        joinUrl: `/lives?lesson=${encodeURIComponent(title)}`,
-        accessMode,
-        resourceUrls: resourceUrl ? [resourceUrl] : undefined,
-        lessonPlan: description,
-        maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
-        notifyEnrolled: true,
       } as any);
-      toast.success(accessMode === "school-only" ? "School live lesson scheduled." : "Live lesson scheduled for school and self-learners.");
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
+
+      toast.success(accessMode === "school-only" ? "School live lesson scheduled." : "Live lesson scheduled.");
       onClose();
       setTitle("");
       setDescription("");
@@ -1011,11 +874,10 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             </Select>
           </div>
           <div>
-            <Label>Access</Label>
-            <Select value={accessMode} onValueChange={setAccessMode}>
+            <Label>Platform</Label>
+            <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-<<<<<<< HEAD
                 <SelectItem value="native">Native Classroom (Cloudflare)</SelectItem>
                 <SelectItem value="youtube">YouTube Live</SelectItem>
                 <SelectItem value="zoom">Zoom Meeting</SelectItem>
@@ -1030,7 +892,11 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
               <Input value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="https://..." />
             </div>
           )}
-=======
+          <div>
+            <Label>Access</Label>
+            <Select value={accessMode} onValueChange={setAccessMode}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
                 <SelectItem value="school-and-public">School and self-learners</SelectItem>
                 <SelectItem value="school-only">School class only</SelectItem>
                 <SelectItem value="public-support">Open support lesson</SelectItem>
@@ -1041,7 +907,6 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             <Label>Date</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
->>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
           <div>
             <Label>Time</Label>
             <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />

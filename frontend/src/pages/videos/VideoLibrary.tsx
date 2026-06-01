@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/AuthProvider";
 import { Play, Search, Clock, Eye, BookOpen, Filter, Plus, Youtube, CheckCircle, X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { uploadFileToR2 } from "@/lib/cloudflareWorker";
 
 export default function VideoLibraryPage() {
   const { user } = useAuth();
@@ -252,18 +252,34 @@ function UploadVideoDialog({ open, onClose, subjects, createVideo }: any) {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoType, setVideoType] = useState("youtube");
   const [subjectId, setSubjectId] = useState("");
-  const [grade, setGrade] = useState("");
   const [playlist, setPlaylist] = useState("");
+  const [grade, setGrade] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
-    if (!title || !videoUrl) { toast.error("Title and URL required"); return; }
+    if (!title) { toast.error("Title required"); return; }
+    if (videoType === "r2" && !videoFile) { toast.error("Video file required for R2 upload"); return; }
+    if (videoType !== "r2" && !videoUrl) { toast.error("Video URL required"); return; }
     setSaving(true);
     try {
-      await createVideo({ title, description, subject: subjectId, videoUrl, videoType, grade: grade ? Number(grade) : undefined, playlist: playlist || undefined });
+      let finalUrl = videoUrl;
+      if (videoType === "r2" && videoFile) {
+        const upload = await uploadFileToR2(videoFile, { title, description });
+        finalUrl = upload.fileUrl;
+      }
+      await createVideo({
+        title,
+        description,
+        subject: subjectId,
+        videoUrl: finalUrl,
+        videoType,
+        grade: grade ? Number(grade) : undefined,
+        playlist: playlist || undefined,
+      });
       toast.success("Video added!");
       onClose();
-      setTitle(""); setDescription(""); setVideoUrl(""); setGrade(""); setPlaylist("");
+      setTitle(""); setDescription(""); setVideoUrl(""); setGrade(""); setPlaylist(""); setVideoFile(null);
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
   };
@@ -275,7 +291,15 @@ function UploadVideoDialog({ open, onClose, subjects, createVideo }: any) {
         <div className="space-y-3">
           <div><Label>Title *</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Introduction to Algebra" /></div>
           <div><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} /></div>
-          <div><Label>Video URL *</Label><Input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="YouTube embed URL or direct link" /></div>
+           <div>
+            <Label>Video URL *</Label>
+            {videoType !== "r2" && (
+              <Input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="YouTube embed URL or direct link" />
+            )}
+            {videoType === "r2" && (
+              <Input type="file" accept="video/*" onChange={e => setVideoFile(e.target.files?.[0] || null)} />
+            )}
+           </div>
           <div><Label>Type</Label>
             <Select value={videoType} onValueChange={setVideoType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -287,20 +311,29 @@ function UploadVideoDialog({ open, onClose, subjects, createVideo }: any) {
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Subject</Label>
+            <div>
+              <Label>Subject</Label>
               <Select value={subjectId} onValueChange={setSubjectId}>
-                <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
                 <SelectContent>{subjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Grade</Label>
+            <div>
+              <Label>Grade</Label>
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Grade" />
+                </SelectTrigger>
                 <SelectContent>{[1,2,3,4,5,6,7,8,9,10,11,12].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-          <div><Label>Playlist</Label><Input value={playlist} onChange={e => setPlaylist(e.target.value)} placeholder="e.g. Grade 10 Maths Term 1" /></div>
+          <div className="mt-2">
+            <Label>Playlist (optional)</Label>
+            <Input value={playlist} onChange={e => setPlaylist(e.target.value)} placeholder="e.g. Grade 10 Maths Term 1" />
+          </div>
           <Button className="w-full bg-purple-600 hover:bg-purple-700" onClick={handleCreate} disabled={saving}>
             {saving ? "Adding..." : "Add Video"}
           </Button>
