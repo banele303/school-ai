@@ -15,6 +15,8 @@ import { Video, Calendar, Clock, Users, Play, Radio, CheckCircle, Upload, Plus, 
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router";
+import { CLOUDFLARE_WORKER_URL } from "@/lib/cloudflareWorker";
 
 const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
   scheduled: { color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: Clock, label: "Scheduled" },
@@ -28,10 +30,12 @@ const PLATFORM_LABELS: Record<string, string> = {
   zoom: "Zoom Meeting",
   jitsi: "Jitsi Meet",
   stream: "Live Stream",
+  native: "Native Classroom",
 };
 
 export default function LiveClassesPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -63,13 +67,20 @@ export default function LiveClassesPage() {
         // Already joined or error
       }
     }
-    window.open(classItem.joinUrl, "_blank");
+    if (classItem.platform === "native") {
+      navigate(`/lives/room/${classItem._id}`);
+    } else {
+      window.open(classItem.joinUrl, "_blank");
+    }
   };
 
-  const handleStatusChange = async (classId: any, newStatus: string) => {
+  const handleStatusChange = async (classItem: any, newStatus: string) => {
     try {
-      await updateStatus({ liveClassId: classId, status: newStatus });
+      await updateStatus({ liveClassId: classItem._id, status: newStatus });
       toast.success(`Class marked as ${newStatus}`);
+      if (classItem.platform === "native" && newStatus === "live") {
+        navigate(`/lives/room/${classItem._id}`);
+      }
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -213,12 +224,12 @@ export default function LiveClassesPage() {
                         {isTeacher && (classItem.teacher === user?._id || user?.role === "admin") && (
                           <div className="flex gap-1">
                             {classItem.status === "scheduled" && (
-                              <Button size="sm" variant="ghost" onClick={() => handleStatusChange(classItem._id, "live")} className="text-red-600">
+                              <Button size="sm" variant="ghost" onClick={() => handleStatusChange(classItem, "live")} className="text-red-600">
                                 <Radio className="h-4 w-4" />
                               </Button>
                             )}
                             {classItem.status === "live" && (
-                              <Button size="sm" variant="ghost" onClick={() => handleStatusChange(classItem._id, "ended")}>
+                              <Button size="sm" variant="ghost" onClick={() => handleStatusChange(classItem, "ended")}>
                                 <CheckCircle className="h-4 w-4" />
                               </Button>
                             )}
@@ -258,23 +269,53 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
-    if (!title || !date || !time || !joinUrl) {
+    if (!title || !date || !time || (platform !== "native" && !joinUrl)) {
       toast.error("Please fill in all required fields");
       return;
     }
     setCreating(true);
     try {
       const startTime = new Date(`${date}T${time}`).getTime();
+      let streamData = { uid: undefined, whipUrl: undefined, whepUrl: undefined, playbackUrl: undefined };
+      let finalJoinUrl = joinUrl;
+
+      if (platform === "native") {
+        toast.info("Provisioning native live classroom...");
+        const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/live/create-input`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to provision native stream input from Cloudflare");
+        }
+
+        const data = await response.json();
+        streamData = {
+          uid: data.uid,
+          whipUrl: data.whipUrl,
+          whepUrl: data.whepUrl,
+          playbackUrl: data.playbackUrl,
+        };
+        finalJoinUrl = `/lives/room/pending`;
+      }
+
       await createLiveClass({
         title,
         description,
         subject: subjectId,
         startTime,
         platform,
-        joinUrl,
+        joinUrl: finalJoinUrl,
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
         notifyEnrolled: true,
+        streamInputId: streamData.uid,
+        whipUrl: streamData.whipUrl,
+        whepUrl: streamData.whepUrl,
+        playbackUrl: streamData.playbackUrl,
       });
+
       toast.success("Live class scheduled!");
       onClose();
       setTitle(""); setDescription(""); setDate(""); setTime(""); setJoinUrl(""); setMaxParticipants("");
@@ -329,6 +370,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="native">Native Classroom (Cloudflare)</SelectItem>
                 <SelectItem value="youtube">YouTube Live</SelectItem>
                 <SelectItem value="zoom">Zoom Meeting</SelectItem>
                 <SelectItem value="jitsi">Jitsi Meet</SelectItem>
@@ -336,10 +378,12 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Join URL *</Label>
-            <Input value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="https://..." />
-          </div>
+          {platform !== "native" && (
+            <div>
+              <Label>Join URL *</Label>
+              <Input value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="https://..." />
+            </div>
+          )}
           <div>
             <Label>Max Participants</Label>
             <Input type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} placeholder="Unlimited" />

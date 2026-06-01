@@ -39,6 +39,7 @@ import AssignmentDetails from "@/pages/lms/AssignmentDetails";
 import ResourceLibrary from "@/pages/ResourceLibrary";
 import AdminResources from "@/pages/admin/ResourceManagement";
 import LiveClassesPage from "@/pages/lives/LiveClasses";
+import LiveRoomPage from "@/pages/lives/LiveRoom";
 import VideoLibraryPage from "@/pages/videos/VideoLibrary";
 import HomeworkCheckerPage from "@/pages/ai/HomeworkChecker";
 import StudyGroupsPage from "@/pages/groups/StudyGroups";
@@ -105,6 +106,7 @@ export const router = createBrowserRouter([
 
       // ── NEW FEATURES ──
       { path: "lives", element: <LiveClassesPage /> },
+      { path: "lives/room/:id", element: <LiveRoomPage /> },
       { path: "videos", element: <VideoLibraryPage /> },
       { path: "ai/homework", element: <HomeworkCheckerPage /> },
       { path: "groups", element: <StudyGroupsPage /> },
