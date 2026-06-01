@@ -246,11 +246,13 @@ export default function VideoLibraryPage() {
   );
 }
 
+
+
 function UploadVideoDialog({ open, onClose, subjects, createVideo }: any) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
-  const [videoType, setVideoType] = useState("youtube");
+  const [videoType, setVideoType] = useState("r2");
   const [subjectId, setSubjectId] = useState("");
   const [playlist, setPlaylist] = useState("");
   const [grade, setGrade] = useState("");
@@ -259,7 +261,7 @@ function UploadVideoDialog({ open, onClose, subjects, createVideo }: any) {
 
   const handleCreate = async () => {
     if (!title) { toast.error("Title required"); return; }
-    if (videoType === "r2" && !videoFile) { toast.error("Video file required for R2 upload"); return; }
+    if (videoType === "r2" && !videoFile) { toast.error("Video file required for upload"); return; }
     if (videoType !== "r2" && !videoUrl) { toast.error("Video URL required"); return; }
     setSaving(true);
     try {
@@ -291,49 +293,36 @@ function UploadVideoDialog({ open, onClose, subjects, createVideo }: any) {
         <div className="space-y-3">
           <div><Label>Title *</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Introduction to Algebra" /></div>
           <div><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} /></div>
-           <div>
-            <Label>Video URL *</Label>
-            {videoType !== "r2" && (
-              <Input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="YouTube embed URL or direct link" />
-            )}
-            {videoType === "r2" && (
-              <Input type="file" accept="video/*" onChange={e => setVideoFile(e.target.files?.[0] || null)} />
-            )}
-           </div>
           <div><Label>Type</Label>
             <Select value={videoType} onValueChange={setVideoType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="r2">Upload (R2)</SelectItem>
                 <SelectItem value="youtube">YouTube</SelectItem>
-                <SelectItem value="r2">Direct (R2)</SelectItem>
                 <SelectItem value="external">External Link</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {videoType === "r2" ? (
+            <div><Label>Video File *</Label><Input type="file" accept="video/*" onChange={e => setVideoFile(e.target.files?.[0] || null)} /></div>
+          ) : (
+            <div><Label>Video URL *</Label><Input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="YouTube embed URL or direct link" /></div>
+          )}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Subject</Label>
+            <div><Label>Subject</Label>
               <Select value={subjectId} onValueChange={setSubjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Subject" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
                 <SelectContent>{subjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Grade</Label>
+            <div><Label>Grade</Label>
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Grade" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
                 <SelectContent>{[1,2,3,4,5,6,7,8,9,10,11,12].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-          <div className="mt-2">
-            <Label>Playlist (optional)</Label>
-            <Input value={playlist} onChange={e => setPlaylist(e.target.value)} placeholder="e.g. Grade 10 Maths Term 1" />
-          </div>
+          <div className="mt-2"><Label>Playlist (optional)</Label><Input value={playlist} onChange={e => setPlaylist(e.target.value)} placeholder="e.g. Grade 10 Maths Term 1" /></div>
           <Button className="w-full bg-purple-600 hover:bg-purple-700" onClick={handleCreate} disabled={saving}>
             {saving ? "Adding..." : "Add Video"}
           </Button>

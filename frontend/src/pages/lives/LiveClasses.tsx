@@ -797,27 +797,32 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
       let streamData = { uid: undefined, whipUrl: undefined, whepUrl: undefined, playbackUrl: undefined };
       let finalJoinUrl = joinUrl;
 
-      if (platform === "native") {
-        toast.info("Provisioning native live classroom...");
-        const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/live/create-input`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to provision native stream input from Cloudflare");
+        if (platform === "native") {
+          toast.info("Provisioning native live classroom...");
+          try {
+            const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/live/create-input`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title }),
+            });
+            if (!response.ok) {
+              throw new Error("Failed to provision native stream input from Cloudflare");
+            }
+            const data = await response.json();
+            streamData = {
+              uid: data.uid,
+              whipUrl: data.whipUrl,
+              whepUrl: data.whepUrl,
+              playbackUrl: data.playbackUrl,
+            };
+            finalJoinUrl = `/lives/room/pending`;
+          } catch (e: any) {
+            toast.error(e.message || "Failed to provision native stream input from Cloudflare");
+            // Continue without native stream data
+            streamData = { uid: undefined, whipUrl: undefined, whepUrl: undefined, playbackUrl: undefined };
+            finalJoinUrl = joinUrl; // fallback to provided joinUrl if any
+          }
         }
-
-        const data = await response.json();
-        streamData = {
-          uid: data.uid,
-          whipUrl: data.whipUrl,
-          whepUrl: data.whepUrl,
-          playbackUrl: data.playbackUrl,
-        };
-        finalJoinUrl = `/lives/room/pending`;
-      }
 
       await createLiveClass({
         title,
