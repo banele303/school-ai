@@ -16,6 +16,13 @@ index_name = "edunexus-materials"
 [ai]
 binding = "AI"
 
+[stream]
+binding = "STREAM"
+
 [vars]
 # Public URL for R2 objects (custom domain or r2.dev). Leave empty to use /api/files/:key in dev.
 R2_PUBLIC_URL = ""
+
+# Required for Stream live input / REST operations:
+# wrangler secret put CLOUDFLARE_API_TOKEN
+# CLOUDFLARE_ACCOUNT_ID can also be set here or as an environment variable.

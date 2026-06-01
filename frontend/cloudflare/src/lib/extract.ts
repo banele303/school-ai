@@ -21,7 +21,7 @@ export async function extractTextFromBuffer(
     lowerName.endsWith(".md") ||
     lowerName.endsWith(".csv")
   ) {
-    return new TextDecoder("utf-8", { fatal: false }).decode(buffer).trim();
+    return new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(buffer).trim();
   }
 
   if (type === "application/pdf" || lowerName.endsWith(".pdf")) {
@@ -29,7 +29,7 @@ export async function extractTextFromBuffer(
   }
 
   // Best-effort UTF-8 for unknown types (may be empty for binary)
-  const decoded = new TextDecoder("utf-8", { fatal: false }).decode(buffer).trim();
+  const decoded = new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(buffer).trim();
   if (decoded.length > 80 && /[\x20-\x7E\n]/.test(decoded.slice(0, 200))) {
     return decoded;
   }
@@ -42,7 +42,7 @@ async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
     const { extractText, getDocumentProxy } = await import("unpdf");
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     const result = await extractText(pdf, { mergePages: true });
-    const text = typeof result.text === "string" ? result.text : result.text.join("\n");
+    const text = Array.isArray(result.text) ? result.text.join("\n") : String(result.text || "");
     return text.trim();
   } catch {
     return "";

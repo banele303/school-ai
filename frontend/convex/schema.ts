@@ -107,7 +107,7 @@ export default defineSchema({
     dueDate: v.string(),
     isActive: v.boolean(),
     // "quiz" = self-paced student practice, "exam" = formal timed assessment
-    examType: v.union(v.literal("quiz"), v.literal("exam")),
+    examType: v.optional(v.union(v.literal("quiz"), v.literal("exam"))),
     // For quizzes: allow multiple attempts
     maxAttempts: v.optional(v.number()),
     // For quizzes: show instant feedback after each question
@@ -485,6 +485,16 @@ export default defineSchema({
     platform: v.string(),
     joinUrl: v.string(),
     recordingUrl: v.optional(v.string()),
+    streamVideoUid: v.optional(v.string()),
+    playbackUrl: v.optional(v.string()),
+    roomId: v.optional(v.string()),
+    accessMode: v.optional(v.union(
+      v.literal("school-only"),
+      v.literal("school-and-public"),
+      v.literal("public-support")
+    )),
+    resourceUrls: v.optional(v.array(v.string())),
+    lessonPlan: v.optional(v.string()),
     status: v.union(
       v.literal("scheduled"),
       v.literal("live"),

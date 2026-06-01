@@ -8,6 +8,12 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", cors());
 
+type CloudflareApiResponse<T> = {
+  success: boolean;
+  result?: T;
+  errors?: { message?: string }[];
+};
+
 function publicFileUrl(env: Env, objectKey: string, host: string): string {
   if (env.R2_PUBLIC_URL) {
     return `${env.R2_PUBLIC_URL.replace(/\/$/, "")}/${objectKey}`;
@@ -132,6 +138,153 @@ app.post("/api/upload-url", async (c) => {
   }
 });
 
+app.post("/api/stream/direct-upload", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const maxDurationSeconds = Number(body.maxDurationSeconds || 7200);
+    const creator = body.creator || "edunexus";
+
+    if (c.env.STREAM) {
+      const directUpload = await c.env.STREAM.createDirectUpload({
+        maxDurationSeconds,
+        meta: {
+          name: body.name || "EduNexus lesson recording",
+          creator,
+          source: "edunexus-live-class",
+        },
+      });
+      return c.json(directUpload);
+    }
+
+    if (!c.env.CLOUDFLARE_ACCOUNT_ID || !c.env.CLOUDFLARE_API_TOKEN) {
+      return c.json({ error: "Cloudflare Stream is not configured." }, 400);
+    }
+
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/stream/direct_upload`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          maxDurationSeconds,
+          meta: {
+            name: body.name || "EduNexus lesson recording",
+            creator,
+            source: "edunexus-live-class",
+          },
+        }),
+      }
+    );
+
+    const data = await response.json() as CloudflareApiResponse<{ uid: string; uploadURL: string }>;
+    if (!response.ok || !data.success) {
+      return c.json({ error: data.errors?.[0]?.message || "Failed to create Stream upload." }, 500);
+    }
+
+    return c.json(data.result);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to create Stream upload.";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.get("/api/stream/video/:uid", async (c) => {
+  try {
+    const uid = c.req.param("uid");
+    if (!c.env.CLOUDFLARE_ACCOUNT_ID || !c.env.CLOUDFLARE_API_TOKEN) {
+      return c.json({
+        uid,
+        iframeUrl: `https://iframe.videodelivery.net/${uid}`,
+        thumbnailUrl: `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`,
+        status: "unknown",
+      });
+    }
+
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/stream/${uid}`,
+      { headers: { Authorization: `Bearer ${c.env.CLOUDFLARE_API_TOKEN}` } }
+    );
+    const data = await response.json() as CloudflareApiResponse<{
+      duration?: number;
+      thumbnail?: string;
+      playback?: unknown;
+      status?: { state?: string };
+    }>;
+    if (!response.ok || !data.success) {
+      return c.json({ error: data.errors?.[0]?.message || "Failed to fetch Stream video." }, 500);
+    }
+
+    return c.json({
+      uid,
+      status: data.result?.status?.state,
+      duration: data.result?.duration,
+      iframeUrl: `https://iframe.videodelivery.net/${uid}`,
+      thumbnailUrl: data.result?.thumbnail || `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`,
+      playback: data.result?.playback,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to fetch Stream video.";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post("/api/mark-scanned-work", async (c) => {
+  try {
+    const { title, subjectName, gradeLevel, questionText, memoText, studentText, rubric } = await c.req.json();
+
+    const prompt = `You are an experienced South African CAPS teacher and marker.
+Mark the learner's scanned or uploaded work professionally.
+
+Assessment: ${title || "Untitled task"}
+Subject: ${subjectName || "General"}
+Grade: ${gradeLevel || "Not specified"}
+
+Question paper / instructions:
+${questionText || "Not provided"}
+
+Teacher memo / expected answer:
+${memoText || "No memo provided. Infer a fair rubric from the question."}
+
+Rubric:
+${rubric || "Use accuracy, reasoning, evidence, structure, and clarity."}
+
+Learner answer:
+${studentText || "No answer text provided"}
+
+Return ONLY JSON:
+{
+  "mark": number,
+  "maxMark": number,
+  "percentage": number,
+  "level": "Needs support | Developing | Proficient | Excellent",
+  "feedback": "Short learner-friendly feedback",
+  "teacherNotes": "Specific notes for the teacher",
+  "corrections": ["correction 1", "correction 2"],
+  "rubricBreakdown": [{"criterion":"string","mark":number,"comment":"string"}]
+}`;
+
+    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 2048,
+    });
+
+    const content = String(response.response || "").trim();
+    const startIdx = content.indexOf("{");
+    const endIdx = content.lastIndexOf("}");
+    if (startIdx === -1 || endIdx === -1) {
+      return c.json({ error: "AI marker did not return valid JSON.", rawResponse: content }, 500);
+    }
+
+    return c.json(JSON.parse(content.substring(startIdx, endIdx + 1)));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to mark scanned work.";
+    return c.json({ error: message }, 500);
+  }
+});
+
 // Step 2: Upload bytes to R2; Step 3–5: process + embed + Vectorize (async)
 app.put("/api/upload-proxy/:key", async (c) => {
   const key = decodeURIComponent(c.req.param("key"));
@@ -237,9 +390,10 @@ Example: ["id1", "id2", "id3"]`;
       max_tokens: 512,
     });
 
-    const startIdx = response.response.indexOf("[");
-    const endIdx = response.response.lastIndexOf("]");
-    const ids = JSON.parse(response.response.substring(startIdx, endIdx + 1));
+    const content = String(response.response || "");
+    const startIdx = content.indexOf("[");
+    const endIdx = content.lastIndexOf("]");
+    const ids = JSON.parse(content.substring(startIdx, endIdx + 1));
 
     return c.json({ ids });
   } catch (error: unknown) {
@@ -266,9 +420,10 @@ Return as JSON: { "grade": number, "feedback": "string" }`;
       max_tokens: 1024,
     });
 
-    const startIdx = response.response.indexOf("{");
-    const endIdx = response.response.lastIndexOf("}");
-    const result = JSON.parse(response.response.substring(startIdx, endIdx + 1));
+    const content = String(response.response || "");
+    const startIdx = content.indexOf("{");
+    const endIdx = content.lastIndexOf("}");
+    const result = JSON.parse(content.substring(startIdx, endIdx + 1));
 
     return c.json(result);
   } catch (error: unknown) {
@@ -312,7 +467,7 @@ app.post("/api/generate-exam", async (c) => {
       max_tokens: 2048,
     });
 
-    let content = response.response.trim();
+    let content = String(response.response || "").trim();
     const startIdx = content.indexOf("[");
     const endIdx = content.lastIndexOf("]");
 
@@ -353,7 +508,7 @@ app.post("/api/generate-timetable", async (c) => {
       max_tokens: 2560,
     });
 
-    let content = response.response.trim();
+    let content = String(response.response || "").trim();
     const startIdx = content.indexOf("{");
     const endIdx = content.lastIndexOf("}");
 

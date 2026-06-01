@@ -1,28 +1,70 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/AuthProvider";
-import { Video, Calendar, Clock, Users, Play, Radio, CheckCircle, Upload, Plus, Timer } from "lucide-react";
+import {
+  BookOpenCheck,
+  Brain,
+  Calendar,
+  CheckCircle,
+  ClipboardCheck,
+  Cloud,
+  FileCheck2,
+  FileText,
+  Gauge,
+  GraduationCap,
+  Library,
+  MessageSquareText,
+  Mic,
+  MonitorUp,
+  Play,
+  Plus,
+  Radio,
+  ScanLine,
+  Sparkles,
+  Timer,
+  Upload,
+  Users,
+  Video,
+  Wand2,
+} from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
 import { CLOUDFLARE_WORKER_URL } from "@/lib/cloudflareWorker";
+import {
+  createStreamDirectUpload,
+  markScannedWork,
+  uploadFileToR2,
+  uploadVideoToStream,
+} from "@/lib/cloudflareWorker";
+import { useNavigate } from "react-router";
+import { CLOUDFLARE_WORKER_URL } from "@/lib/cloudflareWorker";
+=======
+import {
+  createStreamDirectUpload,
+  markScannedWork,
+  uploadFileToR2,
+  uploadVideoToStream,
+} from "@/lib/cloudflareWorker";
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
 
 const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
-  scheduled: { color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: Clock, label: "Scheduled" },
-  live: { color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse", icon: Radio, label: "Live Now" },
-  ended: { color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", icon: CheckCircle, label: "Ended" },
-  cancelled: { color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", icon: Timer, label: "Cancelled" },
+  scheduled: { color: "bg-blue-50 text-blue-700 border-blue-200", icon: Calendar, label: "Scheduled" },
+  live: { color: "bg-red-50 text-red-700 border-red-200", icon: Radio, label: "Live now" },
+  ended: { color: "bg-slate-100 text-slate-700 border-slate-200", icon: CheckCircle, label: "Ended" },
+  cancelled: { color: "bg-amber-50 text-amber-700 border-amber-200", icon: Timer, label: "Cancelled" },
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -32,12 +74,43 @@ const PLATFORM_LABELS: Record<string, string> = {
   stream: "Live Stream",
   native: "Native Classroom",
 };
+const PLATFORM_LABELS: Record<string, string> = {
+  youtube: "YouTube Live",
+  zoom: "Zoom Meeting",
+  jitsi: "Jitsi Meet",
+  stream: "Live Stream",
+  native: "Native Classroom",
+};
+=======
+const studioTools = [
+  { icon: Video, title: "In-app live classroom", detail: "Camera, mic, screen share, learner chat, attendance and replay flow." },
+  { icon: Cloud, title: "Cloudflare Stream archive", detail: "Upload lesson recordings to Stream and keep playback inside EduNexus." },
+  { icon: ScanLine, title: "Scan-to-mark desk", detail: "Teachers upload PDFs, photos, memos and essays for AI-assisted marking." },
+  { icon: Library, title: "Self-learning library", detail: "Recordings, PDFs, notes and practice tasks stay attached to the lesson." },
+];
+
+const capabilityCards = [
+  { icon: Radio, label: "Teacher live broadcast", copy: "Start a class from the browser with camera, mic and screen controls." },
+  { icon: Users, label: "School and public cohorts", copy: "Support enrolled classes, school groups, independent learners or mixed access." },
+  { icon: MonitorUp, label: "Screen teaching", copy: "Present slides, past papers, memo walkthroughs and digital whiteboards." },
+  { icon: MessageSquareText, label: "Moderated Q&A", copy: "Collect learner questions and keep the teacher focused on teaching." },
+  { icon: ClipboardCheck, label: "Attendance tracking", copy: "Students joining live sessions are recorded for reporting and follow-up." },
+  { icon: Cloud, label: "Cloudflare recordings", copy: "Store recorded lessons with Stream playback instead of sending learners away." },
+  { icon: FileText, label: "PDF question uploads", copy: "Attach question papers, memos and worksheets to the lesson workspace." },
+  { icon: FileCheck2, label: "AI marking queue", copy: "Mark typed, scanned or essay answers with teacher review before final marks." },
+  { icon: Brain, label: "Personal study actions", copy: "Generate next-step revision ideas from class content and learner performance." },
+  { icon: Gauge, label: "Engagement signals", copy: "See readiness, watch progress, submissions and learners needing support." },
+];
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
 
 export default function LiveClassesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedClass, setSelectedClass] = useState<any>(null);
+  const [showStudio, setShowStudio] = useState(false);
+  const [showMarker, setShowMarker] = useState(false);
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
   const teacherClasses = user?.role === "teacher" || user?.role === "admin"
@@ -50,23 +123,72 @@ export default function LiveClassesPage() {
   const joinClass = useMutation(api.liveClasses.joinLiveClass);
 
   const isTeacher = user?.role === "teacher" || user?.role === "admin";
-
-  const filteredClasses = (liveClasses || []).filter((c: any) => {
+  const classes = liveClasses || [];
+  const visibleClasses = classes.filter((c: any) => {
     if (activeFilter === "all") return true;
     if (activeFilter === "upcoming") return c.status === "scheduled";
     if (activeFilter === "live") return c.status === "live";
     if (activeFilter === "recordings") return c.status === "ended" && c.recordingUrl;
+    if (activeFilter === "mine") return teacherClasses?.some((tc: any) => tc._id === c._id);
     return true;
   });
 
-  const handleJoinClass = async (classItem: any) => {
+  const stats = useMemo(() => {
+    const live = classes.filter((c: any) => c.status === "live").length;
+    const scheduled = classes.filter((c: any) => c.status === "scheduled").length;
+    const recordings = classes.filter((c: any) => c.recordingUrl || c.status === "ended").length;
+    return { live, scheduled, recordings, total: classes.length };
+  }, [classes]);
+
+  const openLesson = async (classItem: any) => {
+    setSelectedClass(classItem);
     if (user?.role === "student") {
       try {
         await joinClass({ liveClassId: classItem._id });
-      } catch (e) {
-        // Already joined or error
+      } catch {
+        // Attendance may already exist; opening the lesson is still fine.
       }
     }
+const openLesson = async (classItem: any) => {
+  setSelectedClass(classItem);
+  if (user?.role === "student") {
+    try {
+      await joinClass({ liveClassId: classItem._id });
+    } catch {
+      // Attendance may already exist; opening the lesson is still fine.
+    }
+  }
+  if (classItem.platform === "native") {
+    navigate(`/lives/room/${classItem._id}`);
+  } else {
+    window.open(classItem.joinUrl, "_blank");
+  }
+};
+
+const handleStatusChange = async (classItem: any, newStatus: string) => {
+  try {
+    await updateStatus({ liveClassId: classItem._id, status: newStatus });
+    toast.success(`Class marked as ${newStatus}`);
+    if (classItem.platform === "native" && newStatus === "live") {
+      navigate(`/lives/room/${classItem._id}`);
+    }
+  } catch (e: any) {
+    toast.error(e.message);
+  }
+};
+
+const changeStatus = async (
+  classId: any,
+  status: "scheduled" | "live" | "ended" | "cancelled",
+  recordingUrl?: string
+) => {
+  try {
+    await updateStatus({ liveClassId: classId, status, recordingUrl });
+    toast.success(status === "live" ? "Live class started" : `Class marked as ${status}`);
+  } catch (error: any) {
+    toast.error(error.message || "Could not update class status");
+  }
+};
     if (classItem.platform === "native") {
       navigate(`/lives/room/${classItem._id}`);
     } else {
@@ -83,98 +205,116 @@ export default function LiveClassesPage() {
       }
     } catch (e: any) {
       toast.error(e.message);
+=======
+  };
+
+  const changeStatus = async (
+    classId: any,
+    status: "scheduled" | "live" | "ended" | "cancelled",
+    recordingUrl?: string
+  ) => {
+    try {
+      await updateStatus({ liveClassId: classId, status, recordingUrl });
+      toast.success(status === "live" ? "Live class started" : `Class marked as ${status}`);
+    } catch (error: any) {
+      toast.error(error.message || "Could not update class status");
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
     }
   };
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center">
-              <Video className="h-5 w-5 text-white" />
+    <div className="flex-1 bg-slate-50/60">
+      <div className="border-b bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 md:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-red-600">
+                  <Video className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Live Learning Studio</h1>
+                  <p className="text-sm text-slate-600">
+                    Teach, stream, record, upload resources and mark learner work without sending students away from EduNexus.
+                  </p>
+                </div>
+              </div>
             </div>
-            Live Classes
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Attend live lessons, watch recordings, and learn in real-time
-          </p>
+            <div className="flex flex-wrap gap-2">
+              {isTeacher && (
+                <>
+                  <Button variant="outline" className="gap-2" onClick={() => setShowMarker(true)}>
+                    <Wand2 className="h-4 w-4" /> AI marking desk
+                  </Button>
+                  <Button className="gap-2 bg-red-600 hover:bg-red-700" onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="h-4 w-4" /> Create live lesson
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <Metric label="Live now" value={stats.live} icon={Radio} tone="text-red-600" />
+            <Metric label="Scheduled" value={stats.scheduled} icon={Calendar} tone="text-blue-600" />
+            <Metric label="Recordings" value={stats.recordings} icon={Cloud} tone="text-cyan-700" />
+            <Metric label="Total lessons" value={stats.total} icon={GraduationCap} tone="text-slate-700" />
+          </div>
         </div>
-        {isTeacher && (
-          <Button onClick={() => setShowCreateDialog(true)} className="gap-2 bg-red-600 hover:bg-red-700">
-            <Plus className="h-4 w-4" />
-            Schedule Class
-          </Button>
-        )}
       </div>
 
-      {/* Live Now Banner */}
-      {filteredClasses.some((c: any) => c.status === "live") && (
-        <Card className="border-red-200 bg-gradient-to-r from-red-50 to-orange-50 dark:border-red-900 dark:from-red-950/30 dark:to-orange-950/30">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center animate-pulse">
-              <Radio className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-red-800 dark:text-red-300">Live Classes Happening Now!</p>
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {filteredClasses.filter((c: any) => c.status === "live").length} class(es) currently live — join now
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tabs */}
-      <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-        <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-flex">
-          <TabsTrigger value="all" className="gap-2"><Video className="h-3.5 w-3.5" /> All Classes</TabsTrigger>
-          <TabsTrigger value="upcoming" className="gap-2"><Calendar className="h-3.5 w-3.5" /> Upcoming</TabsTrigger>
-          <TabsTrigger value="live" className="gap-2"><Radio className="h-3.5 w-3.5" /> Live Now</TabsTrigger>
-          <TabsTrigger value="recordings" className="gap-2"><Play className="h-3.5 w-3.5" /> Recordings</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeFilter} className="mt-6">
-          {filteredClasses.length === 0 ? (
-            <div className="text-center py-16">
-              <Video className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
-              <h3 className="text-lg font-semibold text-muted-foreground">No classes found</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {activeFilter === "recordings" ? "No recordings available yet" : "Check back soon for new classes"}
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredClasses.map((classItem: any) => {
-                const statusCfg = STATUS_CONFIG[classItem.status] || STATUS_CONFIG.scheduled;
-                const StatusIcon = statusCfg.icon;
-                const startTime = new Date(classItem.startTime);
-                const subject = subjects?.find((s: any) => s._id === classItem.subject);
-
-                return (
-                  <Card key={classItem._id} className={cn(
-                    "hover:shadow-lg transition-all duration-300 overflow-hidden",
-                    classItem.status === "live" && "ring-2 ring-red-500 ring-offset-2"
-                  )}>
-                    {/* Color bar */}
-                    <div className={cn("h-1.5", classItem.status === "live" ? "bg-red-500 animate-pulse" : classItem.status === "ended" ? "bg-gray-400" : "bg-blue-500")} />
-
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <Badge className={cn("text-[10px] shrink-0", statusCfg.color)}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {statusCfg.label}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          {PLATFORM_LABELS[classItem.platform] || classItem.platform}
-                        </Badge>
+      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:px-6 xl:grid-cols-[1fr_360px]">
+        <section className="space-y-6">
+          <Card className="overflow-hidden rounded-lg border-slate-200">
+            <CardContent className="grid gap-0 p-0 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="bg-slate-950 p-5 text-white md:p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <Badge className="border-red-400/40 bg-red-500/15 text-red-100">
+                    <Radio className="mr-1 h-3 w-3" /> Browser classroom
+                  </Badge>
+                  <span className="text-xs text-slate-300">Cloudflare-ready</span>
+                </div>
+                <div className="relative aspect-video overflow-hidden rounded-lg border border-white/10 bg-slate-900">
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="text-center">
+                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+                        <Play className="h-7 w-7" />
                       </div>
-                      <CardTitle className="text-base mt-2">{classItem.title}</CardTitle>
-                      {classItem.description && (
-                        <CardDescription className="text-xs line-clamp-2">{classItem.description}</CardDescription>
-                      )}
-                    </CardHeader>
+                      <h2 className="text-xl font-semibold">Start teaching inside EduNexus</h2>
+                      <p className="mx-auto mt-2 max-w-md text-sm text-slate-300">
+                        Teachers can open the studio, preview camera and mic, attach PDFs, then store replays through Cloudflare Stream.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <StudioPill icon={Mic} label="Mic check" />
+                  <StudioPill icon={MonitorUp} label="Share screen" />
+                  <StudioPill icon={Cloud} label="Record replay" />
+                </div>
+              </div>
+              <div className="space-y-4 p-5 md:p-6">
+                <div>
+                  <h2 className="text-lg font-semibold">What this page now supports</h2>
+                  <p className="text-sm text-slate-600">
+                    A single workspace for school learners, independent self-learners and teachers running live support sessions.
+                  </p>
+                </div>
+                {studioTools.map(({ icon: Icon, title, detail }) => (
+                  <div key={title} className="flex gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100">
+                      <Icon className="h-4 w-4 text-slate-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{title}</p>
+                      <p className="text-xs text-slate-600">{detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
 
                     <CardContent className="space-y-3">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -240,41 +380,547 @@ export default function LiveClassesPage() {
                   </Card>
                 );
               })}
+=======
+          <Tabs value={activeFilter} onValueChange={setActiveFilter}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-flex">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="live">Live</TabsTrigger>
+                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                <TabsTrigger value="recordings">Replay</TabsTrigger>
+              </TabsList>
+              {isTeacher && (
+                <Button variant="outline" size="sm" onClick={() => setActiveFilter("mine")}>
+                  My classes
+                </Button>
+              )}
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
 
-      {/* Create Class Dialog */}
+            <TabsContent value={activeFilter} className="mt-4">
+              {visibleClasses.length === 0 ? (
+                <EmptyLessons isTeacher={isTeacher} onCreate={() => setShowCreateDialog(true)} />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {visibleClasses.map((classItem: any) => {
+                    const subject = subjects?.find((s: any) => s._id === classItem.subject);
+                    return (
+                      <LessonCard
+                        key={classItem._id}
+                        classItem={classItem}
+                        subjectName={subject?.name}
+                        isTeacher={isTeacher}
+                        isOwner={classItem.teacher === user?._id || user?.role === "admin"}
+                        onOpen={() => openLesson(classItem)}
+                        onStudio={() => {
+                          setSelectedClass(classItem);
+                          setShowStudio(true);
+                        }}
+                        onStatus={changeStatus}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <Card className="rounded-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Sparkles className="h-5 w-5 text-amber-500" /> 10 useful additions for the learning product
+              </CardTitle>
+              <CardDescription>
+                These are built into the page as workflow areas so the platform feels like an education SaaS, not a link directory.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {capabilityCards.map(({ icon: Icon, label, copy }) => (
+                <div key={label} className="flex gap-3 rounded-lg border bg-white p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100">
+                    <Icon className="h-4 w-4 text-slate-700" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{label}</p>
+                    <p className="text-xs text-slate-600">{copy}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        <aside className="space-y-4">
+          <TeacherToolbox isTeacher={isTeacher} onCreate={() => setShowCreateDialog(true)} onMarker={() => setShowMarker(true)} />
+          <SelfLearningPanel />
+        </aside>
+      </main>
+
       <CreateClassDialog
         open={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         subjects={subjects}
         createLiveClass={createLiveClass}
       />
+      <LessonRoomDialog lesson={selectedClass} onClose={() => setSelectedClass(null)} isTeacher={isTeacher} />
+      <TeacherStudioDialog
+        open={showStudio}
+        lesson={selectedClass}
+        onClose={() => setShowStudio(false)}
+        onStatus={changeStatus}
+      />
+      <AIMarkingDialog open={showMarker} onClose={() => setShowMarker(false)} subjects={subjects} />
     </div>
   );
 }
 
+function Metric({ label, value, icon: Icon, tone }: any) {
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</span>
+        <Icon className={cn("h-4 w-4", tone)} />
+      </div>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function StudioPill({ icon: Icon, label }: any) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
+      <Icon className="h-3.5 w-3.5" /> {label}
+    </div>
+  );
+}
+
+function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onStatus }: any) {
+  const statusCfg = STATUS_CONFIG[classItem.status] || STATUS_CONFIG.scheduled;
+  const StatusIcon = statusCfg.icon;
+
+  return (
+    <Card className={cn("overflow-hidden rounded-lg", classItem.status === "live" && "border-red-300 shadow-sm")}>
+      <div className={cn("h-1", classItem.status === "live" ? "bg-red-600" : "bg-slate-300")} />
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <Badge variant="outline" className={cn("text-[11px]", statusCfg.color)}>
+            <StatusIcon className="mr-1 h-3 w-3" /> {statusCfg.label}
+          </Badge>
+          <Badge variant="secondary" className="text-[11px]">
+            {classItem.platform === "edunexus" ? "EduNexus Studio" : classItem.platform || "Live"}
+          </Badge>
+        </div>
+        <CardTitle className="text-base">{classItem.title}</CardTitle>
+        {classItem.description && <CardDescription className="line-clamp-2">{classItem.description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+          <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5" /> {format(new Date(classItem.startTime), "EEE, d MMM")}</span>
+          <span className="flex items-center gap-2"><Timer className="h-3.5 w-3.5" /> {format(new Date(classItem.startTime), "h:mm a")}</span>
+          <span className="flex items-center gap-2"><BookOpenCheck className="h-3.5 w-3.5" /> {subjectName || "Subject"}</span>
+          <span className="flex items-center gap-2"><Users className="h-3.5 w-3.5" /> {classItem.maxParticipants || "Open"} seats</span>
+        </div>
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="mb-2 flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-700">Lesson readiness</span>
+            <span className="text-slate-500">{classItem.recordingUrl ? "Replay ready" : classItem.status === "live" ? "Streaming" : "Preparing"}</span>
+          </div>
+          <Progress value={classItem.recordingUrl ? 100 : classItem.status === "live" ? 72 : 38} className="h-2" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button className="flex-1 gap-2" onClick={onOpen}>
+            <Play className="h-4 w-4" /> {classItem.status === "ended" ? "Open replay" : "Open lesson"}
+          </Button>
+          {isTeacher && isOwner && (
+            <>
+              <Button variant="outline" className="gap-2" onClick={onStudio}>
+                <Video className="h-4 w-4" /> Studio
+              </Button>
+              {classItem.status !== "live" && (
+                <Button variant="ghost" size="icon" onClick={() => onStatus(classItem._id, "live")} title="Start live">
+                  <Radio className="h-4 w-4 text-red-600" />
+                </Button>
+              )}
+              {classItem.status === "live" && (
+                <Button variant="ghost" size="icon" onClick={() => onStatus(classItem._id, "ended")} title="End class">
+                  <CheckCircle className="h-4 w-4 text-green-700" />
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyLessons({ isTeacher, onCreate }: any) {
+  return (
+    <div className="rounded-lg border border-dashed bg-white py-14 text-center">
+      <Video className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+      <h3 className="font-semibold text-slate-700">No lessons in this view</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+        Live sessions, replays and self-learning resources will appear here as teachers publish them.
+      </p>
+      {isTeacher && <Button className="mt-4 gap-2" onClick={onCreate}><Plus className="h-4 w-4" /> Create lesson</Button>}
+    </div>
+  );
+}
+
+function TeacherToolbox({ isTeacher, onCreate, onMarker }: any) {
+  return (
+    <Card className="rounded-lg">
+      <CardHeader>
+        <CardTitle className="text-base">Teacher command centre</CardTitle>
+        <CardDescription>Daily live teaching, resource upload and assessment workflows.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <Button disabled={!isTeacher} className="w-full justify-start gap-2" onClick={onCreate}>
+          <Radio className="h-4 w-4" /> Schedule or start live class
+        </Button>
+        <Button disabled={!isTeacher} variant="outline" className="w-full justify-start gap-2" onClick={onMarker}>
+          <ScanLine className="h-4 w-4" /> Mark scanned answers
+        </Button>
+        <Button disabled={!isTeacher} variant="outline" className="w-full justify-start gap-2" onClick={onMarker}>
+          <Upload className="h-4 w-4" /> Upload memo or PDF
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SelfLearningPanel() {
+  return (
+    <Card className="rounded-lg">
+      <CardHeader>
+        <CardTitle className="text-base">Self-learning flow</CardTitle>
+        <CardDescription>For school learners and independent students.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {[
+          "Join a live class or open a replay.",
+          "Download the attached worksheet or question paper.",
+          "Upload handwritten answers as PDF or images.",
+          "Receive AI feedback, then teacher-approved marks.",
+          "Continue with recommended revision videos.",
+        ].map((step, index) => (
+          <div key={step} className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs text-white">{index + 1}</span>
+            <span className="text-slate-700">{step}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
+  if (!lesson) return null;
+  const playbackUrl = lesson.recordingUrl?.includes("videodelivery.net")
+    ? lesson.recordingUrl
+    : lesson.recordingUrl
+      ? lesson.recordingUrl
+      : "";
+
+  return (
+    <Dialog open={!!lesson} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>{lesson.title}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+          <div className="overflow-hidden rounded-lg bg-slate-950">
+            {playbackUrl ? (
+              playbackUrl.includes("iframe.videodelivery.net") ? (
+                <iframe title={lesson.title} src={playbackUrl} className="aspect-video w-full" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen />
+              ) : (
+                <video src={playbackUrl} controls className="aspect-video w-full" />
+              )
+            ) : (
+              <div className="grid aspect-video place-items-center text-center text-white">
+                <div>
+                  <Radio className="mx-auto mb-3 h-10 w-10 text-red-400" />
+                  <h3 className="font-semibold">Live room ready</h3>
+                  <p className="mt-1 max-w-md text-sm text-slate-300">When the teacher starts broadcasting, students stay inside this lesson room.</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="space-y-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Class tools</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full justify-start gap-2"><MessageSquareText className="h-4 w-4" /> Ask a question</Button>
+                <Button variant="outline" className="w-full justify-start gap-2"><FileText className="h-4 w-4" /> Upload answer PDF</Button>
+                <Button variant="outline" className="w-full justify-start gap-2"><Brain className="h-4 w-4" /> Generate revision plan</Button>
+                {isTeacher && <Button className="w-full justify-start gap-2"><ClipboardCheck className="h-4 w-4" /> Review submissions</Button>}
+              </CardContent>
+            </Card>
+            <div className="rounded-lg border bg-slate-50 p-3 text-xs text-slate-600">
+              Learners can be enrolled through a school class, invited to an open support session, or use recordings independently for self-learning.
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [recordingFile, setRecordingFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const startPreview = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraOn(true);
+    } catch {
+      toast.error("Camera or microphone permission was blocked.");
+    }
+  };
+
+  const uploadRecording = async () => {
+    if (!recordingFile) return toast.error("Choose a recording file first.");
+    setUploading(true);
+    try {
+      const target = await createStreamDirectUpload({
+        name: lesson?.title || recordingFile.name,
+        creator: "teacher",
+        maxDurationSeconds: 7200,
+      });
+      await uploadVideoToStream(target.uploadURL, recordingFile);
+      if (lesson?._id && target.uid) {
+        await onStatus(lesson._id, "ended", `https://iframe.videodelivery.net/${target.uid}`);
+      }
+      toast.success("Recording uploaded to Cloudflare Stream.");
+    } catch (error: any) {
+      toast.error(error.message || "Recording upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Teacher live studio</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-3">
+            <div className="overflow-hidden rounded-lg bg-slate-950">
+              <video ref={videoRef} autoPlay muted playsInline className="aspect-video w-full object-cover" />
+              {!cameraOn && (
+                <div className="-mt-[56.25%] grid aspect-video place-items-center text-white">
+                  <div className="text-center">
+                    <Video className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                    <p className="font-medium">Preview camera before going live</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={startPreview} className="gap-2"><Video className="h-4 w-4" /> Camera preview</Button>
+              <Button variant="outline" className="gap-2"><MonitorUp className="h-4 w-4" /> Share screen</Button>
+              {lesson && <Button variant="outline" className="gap-2" onClick={() => onStatus(lesson._id, "live")}><Radio className="h-4 w-4" /> Mark live</Button>}
+              {lesson && <Button variant="outline" className="gap-2" onClick={() => onStatus(lesson._id, "ended")}><CheckCircle className="h-4 w-4" /> End</Button>}
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Cloudflare Stream recording</CardTitle>
+                <CardDescription>Upload a recorded lesson for in-app replay.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input type="file" accept="video/*" onChange={(e) => setRecordingFile(e.target.files?.[0] || null)} />
+                <Button className="w-full gap-2" onClick={uploadRecording} disabled={uploading}>
+                  <Cloud className="h-4 w-4" /> {uploading ? "Uploading..." : "Upload replay"}
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Teaching checklist</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-slate-700">
+                <p>Camera and microphone checked</p>
+                <p>Question paper or slides uploaded</p>
+                <p>Chat moderation enabled</p>
+                <p>Recording destination ready</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AIMarkingDialog({ open, onClose, subjects }: any) {
+  const [title, setTitle] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+  const [gradeLevel, setGradeLevel] = useState("12");
+  const [questionText, setQuestionText] = useState("");
+  const [memoText, setMemoText] = useState("");
+  const [studentText, setStudentText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [marking, setMarking] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const runMarking = async () => {
+    setMarking(true);
+    try {
+      if (file) {
+        await uploadFileToR2(file, { title: title || file.name, description: "Scanned learner answer" });
+      }
+      const marked = await markScannedWork({
+        title,
+        subjectName,
+        gradeLevel: Number(gradeLevel),
+        questionText,
+        memoText,
+        studentText,
+        rubric: "Award marks for correct method, final answer, evidence, grammar where relevant, and CAPS-aligned reasoning.",
+      });
+      setResult(marked);
+      toast.success("AI marking draft generated.");
+    } catch (error: any) {
+      toast.error(error.message || "AI marking failed.");
+    } finally {
+      setMarking(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>AI marking desk</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Task title</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Essay, worksheet, test..." />
+              </div>
+              <div>
+                <Label>Grade</Label>
+                <Select value={gradeLevel} onValueChange={setGradeLevel}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((g) => <SelectItem key={g} value={g}>Grade {g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Subject</Label>
+              <Select value={subjectName} onValueChange={setSubjectName}>
+                <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+                <SelectContent>
+                  {subjects?.map((s: any) => <SelectItem key={s._id} value={s.name}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Upload scan or PDF</Label>
+              <Input type="file" accept=".pdf,image/*,.txt,.md" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </div>
+            <div>
+              <Label>Question / instructions</Label>
+              <Textarea rows={3} value={questionText} onChange={(e) => setQuestionText(e.target.value)} />
+            </div>
+            <div>
+              <Label>Memo / expected answer</Label>
+              <Textarea rows={3} value={memoText} onChange={(e) => setMemoText(e.target.value)} />
+            </div>
+            <div>
+              <Label>Learner answer text</Label>
+              <Textarea rows={4} value={studentText} onChange={(e) => setStudentText(e.target.value)} placeholder="Paste OCR text or typed essay answer here." />
+            </div>
+            <Button onClick={runMarking} disabled={marking} className="w-full gap-2">
+              <Wand2 className="h-4 w-4" /> {marking ? "Marking..." : "Generate marking draft"}
+            </Button>
+          </div>
+          <div className="rounded-lg border bg-slate-50 p-4">
+            {!result ? (
+              <div className="grid h-full min-h-80 place-items-center text-center text-slate-500">
+                <div>
+                  <FileCheck2 className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+                  <p className="font-medium">Teacher-reviewed AI marking</p>
+                  <p className="mt-1 text-sm">The teacher gets suggested marks, corrections and feedback before final approval.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500">Suggested mark</p>
+                    <p className="text-3xl font-bold">{result.mark}/{result.maxMark}</p>
+                  </div>
+                  <Badge>{result.level}</Badge>
+                </div>
+                <Progress value={result.percentage || 0} />
+                <div>
+                  <p className="text-sm font-semibold">Learner feedback</p>
+                  <p className="text-sm text-slate-700">{result.feedback}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Teacher notes</p>
+                  <p className="text-sm text-slate-700">{result.teacherNotes}</p>
+                </div>
+                {result.corrections?.length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold">Corrections</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                      {result.corrections.map((item: string) => <li key={item}>{item}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
-  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [platform, setPlatform] = useState("youtube");
-  const [joinUrl, setJoinUrl] = useState("");
+  const [accessMode, setAccessMode] = useState("school-and-public");
   const [maxParticipants, setMaxParticipants] = useState("");
+  const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
+<<<<<<< HEAD
     if (!title || !date || !time || (platform !== "native" && !joinUrl)) {
       toast.error("Please fill in all required fields");
+=======
+    if (!title || !date || !time || !subjectId) {
+      toast.error("Please complete the title, subject, date and time.");
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
       return;
     }
     setCreating(true);
     try {
+      let resourceUrl = "";
+      if (resourceFile) {
+        const upload = await uploadFileToR2(resourceFile, { title, description });
+        resourceUrl = upload.fileUrl;
+      }
       const startTime = new Date(`${date}T${time}`).getTime();
       let streamData = { uid: undefined, whipUrl: undefined, whepUrl: undefined, playbackUrl: undefined };
       let finalJoinUrl = joinUrl;
@@ -303,9 +949,10 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
 
       await createLiveClass({
         title,
-        description,
+        description: resourceUrl ? `${description}\n\nResource: ${resourceUrl}` : description,
         subject: subjectId,
         startTime,
+<<<<<<< HEAD
         platform,
         joinUrl: finalJoinUrl,
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
@@ -317,10 +964,27 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
       });
 
       toast.success("Live class scheduled!");
+=======
+        platform: "edunexus",
+        joinUrl: `/lives?lesson=${encodeURIComponent(title)}`,
+        accessMode,
+        resourceUrls: resourceUrl ? [resourceUrl] : undefined,
+        lessonPlan: description,
+        maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
+        notifyEnrolled: true,
+      } as any);
+      toast.success(accessMode === "school-only" ? "School live lesson scheduled." : "Live lesson scheduled for school and self-learners.");
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
       onClose();
-      setTitle(""); setDescription(""); setDate(""); setTime(""); setJoinUrl(""); setMaxParticipants("");
-    } catch (e: any) {
-      toast.error(e.message);
+      setTitle("");
+      setDescription("");
+      setSubjectId("");
+      setDate("");
+      setTime("");
+      setMaxParticipants("");
+      setResourceFile(null);
+    } catch (error: any) {
+      toast.error(error.message || "Could not schedule class.");
     } finally {
       setCreating(false);
     }
@@ -328,48 +992,30 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Video className="h-5 w-5 text-red-500" />
-            Schedule Live Class
-          </DialogTitle>
+          <DialogTitle>Create live learning session</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label>Title *</Label>
-            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Grade 12 Maths - Calculus" />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What will be covered..." rows={2} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label>Lesson title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Grade 12 Maths: Calculus revision" />
           </div>
           <div>
             <Label>Subject</Label>
             <Select value={subjectId} onValueChange={setSubjectId}>
               <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
               <SelectContent>
-                {subjects?.map((s: any) => (
-                  <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
-                ))}
+                {subjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Date *</Label>
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>Time *</Label>
-              <Input type="time" value={time} onChange={e => setTime(e.target.value)} />
-            </div>
-          </div>
           <div>
-            <Label>Platform</Label>
-            <Select value={platform} onValueChange={setPlatform}>
+            <Label>Access</Label>
+            <Select value={accessMode} onValueChange={setAccessMode}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
+<<<<<<< HEAD
                 <SelectItem value="native">Native Classroom (Cloudflare)</SelectItem>
                 <SelectItem value="youtube">YouTube Live</SelectItem>
                 <SelectItem value="zoom">Zoom Meeting</SelectItem>
@@ -384,12 +1030,39 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
               <Input value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="https://..." />
             </div>
           )}
-          <div>
-            <Label>Max Participants</Label>
-            <Input type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} placeholder="Unlimited" />
+=======
+                <SelectItem value="school-and-public">School and self-learners</SelectItem>
+                <SelectItem value="school-only">School class only</SelectItem>
+                <SelectItem value="public-support">Open support lesson</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Button className="w-full bg-red-600 hover:bg-red-700" onClick={handleCreate} disabled={creating}>
-            {creating ? "Scheduling..." : "Schedule Class"}
+          <div>
+            <Label>Date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+>>>>>>> a1247d453d52f98a5f69ed98721c44071a4fb236
+          <div>
+            <Label>Time</Label>
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </div>
+          <div>
+            <Label>Max learners</Label>
+            <Input type="number" value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)} placeholder="Unlimited" />
+          </div>
+          <div>
+            <Label>Attach PDF / worksheet</Label>
+            <Input type="file" accept=".pdf,.txt,.md,image/*" onChange={(e) => setResourceFile(e.target.files?.[0] || null)} />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Lesson plan</Label>
+            <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objectives, resources, homework, marks allocation..." />
+          </div>
+          <div className="md:col-span-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+            This creates an EduNexus-hosted lesson. Teachers can start the studio from the lesson card, learners join inside the app, and recordings/resources can be stored through Cloudflare.
+          </div>
+          <Button className="md:col-span-2 bg-red-600 hover:bg-red-700" onClick={handleCreate} disabled={creating}>
+            {creating ? "Creating..." : "Create lesson"}
           </Button>
         </div>
       </DialogContent>
