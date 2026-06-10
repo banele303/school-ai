@@ -35,3 +35,46 @@ export const upsertAdmin = mutation({
     return { created: true, userId, email };
   },
 });
+
+export const upsertCurrentAcademicYear = mutation({
+  args: {
+    name: v.optional(v.string()),
+    fromYear: v.optional(v.string()),
+    toYear: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const name = args.name || "2026 Academic Year";
+    const fromYear = args.fromYear || "2026";
+    const toYear = args.toYear || "2026";
+
+    const years = await ctx.db.query("academicYears").collect();
+    const matchingYear = years.find(
+      (year) => year.fromYear === fromYear && year.toYear === toYear
+    );
+
+    for (const year of years) {
+      if (year.isCurrent && year._id !== matchingYear?._id) {
+        await ctx.db.patch(year._id, { isCurrent: false });
+      }
+    }
+
+    if (matchingYear) {
+      await ctx.db.patch(matchingYear._id, {
+        name,
+        fromYear,
+        toYear,
+        isCurrent: true,
+      });
+      return { created: false, yearId: matchingYear._id, name };
+    }
+
+    const yearId = await ctx.db.insert("academicYears", {
+      name,
+      fromYear,
+      toYear,
+      isCurrent: true,
+    });
+
+    return { created: true, yearId, name };
+  },
+});
