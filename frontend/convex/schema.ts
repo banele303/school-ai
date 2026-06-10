@@ -485,6 +485,14 @@ export default defineSchema({
     platform: v.string(),
     joinUrl: v.string(),
     recordingUrl: v.optional(v.string()),
+    streamInputId: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    whepUrl: v.optional(v.string()),
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
     streamVideoUid: v.optional(v.string()),
     playbackUrl: v.optional(v.string()),
     roomId: v.optional(v.string()),
@@ -520,6 +528,23 @@ export default defineSchema({
     .index("by_student", ["student"]),
 
   // ─── VIDEO LIBRARY ─────────────────────────────────────────────
+
+  liveClassChatMessages: defineTable({
+    liveClass: v.id("liveClasses"),
+    sender: v.id("users"),
+    senderName: v.string(),
+    senderRole: v.optional(v.string()),
+    content: v.string(),
+    createdAt: v.number(),
+  }).index("by_class", ["liveClass"]),
+
+  liveClassRaisedHands: defineTable({
+    liveClass: v.id("liveClasses"),
+    student: v.id("users"),
+    studentName: v.string(),
+    raisedAt: v.number(),
+  }).index("by_class", ["liveClass"])
+    .index("by_student_class", ["student", "liveClass"]),
 
   videoLibrary: defineTable({
     title: v.string(),

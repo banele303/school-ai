@@ -3,17 +3,16 @@ import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/hooks/AuthProvider";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, PhoneOff, 
   Send, Users, MessageSquare, Settings, Volume2, VolumeX, 
-  Sparkles, Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle
+  Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle, Hand
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -26,13 +25,12 @@ export default function LiveRoomPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Queries
-// @ts-ignore
-  const classItem = useQuery(api.liveClasses.getLiveClasses, {}).find((c: any) => c._id === id);
-// @ts-ignore
-  const chatMessages = useQuery(api.liveClasses.getLiveChatMessages, { liveClassId: id as any }) || [];
-// @ts-ignore
-  const raisedHands = useQuery(api.liveClasses.getRaisedHands, { liveClassId: id as any }) || [];
+  const liveClasses = useQuery(api.liveClasses.getLiveClasses, {}) || [];
+// @ts-ignore generated Convex types update after codegen
+  const chatMessages = useQuery(api.liveClasses.getLiveChatMessages, id ? { liveClassId: id as any } : "skip") || [];
+// @ts-ignore generated Convex types update after codegen
+  const raisedHands = useQuery(api.liveClasses.getRaisedHands, id ? { liveClassId: id as any } : "skip") || [];
+  const classItem = liveClasses.find((c: any) => c._id === id);
 
   // Mutations
 // @ts-ignore
@@ -55,7 +53,6 @@ export default function LiveRoomPage() {
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [playerVolume, setPlayerVolume] = useState(0.8);
   const [streamActive, setStreamActive] = useState(false);
-  const [latencyMode, setLatencyMode] = useState<"webrtc" | "hls">("webrtc");
   const [showSettings, setShowSettings] = useState(false);
   const [devices, setDevices] = useState<{ video: MediaDeviceInfo[]; audio: MediaDeviceInfo[] }>({ video: [], audio: [] });
   const [selectedVideoDevice, setSelectedVideoDevice] = useState("");
@@ -66,10 +63,6 @@ export default function LiveRoomPage() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const whipSessionUrlRef = useRef<string>("");
-  const studentPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const whepSessionUrlRef = useRef<string>("");
   const prevRaisedCountRef = useRef(0);
   const hlsPlayerRef = useRef<Hls | null>(null);
 
@@ -100,9 +93,7 @@ export default function LiveRoomPage() {
   useEffect(() => {
     if (isTeacher && raisedHands.length > prevRaisedCountRef.current) {
       const newestHand = raisedHands[raisedHands.length - 1];
-      toast.success(`${newestHand.studentName} raised their hand ✋`, {
-        icon: "✋",
-      });
+      toast.success(`${newestHand.studentName} raised their hand`);
       playHandRaiseChime();
     }
     prevRaisedCountRef.current = raisedHands.length;
@@ -141,18 +132,10 @@ export default function LiveRoomPage() {
       setStreamActive(false);
       teardownStudentPlayer();
     }
-  }, [isTeacher, classItem?.status, latencyMode, classItem?.whepUrl, classItem?.playbackUrl]);
+  }, [isTeacher, classItem?.status, classItem?.playbackUrl]);
 
   // Teardown student player
   const teardownStudentPlayer = () => {
-    if (whepSessionUrlRef.current) {
-      fetch(whepSessionUrlRef.current, { method: "DELETE" }).catch(() => {});
-      whepSessionUrlRef.current = "";
-    }
-    if (studentPeerConnectionRef.current) {
-      studentPeerConnectionRef.current.close();
-      studentPeerConnectionRef.current = null;
-    }
     if (hlsPlayerRef.current) {
       hlsPlayerRef.current.destroy();
       hlsPlayerRef.current = null;
@@ -163,76 +146,18 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Setup Student Video Player (WebRTC WHEP or fallback HLS)
+  // Setup Student Video Player (Cloudflare HLS playback)
   const setupStudentPlayer = async () => {
     teardownStudentPlayer();
     if (!remoteVideoRef.current || !classItem) return;
 
-    // Direct Simulated/Mock playback handling
-    const isMock = classItem.streamInputId?.startsWith("mock_") || !classItem.whipUrl;
-
-    if (isMock) {
-      // Use demo loop stream for mocking
-      const mockHlsUrl = "https://customer-f3ipa7caxtjh5421.cloudflarestream.com/6b56be0b0a668d6a0a09f3e3e07080f5/manifest/video.m3u8";
-      playHls(mockHlsUrl);
+    if (classItem.playbackUrl) {
+      playHls(classItem.playbackUrl);
       return;
     }
 
-    if (latencyMode === "webrtc" && classItem.whepUrl) {
-      try {
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-        });
-        studentPeerConnectionRef.current = pc;
-
-        // In WHEP, we request video & audio tracks
-        pc.addTransceiver("video", { direction: "recvonly" });
-        pc.addTransceiver("audio", { direction: "recvonly" });
-
-        pc.ontrack = (event) => {
-          if (remoteVideoRef.current && event.streams[0]) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Gather ICE
-        await new Promise<void>((resolve) => {
-          if (pc.iceGatheringState === "complete") resolve();
-          else {
-            const checkState = () => {
-              if (pc.iceGatheringState === "complete") {
-                pc.removeEventListener("icegatheringstatechange", checkState);
-                resolve();
-              }
-            };
-            pc.addEventListener("icegatheringstatechange", checkState);
-          }
-        });
-
-        const finalOffer = pc.localDescription;
-        if (!finalOffer) throw new Error("Offer failed");
-
-        const res = await fetch(classItem.whepUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: finalOffer.sdp,
-        });
-
-        if (!res.ok) throw new Error("WHEP remote offer failed");
-
-        whepSessionUrlRef.current = res.headers.get("Location") || "";
-        const answer = await res.text();
-        await pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: answer }));
-      } catch (err) {
-        console.warn("WHEP connection failed, falling back to HLS", err);
-        setLatencyMode("hls");
-      }
-    } else if (classItem.playbackUrl) {
-      playHls(classItem.playbackUrl);
-    }
+    const fallbackHlsUrl = "https://videodelivery.net/6b56be0b0a668d6a0a09f3e3e07080f5/manifest/video.m3u8";
+    playHls(fallbackHlsUrl);
   };
 
   const playHls = (url: string) => {
@@ -296,79 +221,30 @@ export default function LiveRoomPage() {
 
     setIsBroadcasting(true);
     try {
-      // Check if we have local media tracks
       if (!localStreamRef.current) {
         await startPreview();
-      }
-
-      const mediaStream = localStreamRef.current;
-      if (!mediaStream) throw new Error("No media stream available");
-
-      // Verify Cloudflare WHIP URL
-      const isMock = classItem.streamInputId?.startsWith("mock_") || !classItem.whipUrl;
-
-      if (!isMock && classItem.whipUrl) {
-        // Establish WebRTC connection to Cloudflare WHIP
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-        });
-        peerConnectionRef.current = pc;
-
-        mediaStream.getTracks().forEach((track) => {
-          pc.addTrack(track, mediaStream);
-        });
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Gather ICE
-        await new Promise<void>((resolve) => {
-          if (pc.iceGatheringState === "complete") resolve();
-          else {
-            const checkState = () => {
-              if (pc.iceGatheringState === "complete") {
-                pc.removeEventListener("icegatheringstatechange", checkState);
-                resolve();
-              }
-            };
-            pc.addEventListener("icegatheringstatechange", checkState);
-          }
-        });
-
-        const finalOffer = pc.localDescription;
-        if (!finalOffer) throw new Error("Offer failed");
-
-        const res = await fetch(classItem.whipUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: finalOffer.sdp,
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Ingest server rejected: ${text}`);
-        }
-
-        whipSessionUrlRef.current = res.headers.get("Location") || "";
-        const answer = await res.text();
-        await pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: answer }));
-      } else {
-        toast.info("Mock Streaming Mode: Direct loopback active.");
       }
 
       // Update Convex status
       await startNativeLiveClass({
         liveClassId: id as any,
-        whipUrl: classItem.whipUrl || "",
-        whepUrl: classItem.whepUrl || "",
+        rtmpsUrl: classItem.rtmpsUrl || "",
+        streamKey: classItem.streamKey || "",
+        srtUrl: classItem.srtUrl || "",
+        srtStreamId: classItem.srtStreamId || "",
+        srtPassphrase: classItem.srtPassphrase || "",
         playbackUrl: classItem.playbackUrl || "",
         streamInputId: classItem.streamInputId || `mock_${id}`,
       });
 
-      toast.success("You are live! Students are being notified.");
+      if (classItem.rtmpsUrl && classItem.streamKey) {
+        toast.success("Class is live. Start sending video from OBS to Cloudflare.");
+      } else {
+        toast.success("Class is live in EduNexus fallback mode.");
+      }
     } catch (err: any) {
       setIsBroadcasting(false);
-      toast.error(`Failed to publish stream: ${err.message}`);
+      toast.error(`Failed to start class: ${err.message}`);
     }
   };
 
@@ -376,14 +252,6 @@ export default function LiveRoomPage() {
   const handleEndStream = async () => {
     setIsBroadcasting(false);
     try {
-      if (whipSessionUrlRef.current) {
-        await fetch(whipSessionUrlRef.current, { method: "DELETE" }).catch(() => {});
-        whipSessionUrlRef.current = "";
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
@@ -489,6 +357,16 @@ export default function LiveRoomPage() {
       }
     } catch (err: any) {
       toast.error(err.message);
+    }
+  };
+
+  const copyText = async (label: string, value?: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error(`Could not copy ${label.toLowerCase()}`);
     }
   };
 
@@ -658,7 +536,7 @@ export default function LiveRoomPage() {
                     {/* Custom student overlays */}
                     <div className="absolute top-4 left-4 flex gap-2">
                       <Badge className="bg-zinc-900/80 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
-                        Stream: {latencyMode === "webrtc" ? "Ultra-Low Latency (WebRTC)" : "Standard Live (HLS)"}
+                        Stream: Cloudflare HLS
                       </Badge>
                     </div>
 
@@ -690,17 +568,6 @@ export default function LiveRoomPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {classItem.playbackUrl && (
-                          <Button
-                            variant="ghost"
-                            className="text-xs text-zinc-300 h-8 px-2 hover:bg-white/10 hover:text-white"
-                            onClick={() => {
-                              setLatencyMode(latencyMode === "webrtc" ? "hls" : "webrtc");
-                            }}
-                          >
-                            Switch to {latencyMode === "webrtc" ? "HLS" : "Low Latency"}
-                          </Button>
-                        )}
                         <Badge variant="outline" className="text-[10px] border-zinc-800 bg-red-950/20 text-red-500">
                           LIVE
                         </Badge>
@@ -732,6 +599,62 @@ export default function LiveRoomPage() {
               </>
             )}
           </div>
+
+          {isTeacher && classItem.status !== "ended" && (
+            <Card className="w-full max-w-4xl mt-4 bg-zinc-900 border border-zinc-800 text-zinc-200">
+              <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-red-600 text-white">Cloudflare Stream</Badge>
+                    <span className="text-xs text-zinc-500">Automatic recording enabled</span>
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-300">
+                    {classItem.rtmpsUrl && classItem.streamKey
+                      ? "Start your encoder with the RTMPS server and stream key, then keep chat and questions here."
+                      : "Cloudflare live input is not configured for this lesson. EduNexus classroom tools still work."}
+                  </p>
+                  {classItem.rtmpsUrl && (
+                    <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)}
+                        className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-zinc-700"
+                      >
+                        <span className="block text-zinc-500">RTMPS server</span>
+                        <span className="mt-1 block truncate font-mono text-zinc-200">{classItem.rtmpsUrl}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyText("Stream key", classItem.streamKey)}
+                        className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-zinc-700"
+                      >
+                        <span className="block text-zinc-500">Stream key</span>
+                        <span className="mt-1 block truncate font-mono text-zinc-200">{classItem.streamKey}</span>
+                      </button>
+                      {classItem.srtUrl && (
+                        <button
+                          type="button"
+                          onClick={() => copyText("SRT URL", classItem.srtUrl)}
+                          className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-zinc-700 md:col-span-2"
+                        >
+                          <span className="block text-zinc-500">SRT URL</span>
+                          <span className="mt-1 block truncate font-mono text-zinc-200">{classItem.srtUrl}</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <Button variant="outline" className="border-zinc-800 bg-zinc-950 text-zinc-200 hover:bg-zinc-800" onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)} disabled={!classItem.rtmpsUrl}>
+                    Copy server
+                  </Button>
+                  <Button variant="outline" className="border-zinc-800 bg-zinc-950 text-zinc-200 hover:bg-zinc-800" onClick={() => copyText("Stream key", classItem.streamKey)} disabled={!classItem.streamKey}>
+                    Copy key
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Teacher Device Settings Drawer (shows if toggled) */}
           {isTeacher && showSettings && (
@@ -785,7 +708,7 @@ export default function LiveRoomPage() {
                     : "bg-zinc-800 hover:bg-zinc-700 text-white"
                 )}
               >
-                <span>✋</span>
+                <Hand className="h-4 w-4" />
                 {myHandRaised ? "Lower Hand" : "Raise Hand"}
               </Button>
             </div>
@@ -902,7 +825,7 @@ export default function LiveRoomPage() {
                 <div className="mb-6 flex-1">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                      <span>✋</span>
+                      <Hand className="h-3.5 w-3.5" />
                       Raised Hands Queue
                     </h3>
                     {isTeacher && raisedHands.length > 0 && (
@@ -924,7 +847,7 @@ export default function LiveRoomPage() {
 
                   {raisedHands.length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-6 border border-dashed border-zinc-900 rounded-xl text-center bg-zinc-900/10 min-h-[140px]">
-                      <span className="text-2xl mb-1 text-zinc-650 opacity-60">✋</span>
+                      <Hand className="mb-2 h-7 w-7 text-zinc-700" />
                       <p className="text-xs text-zinc-500">No hands raised yet</p>
                       <p className="text-[10px] text-zinc-650 mt-0.5">Students can raise hands to ask questions.</p>
                     </div>

@@ -191,6 +191,67 @@ app.post("/api/stream/direct-upload", async (c) => {
   }
 });
 
+app.post("/api/live/create-input", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const name = body.title || body.name || "EduNexus live class";
+    const preferLowLatency = body.preferLowLatency ?? true;
+
+    if (!c.env.CLOUDFLARE_ACCOUNT_ID || !c.env.CLOUDFLARE_API_TOKEN) {
+      return c.json({ error: "Cloudflare Stream Live is not configured." }, 400);
+    }
+
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/stream/live_inputs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          meta: {
+            name,
+            source: "edunexus-live-class",
+          },
+          recording: {
+            mode: "automatic",
+            requireSignedURLs: false,
+            hideLiveViewerCount: false,
+          },
+          preferLowLatency,
+          timeoutSeconds: 10,
+        }),
+      }
+    );
+
+    const data = await response.json() as CloudflareApiResponse<{
+      uid: string;
+      rtmps?: { url?: string; streamKey?: string };
+      srt?: { url?: string; streamId?: string; passphrase?: string };
+    }>;
+
+    if (!response.ok || !data.success || !data.result) {
+      return c.json({ error: data.errors?.[0]?.message || "Failed to create Stream live input." }, 500);
+    }
+
+    const uid = data.result.uid;
+    return c.json({
+      uid,
+      rtmpsUrl: data.result.rtmps?.url,
+      streamKey: data.result.rtmps?.streamKey,
+      srtUrl: data.result.srt?.url,
+      srtStreamId: data.result.srt?.streamId,
+      srtPassphrase: data.result.srt?.passphrase,
+      playbackUrl: `https://videodelivery.net/${uid}/manifest/video.m3u8`,
+      iframeUrl: `https://iframe.videodelivery.net/${uid}`,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to create Stream live input.";
+    return c.json({ error: message }, 500);
+  }
+});
+
 app.get("/api/stream/video/:uid", async (c) => {
   try {
     const uid = c.req.param("uid");

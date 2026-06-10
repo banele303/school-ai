@@ -42,8 +42,8 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
-import { CLOUDFLARE_WORKER_URL } from "@/lib/cloudflareWorker";
 import {
+  createStreamLiveInput,
   createStreamDirectUpload,
   markScannedWork,
   uploadFileToR2,
@@ -135,18 +135,6 @@ export default function LiveClassesPage() {
       navigate(`/lives/room/${classItem._id}`);
     } else {
       window.open(classItem.joinUrl, "_blank");
-    }
-  };
-
-  const handleStatusChange = async (classItem: any, newStatus: string) => {
-    try {
-      await updateStatus({ liveClassId: classItem._id, status: newStatus });
-      toast.success(`Class marked as ${newStatus}`);
-      if (classItem.platform === "native" && newStatus === "live") {
-        navigate(`/lives/room/${classItem._id}`);
-      }
-    } catch (e: any) {
-      toast.error(e.message);
     }
   };
 
@@ -382,7 +370,7 @@ function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStud
             <StatusIcon className="mr-1 h-3 w-3" /> {statusCfg.label}
           </Badge>
           <Badge variant="secondary" className="text-[11px]">
-            {classItem.platform === "edunexus" ? "EduNexus Studio" : classItem.platform || "Live"}
+            {PLATFORM_LABELS[classItem.platform] || classItem.platform || "Live"}
           </Badge>
         </div>
         <CardTitle className="text-base">{classItem.title}</CardTitle>
@@ -782,63 +770,81 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
-    if (!title || !date || !time || !subjectId || (platform !== "native" && !joinUrl)) {
-      toast.error("Please complete all required fields.");
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
+    const trimmedJoinUrl = joinUrl.trim();
+
+    if (!trimmedTitle || !date || !time || !subjectId || (platform !== "native" && !trimmedJoinUrl)) {
+      toast.error("Please complete the title, subject, date, time, and join URL when needed.");
       return;
     }
+
+    const startTime = new Date(`${date}T${time}`).getTime();
+    if (Number.isNaN(startTime)) {
+      toast.error("Choose a valid class date and time.");
+      return;
+    }
+
     setCreating(true);
     try {
       let resourceUrl = "";
       if (resourceFile) {
-        const upload = await uploadFileToR2(resourceFile, { title, description });
+        const upload = await uploadFileToR2(resourceFile, { title: trimmedTitle, description: trimmedDescription });
         resourceUrl = upload.fileUrl;
       }
-      const startTime = new Date(`${date}T${time}`).getTime();
-      let streamData = { uid: undefined, whipUrl: undefined, whepUrl: undefined, playbackUrl: undefined };
-      let finalJoinUrl = joinUrl;
+      let streamData: {
+        uid?: string;
+        rtmpsUrl?: string;
+        streamKey?: string;
+        srtUrl?: string;
+        srtStreamId?: string;
+        srtPassphrase?: string;
+        playbackUrl?: string;
+      } = {};
+      let finalJoinUrl = trimmedJoinUrl;
 
         if (platform === "native") {
-          toast.info("Provisioning native live classroom...");
+          toast.info("Provisioning Cloudflare live input...");
           try {
-            const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/live/create-input`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title }),
+            const data = await createStreamLiveInput({
+              title: trimmedTitle,
+              preferLowLatency: true,
             });
-            if (!response.ok) {
-              throw new Error("Failed to provision native stream input from Cloudflare");
-            }
-            const data = await response.json();
             streamData = {
               uid: data.uid,
-              whipUrl: data.whipUrl,
-              whepUrl: data.whepUrl,
+              rtmpsUrl: data.rtmpsUrl,
+              streamKey: data.streamKey,
+              srtUrl: data.srtUrl,
+              srtStreamId: data.srtStreamId,
+              srtPassphrase: data.srtPassphrase,
               playbackUrl: data.playbackUrl,
             };
-            finalJoinUrl = `/lives/room/pending`;
+            finalJoinUrl = "/lives/room/native";
           } catch (e: any) {
-            toast.error(e.message || "Failed to provision native stream input from Cloudflare");
-            // Continue without native stream data
-            streamData = { uid: undefined, whipUrl: undefined, whepUrl: undefined, playbackUrl: undefined };
-            finalJoinUrl = joinUrl; // fallback to provided joinUrl if any
+            toast.warning("Cloudflare live input is unavailable, so this lesson will use the in-app classroom fallback.");
+            streamData = {};
+            finalJoinUrl = "/lives/room/native";
           }
         }
 
       await createLiveClass({
-        title,
-        description: resourceUrl ? `${description}\n\nResource: ${resourceUrl}` : description,
+        title: trimmedTitle,
+        description: resourceUrl ? `${trimmedDescription}\n\nResource: ${resourceUrl}` : trimmedDescription,
         subject: subjectId,
         startTime,
         platform,
-        joinUrl: platform === "native" ? finalJoinUrl : joinUrl,
+        joinUrl: platform === "native" ? finalJoinUrl : trimmedJoinUrl,
         accessMode,
         resourceUrls: resourceUrl ? [resourceUrl] : undefined,
-        lessonPlan: description,
+        lessonPlan: trimmedDescription,
         maxParticipants: maxParticipants ? Number(maxParticipants) : undefined,
         notifyEnrolled: true,
         streamInputId: streamData.uid,
-        whipUrl: streamData.whipUrl,
-        whepUrl: streamData.whepUrl,
+        rtmpsUrl: streamData.rtmpsUrl,
+        streamKey: streamData.streamKey,
+        srtUrl: streamData.srtUrl,
+        srtStreamId: streamData.srtStreamId,
+        srtPassphrase: streamData.srtPassphrase,
         playbackUrl: streamData.playbackUrl,
       } as any);
 
@@ -849,6 +855,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
       setSubjectId("");
       setDate("");
       setTime("");
+      setJoinUrl("");
       setMaxParticipants("");
       setResourceFile(null);
     } catch (error: any) {

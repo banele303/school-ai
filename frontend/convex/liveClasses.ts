@@ -15,6 +15,14 @@ export const createLiveClass = mutation({
     platform: v.string(),
     joinUrl: v.string(),
     recordingUrl: v.optional(v.string()),
+    streamInputId: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    whepUrl: v.optional(v.string()),
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
     streamVideoUid: v.optional(v.string()),
     playbackUrl: v.optional(v.string()),
     roomId: v.optional(v.string()),
@@ -49,6 +57,14 @@ export const createLiveClass = mutation({
       platform: args.platform,
       joinUrl: args.joinUrl,
       recordingUrl: args.recordingUrl,
+      streamInputId: args.streamInputId,
+      whipUrl: args.whipUrl,
+      whepUrl: args.whepUrl,
+      rtmpsUrl: args.rtmpsUrl,
+      streamKey: args.streamKey,
+      srtUrl: args.srtUrl,
+      srtStreamId: args.srtStreamId,
+      srtPassphrase: args.srtPassphrase,
       streamVideoUid: args.streamVideoUid,
       playbackUrl: args.playbackUrl,
       roomId: args.roomId || crypto.randomUUID(),
@@ -191,6 +207,52 @@ export const updateLiveClassStatus = mutation({
   },
 });
 
+export const startNativeLiveClass = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    streamInputId: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    whepUrl: v.optional(v.string()),
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
+    playbackUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Only teachers and admins can start live classes");
+    }
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized: you are not the teacher of this class");
+    }
+
+    await ctx.db.patch(args.liveClassId, {
+      status: "live",
+      streamInputId: args.streamInputId || liveClass.streamInputId,
+      whipUrl: args.whipUrl || liveClass.whipUrl,
+      whepUrl: args.whepUrl || liveClass.whepUrl,
+      rtmpsUrl: args.rtmpsUrl || liveClass.rtmpsUrl,
+      streamKey: args.streamKey || liveClass.streamKey,
+      srtUrl: args.srtUrl || liveClass.srtUrl,
+      srtStreamId: args.srtStreamId || liveClass.srtStreamId,
+      srtPassphrase: args.srtPassphrase || liveClass.srtPassphrase,
+      playbackUrl: args.playbackUrl || liveClass.playbackUrl,
+    });
+
+    return { success: true };
+  },
+});
+
 // ─── DELETE LIVE CLASS ───────────────────────────────────────────────────────
 
 export const deleteLiveClass = mutation({
@@ -215,6 +277,24 @@ export const deleteLiveClass = mutation({
 
     for (const record of attendanceRecords) {
       await ctx.db.delete(record._id);
+    }
+
+    const chatMessages = await ctx.db
+      .query("liveClassChatMessages")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    for (const message of chatMessages) {
+      await ctx.db.delete(message._id);
+    }
+
+    const raisedHands = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    for (const hand of raisedHands) {
+      await ctx.db.delete(hand._id);
     }
 
     await ctx.db.delete(args.liveClassId);
@@ -287,7 +367,7 @@ export const getUpcomingClassesForStudent = query({
 
     // Filter by student's class or grade
     const studentClassId = user.studentClass;
-    const studentGrade = userPreferences_grade(userId, ctx);
+    const studentGrade = await userPreferences_grade(userId, ctx);
 
     const upcoming = allClasses.filter((c) => {
       // Class is assigned to student's class
@@ -295,8 +375,7 @@ export const getUpcomingClassesForStudent = query({
       // No class restriction and grade matches or no grade restriction
       if (!c.class) {
         if (!c.targetGrades || c.targetGrades.length === 0) return true;
-        // We'll include all with matching target grades checked at query time
-        return true;
+        return studentGrade ? c.targetGrades.includes(studentGrade) : false;
       }
       return false;
     });
@@ -317,3 +396,145 @@ async function userPreferences_grade(
     .first();
   return prefs?.grade;
 }
+
+export const getLiveChatMessages = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const messages = await ctx.db
+      .query("liveClassChatMessages")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    messages.sort((a, b) => a.createdAt - b.createdAt);
+    return messages;
+  },
+});
+
+export const sendLiveChatMessage = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+    if (liveClass.status === "ended" || liveClass.status === "cancelled") {
+      throw new Error("This class is closed");
+    }
+
+    const content = args.content.trim();
+    if (!content) throw new Error("Message cannot be empty");
+    if (content.length > 1000) throw new Error("Message is too long");
+
+    const user = await ctx.db.get(userId);
+    return await ctx.db.insert("liveClassChatMessages", {
+      liveClass: args.liveClassId,
+      sender: userId,
+      senderName: user?.name || user?.email || "Learner",
+      senderRole: user?.role,
+      content,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const getRaisedHands = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const hands = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    hands.sort((a, b) => a.raisedAt - b.raisedAt);
+    return hands.map((hand) => ({
+      ...hand,
+      studentId: hand.student,
+    }));
+  },
+});
+
+export const toggleRaiseHand = mutation({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (user?.role === "teacher" || user?.role === "admin") {
+      throw new Error("Only students can raise hands");
+    }
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+    if (liveClass.status !== "live") {
+      throw new Error("Hands can only be raised while the class is live");
+    }
+
+    const existing = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", userId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { raised: false };
+    }
+
+    await ctx.db.insert("liveClassRaisedHands", {
+      liveClass: args.liveClassId,
+      student: userId,
+      studentName: user?.name || user?.email || "Learner",
+      raisedAt: Date.now(),
+    });
+
+    return { raised: true };
+  },
+});
+
+export const lowerStudentHand = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    const isTeacher = user?.role === "teacher" || user?.role === "admin";
+    if (!isTeacher && args.studentId !== userId) {
+      throw new Error("Unauthorized");
+    }
+    if (isTeacher && liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized: you are not the teacher of this class");
+    }
+
+    const existing = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", args.studentId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    return { success: true };
+  },
+});

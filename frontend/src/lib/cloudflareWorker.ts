@@ -101,6 +101,33 @@ export async function createStreamDirectUpload(payload: {
   return res.json();
 }
 
+export async function createStreamLiveInput(payload: {
+  title: string;
+  preferLowLatency?: boolean;
+}): Promise<{
+  uid: string;
+  rtmpsUrl?: string;
+  streamKey?: string;
+  srtUrl?: string;
+  srtStreamId?: string;
+  srtPassphrase?: string;
+  playbackUrl?: string;
+  iframeUrl?: string;
+}> {
+  const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/live/create-input`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to create Cloudflare live input.");
+  }
+
+  return res.json();
+}
+
 export async function uploadVideoToStream(uploadURL: string, file: File): Promise<void> {
   const formData = new FormData();
   formData.append("file", file);
