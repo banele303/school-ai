@@ -10,6 +10,7 @@ import {
   Megaphone,
   BookOpen,
   Video,
+  Rocket,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -85,6 +86,24 @@ export const sidebardata = {
         { title: "Study Groups", url: "/groups", roles: ["admin", "teacher", "student"] },
         { title: "Peer Tutoring", url: "/tutoring", roles: ["admin", "teacher", "student"] },
         { title: "Resource Library", url: "/resources", roles: ["admin", "teacher", "student", "parent"] },
+      ],
+    },
+    {
+      title: "Premium Suite",
+      url: "#",
+      icon: Rocket,
+      roles: ["admin", "teacher"],
+      items: [
+        { title: "Command Center", url: "/command-center", roles: ["admin"] },
+        { title: "Lesson Studio", url: "/lesson-studio", roles: ["admin", "teacher"] },
+        { title: "Student Timeline", url: "/student-timeline", roles: ["admin", "teacher"] },
+        { title: "Parent Reports", url: "/parent-reports", roles: ["admin", "teacher"] },
+        { title: "Class Engagement", url: "/class-engagement", roles: ["admin", "teacher"] },
+        { title: "Recording Studio", url: "/recording-studio", roles: ["admin", "teacher"] },
+        { title: "Marketplace", url: "/teacher-marketplace", roles: ["admin", "teacher"] },
+        { title: "Offline Mode", url: "/offline-mode", roles: ["admin"] },
+        { title: "White-Label", url: "/white-label", roles: ["admin"] },
+        { title: "AI Tutor Memory", url: "/ai-tutor-memory", roles: ["admin", "teacher"] },
       ],
     },
     {

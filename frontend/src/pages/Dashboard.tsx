@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Calendar, FileText, GraduationCap, Sparkles, Video, BookOpen,
   Trophy, Flame, TrendingUp, Clock, ArrowRight, Play, MessageSquare,
-  Award, Target, Zap, Users, Radio
+  Award, Target, Zap, Users, Radio, Rocket
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,7 @@ export default function Dashboard() {
     { label: "Live Classes", icon: Radio, path: "/lives", roles: ["admin", "teacher", "student"], color: "text-red-500", bg: "bg-red-500/10" },
     { label: "Video Library", icon: Video, path: "/videos", roles: ["admin", "teacher", "student"], color: "text-purple-500", bg: "bg-purple-500/10" },
     { label: "Study Buddy", icon: Sparkles, path: "/study-buddy", roles: ["admin", "teacher", "student"], color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Premium Suite", icon: Rocket, path: "/command-center", roles: ["admin", "teacher"], color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Homework Checker", icon: FileText, path: "/ai/homework", roles: ["admin", "teacher", "student"], color: "text-green-500", bg: "bg-green-500/10" },
     { label: "Study Groups", icon: Users, path: "/groups", roles: ["admin", "teacher", "student"], color: "text-blue-500", bg: "bg-blue-500/10" },
     { label: "Resources", icon: BookOpen, path: "/resources", roles: ["admin", "teacher", "student", "parent"], color: "text-indigo-500", bg: "bg-indigo-500/10" },

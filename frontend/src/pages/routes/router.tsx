@@ -45,6 +45,7 @@ import HomeworkCheckerPage from "@/pages/ai/HomeworkChecker";
 import StudyGroupsPage from "@/pages/groups/StudyGroups";
 import PeerTutoringPage from "@/pages/tutoring/PeerTutoring";
 import SchoolOnboarding from "@/pages/admin/SchoolOnboarding";
+import PremiumSuite from "@/pages/premium/PremiumSuite";
 
 export const router = createBrowserRouter([
   { path: "/", element: <Home /> },
@@ -112,6 +113,16 @@ export const router = createBrowserRouter([
       { path: "groups", element: <StudyGroupsPage /> },
       { path: "tutoring", element: <PeerTutoringPage /> },
       { path: "admin/onboarding", element: <SchoolOnboarding /> },
+      { path: "command-center", element: <PremiumSuite /> },
+      { path: "lesson-studio", element: <PremiumSuite /> },
+      { path: "student-timeline", element: <PremiumSuite /> },
+      { path: "parent-reports", element: <PremiumSuite /> },
+      { path: "class-engagement", element: <PremiumSuite /> },
+      { path: "recording-studio", element: <PremiumSuite /> },
+      { path: "teacher-marketplace", element: <PremiumSuite /> },
+      { path: "offline-mode", element: <PremiumSuite /> },
+      { path: "white-label", element: <PremiumSuite /> },
+      { path: "ai-tutor-memory", element: <PremiumSuite /> },
     ],
   },
 ]);
