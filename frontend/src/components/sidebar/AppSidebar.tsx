@@ -35,6 +35,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThemeModeToggle } from "@/components/theme/ThemeModeToggle";
 
 export interface NavItem {
   title: string;
@@ -246,6 +247,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             isCollapsed ? "flex-row space-y-2" : "flex justify-between",
           )}
         >
+          <SidebarMenuItem title="Theme">
+            <ThemeModeToggle compact={isCollapsed} />
+          </SidebarMenuItem>
           <SidebarMenuItem title="Logout">
             <Button onClick={logout} variant={"ghost"} size="icon-sm">
               <LogOut />

@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/AuthProvider";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { Loader2, Moon, Sun } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,11 @@ import { Separator } from "@/components/ui/separator";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { StudyBuddy } from "@/components/ai/StudyBuddy";
 import { GlobalSearch } from "@/components/global/GlobalSearch";
-import { useTheme } from "@/components/provider/theme";
+import { ThemeModeToggle } from "@/components/theme/ThemeModeToggle";
 
 const PrivateRoutes = () => {
   const { loading, user, year, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
   const location = useLocation();
-  const isDark = theme === "dark";
 
   if (loading) {
     return (
@@ -55,15 +53,7 @@ const PrivateRoutes = () => {
           <Separator orientation="vertical" className="mr-2 h-4" />
           <GlobalSearch />
           <div className="flex-1" />
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <ThemeModeToggle />
           <NotificationBell />
         </header>
         <main className="flex-1 overflow-auto bg-white dark:bg-zinc-950">
