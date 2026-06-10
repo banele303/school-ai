@@ -768,14 +768,24 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
+  const subjectOptions = Array.isArray(subjects) ? subjects : [];
+  const subjectsLoading = subjects === undefined;
 
   const handleCreate = async () => {
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
     const trimmedJoinUrl = joinUrl.trim();
 
-    if (!trimmedTitle || !date || !time || !subjectId || (platform !== "native" && !trimmedJoinUrl)) {
-      toast.error("Please complete the title, subject, date, time, and join URL when needed.");
+    const missingFields = [
+      !trimmedTitle && "title",
+      !subjectId && "subject",
+      !date && "date",
+      !time && "time",
+      platform !== "native" && !trimmedJoinUrl && "join URL",
+    ].filter(Boolean);
+
+    if (missingFields.length > 0) {
+      toast.error(`Please complete: ${missingFields.join(", ")}.`);
       return;
     }
 
@@ -879,11 +889,16 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
           <div>
             <Label>Subject</Label>
             <Select value={subjectId} onValueChange={setSubjectId}>
-              <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+              <SelectTrigger disabled={subjectsLoading || subjectOptions.length === 0}>
+                <SelectValue placeholder={subjectsLoading ? "Loading subjects..." : subjectOptions.length === 0 ? "No subjects available" : "Select subject"} />
+              </SelectTrigger>
               <SelectContent>
-                {subjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                {subjectOptions.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            {!subjectsLoading && subjectOptions.length === 0 && (
+              <p className="mt-1 text-xs text-amber-600">Ask an admin to add subjects before scheduling live lessons.</p>
+            )}
           </div>
           <div>
             <Label>Platform</Label>

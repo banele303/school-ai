@@ -78,3 +78,56 @@ export const upsertCurrentAcademicYear = mutation({
     return { created: true, yearId, name };
   },
 });
+
+export const upsertCoreSubjects = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const coreSubjects = [
+      { name: "Mathematics", code: "MATH101", category: "maths", grade: 12 },
+      { name: "Physical Sciences", code: "SCI101", category: "science", grade: 12 },
+      { name: "English Home Language", code: "ENG101", category: "language", grade: 12 },
+      { name: "Afrikaans First Additional Language", code: "AFR101", category: "language", grade: 12 },
+      { name: "Life Orientation", code: "LO101", category: "life_skills", grade: 12 },
+      { name: "Life Sciences", code: "LIFE101", category: "science", grade: 12 },
+      { name: "History", code: "HIST101", category: "humanities", grade: 12 },
+      { name: "Geography", code: "GEO101", category: "humanities", grade: 12 },
+      { name: "Accounting", code: "ACC101", category: "other", grade: 12 },
+      { name: "Business Studies", code: "BUS101", category: "other", grade: 12 },
+      { name: "Economics", code: "ECON101", category: "other", grade: 12 },
+      { name: "Computer Applications Technology", code: "CAT101", category: "technology", grade: 12 },
+      { name: "Information Technology", code: "IT101", category: "technology", grade: 12 },
+      { name: "Natural Sciences", code: "NATSCI101", category: "science", grade: 9 },
+      { name: "Technology", code: "TECH101", category: "technology", grade: 9 },
+    ];
+
+    const existingSubjects = await ctx.db.query("subjects").collect();
+    const byCode = new Map(existingSubjects.map((subject) => [subject.code, subject]));
+    let created = 0;
+    let updated = 0;
+
+    for (const subject of coreSubjects) {
+      const existing = byCode.get(subject.code);
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          name: subject.name,
+          code: subject.code,
+          category: subject.category,
+          grade: subject.grade,
+          isActive: true,
+        });
+        updated += 1;
+      } else {
+        await ctx.db.insert("subjects", {
+          name: subject.name,
+          code: subject.code,
+          category: subject.category,
+          grade: subject.grade,
+          isActive: true,
+        });
+        created += 1;
+      }
+    }
+
+    return { created, updated, total: coreSubjects.length };
+  },
+});
