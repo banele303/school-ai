@@ -14,6 +14,8 @@ export const getVideos = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    const canManageVideos = user?.role === "teacher" || user?.role === "admin";
 
     let videos;
 
@@ -34,10 +36,16 @@ export const getVideos = query({
         .withIndex("by_grade", (q) => q.eq("grade", args.grade!))
         .collect();
     } else {
-      videos = await ctx.db
-        .query("videoLibrary")
-        .withIndex("by_published", (q) => q.eq("isPublished", true))
-        .collect();
+      videos = canManageVideos
+        ? await ctx.db.query("videoLibrary").collect()
+        : await ctx.db
+            .query("videoLibrary")
+            .withIndex("by_published", (q) => q.eq("isPublished", true))
+            .collect();
+    }
+
+    if (!canManageVideos) {
+      videos = videos.filter((v) => v.isPublished);
     }
 
     // Apply additional filters
@@ -112,7 +120,7 @@ export const createVideo = mutation({
       playlist: args.playlist,
       playlistOrder: args.playlistOrder,
       viewCount: 0,
-      isPublished: args.isPublished ?? false,
+      isPublished: args.isPublished ?? true,
     });
 
     return videoId;

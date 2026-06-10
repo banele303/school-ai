@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/AuthProvider";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2, Moon, Sun } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,13 @@ import { Separator } from "@/components/ui/separator";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { StudyBuddy } from "@/components/ai/StudyBuddy";
 import { GlobalSearch } from "@/components/global/GlobalSearch";
-import { SchoolBrand } from "@/components/brand/SchoolBrand";
+import { useTheme } from "@/components/provider/theme";
 
 const PrivateRoutes = () => {
   const { loading, user, year, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const location = useLocation();
+  const isDark = theme === "dark";
 
   if (loading) {
     return (
@@ -47,18 +49,24 @@ const PrivateRoutes = () => {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="bg-white text-gray-950">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 px-4 sticky top-0 z-10">
+      <SidebarInset className="bg-white text-gray-950 dark:bg-zinc-950 dark:text-zinc-100">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-gray-200 bg-white/95 px-4 sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-white/90 dark:border-zinc-800 dark:bg-zinc-950/90">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="hidden min-w-0 shrink-0 md:block">
-            <SchoolBrand compact />
-          </div>
           <GlobalSearch />
           <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
           <NotificationBell />
         </header>
-        <main className="flex-1 overflow-auto bg-white">
+        <main className="flex-1 overflow-auto bg-white dark:bg-zinc-950">
           <Outlet />
         </main>
         <StudyBuddy />

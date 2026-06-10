@@ -12,12 +12,7 @@ export function SchoolBrand({ to = "/", compact = false }: SchoolBrandProps) {
       <div className={`${compact ? "w-9 h-9" : "w-11 h-11"} rounded-xl bg-gradient-to-br from-red-600 to-red-500 flex items-center justify-center shadow-lg shadow-red-500/20`}>
         <GraduationCap className={`${compact ? "w-5 h-5" : "w-6 h-6"} text-white`} />
       </div>
-      <div>
-        <span className={`font-extrabold tracking-tight text-gray-900 dark:text-white ${compact ? "text-lg" : "text-xl"}`}>
-          Edu<span className="text-red-500">Nexus</span>
-        </span>
-        {!compact && <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">Learn Without Limits</p>}
-      </div>
+      {!compact && <span className="font-extrabold tracking-tight text-gray-900 dark:text-white text-xl">School AI</span>}
     </div>
   );
 

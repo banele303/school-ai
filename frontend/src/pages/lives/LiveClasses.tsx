@@ -67,7 +67,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 const studioTools = [
   { icon: Video, title: "In-app live classroom", detail: "Camera, mic, screen share, learner chat, attendance and replay flow." },
-  { icon: Cloud, title: "Cloudflare Stream archive", detail: "Upload lesson recordings to Stream and keep playback inside EduNexus." },
+  { icon: Cloud, title: "Cloudflare Stream archive", detail: "Upload lesson recordings to Stream and keep playback inside the classroom." },
   { icon: ScanLine, title: "Scan-to-mark desk", detail: "Teachers upload PDFs, photos, memos and essays for AI-assisted marking." },
   { icon: Library, title: "Self-learning library", detail: "Recordings, PDFs, notes and practice tasks stay attached to the lesson." },
 ];
@@ -164,7 +164,7 @@ export default function LiveClassesPage() {
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Live Learning Studio</h1>
                   <p className="text-sm text-slate-600">
-                    Teach, stream, record, upload resources and mark learner work without sending students away from EduNexus.
+                    Teach, stream, record, upload resources and mark learner work without sending students away from the classroom.
                   </p>
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function LiveClassesPage() {
                       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
                         <Play className="h-7 w-7" />
                       </div>
-                      <h2 className="text-xl font-semibold">Start teaching inside EduNexus</h2>
+                      <h2 className="text-xl font-semibold">Start teaching inside the classroom</h2>
                       <p className="mx-auto mt-2 max-w-md text-sm text-slate-300">
                         Teachers can open the studio, preview camera and mic, attach PDFs, then store replays through Cloudflare Stream.
                       </p>
@@ -951,7 +951,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objectives, resources, homework, marks allocation..." />
           </div>
           <div className="md:col-span-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-            This creates an EduNexus-hosted lesson. Teachers can start the studio from the lesson card, learners join inside the app, and recordings/resources can be stored through Cloudflare.
+            This creates an in-app lesson. Teachers can start the studio from the lesson card, learners join inside the app, and recordings/resources can be stored through Cloudflare.
           </div>
           <Button className="md:col-span-2 bg-red-600 hover:bg-red-700" onClick={handleCreate} disabled={creating}>
             {creating ? "Creating..." : "Create lesson"}

@@ -240,7 +240,7 @@ export default function LiveRoomPage() {
       if (classItem.rtmpsUrl && classItem.streamKey) {
         toast.success("Class is live. Start sending video from OBS to Cloudflare.");
       } else {
-        toast.success("Class is live in EduNexus fallback mode.");
+        toast.success("Class is live in classroom fallback mode.");
       }
     } catch (err: any) {
       setIsBroadcasting(false);
@@ -372,11 +372,11 @@ export default function LiveRoomPage() {
 
   if (!classItem) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center h-screen bg-zinc-950 text-white">
+      <div className="flex-1 flex flex-col items-center justify-center h-screen bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-white">
         <AlertCircle className="h-10 w-10 text-red-500 mb-4 animate-bounce" />
         <h3 className="text-xl font-bold">Classroom Not Found</h3>
-        <p className="text-sm text-zinc-400 mt-1">This class may have been deleted or the link is invalid.</p>
-        <Button className="mt-6 bg-zinc-800 text-white hover:bg-zinc-700" onClick={() => navigate("/lives")}>
+        <p className="text-sm text-slate-500 mt-1 dark:text-zinc-400">This class may have been deleted or the link is invalid.</p>
+        <Button className="mt-6" onClick={() => navigate("/lives")}>
           Back to Live Classes
         </Button>
       </div>
@@ -384,22 +384,22 @@ export default function LiveRoomPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans overflow-hidden">
       
       {/* ── HEADER ── */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-10 shrink-0">
+      <header className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md z-10 shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white" onClick={() => navigate("/lives")}>
+          <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-950 dark:text-zinc-400 dark:hover:text-white" onClick={() => navigate("/lives")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold tracking-tight">{classItem.title}</h2>
-              <Badge variant="outline" className="text-[10px] py-0 border-zinc-800 text-zinc-400 bg-zinc-900/40">
+              <Badge variant="outline" className="text-[10px] py-0 border-slate-200 text-slate-500 bg-slate-100 dark:border-zinc-800 dark:text-zinc-400 dark:bg-zinc-900/40">
                 {classItem.platform === "native" ? "Native Classroom" : classItem.platform}
               </Badge>
             </div>
-            <p className="text-[11px] text-zinc-400">Scheduled by Teacher (Real-time Broadcast)</p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">Scheduled by Teacher (Real-time Broadcast)</p>
           </div>
         </div>
 
@@ -413,9 +413,9 @@ export default function LiveRoomPage() {
               <span className="text-[11px] font-semibold text-red-400 tracking-wider uppercase">Live Now</span>
             </div>
           ) : classItem.status === "ended" ? (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800">
-              <CheckCircle className="h-3.5 w-3.5 text-zinc-400" />
-              <span className="text-[11px] font-semibold text-zinc-400 tracking-wider uppercase">Class Ended</span>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 dark:bg-zinc-900 dark:border-zinc-800">
+              <CheckCircle className="h-3.5 w-3.5 text-slate-500 dark:text-zinc-400" />
+              <span className="text-[11px] font-semibold text-slate-500 tracking-wider uppercase dark:text-zinc-400">Class Ended</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950/50 border border-blue-900/30">
@@ -428,7 +428,7 @@ export default function LiveRoomPage() {
             <Button
               variant="outline"
               size="icon"
-              className={cn("border-zinc-800 text-zinc-400 hover:text-white bg-zinc-900/40", showSettings && "bg-zinc-800 text-white")}
+              className={cn("border-slate-200 bg-white text-slate-600 hover:text-slate-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-white dark:bg-zinc-900/40", showSettings && "bg-slate-100 text-slate-950 dark:bg-zinc-800 dark:text-white")}
               onClick={() => setShowSettings(!showSettings)}
             >
               <Settings className="h-4 w-4" />
@@ -441,7 +441,7 @@ export default function LiveRoomPage() {
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
         {/* Left Side: Video Stream Arena */}
-        <section className="flex-1 flex flex-col bg-zinc-950 p-4 md:p-6 overflow-y-auto min-w-0 justify-center items-center">
+        <section className="flex-1 flex flex-col bg-slate-50 p-4 md:p-6 overflow-y-auto min-w-0 justify-center items-center dark:bg-zinc-950">
           
           <div className="w-full max-w-4xl aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-900 relative shadow-2xl group">
             
@@ -601,54 +601,54 @@ export default function LiveRoomPage() {
           </div>
 
           {isTeacher && classItem.status !== "ended" && (
-            <Card className="w-full max-w-4xl mt-4 bg-zinc-900 border border-zinc-800 text-zinc-200">
+            <Card className="w-full max-w-4xl mt-4 bg-white border border-slate-200 text-slate-800 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-200">
               <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="bg-red-600 text-white">Cloudflare Stream</Badge>
-                    <span className="text-xs text-zinc-500">Automatic recording enabled</span>
+                    <span className="text-xs text-slate-500 dark:text-zinc-500">Automatic recording enabled</span>
                   </div>
-                  <p className="mt-2 text-sm text-zinc-300">
+                  <p className="mt-2 text-sm text-slate-600 dark:text-zinc-300">
                     {classItem.rtmpsUrl && classItem.streamKey
                       ? "Start your encoder with the RTMPS server and stream key, then keep chat and questions here."
-                      : "Cloudflare live input is not configured for this lesson. EduNexus classroom tools still work."}
+                      : "Cloudflare live input is not configured for this lesson. Classroom tools still work."}
                   </p>
                   {classItem.rtmpsUrl && (
                     <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
                       <button
                         type="button"
                         onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)}
-                        className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-zinc-700"
+                        className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
                       >
-                        <span className="block text-zinc-500">RTMPS server</span>
-                        <span className="mt-1 block truncate font-mono text-zinc-200">{classItem.rtmpsUrl}</span>
+                        <span className="block text-slate-500 dark:text-zinc-500">RTMPS server</span>
+                        <span className="mt-1 block truncate font-mono text-slate-800 dark:text-zinc-200">{classItem.rtmpsUrl}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => copyText("Stream key", classItem.streamKey)}
-                        className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-zinc-700"
+                        className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
                       >
-                        <span className="block text-zinc-500">Stream key</span>
-                        <span className="mt-1 block truncate font-mono text-zinc-200">{classItem.streamKey}</span>
+                        <span className="block text-slate-500 dark:text-zinc-500">Stream key</span>
+                        <span className="mt-1 block truncate font-mono text-slate-800 dark:text-zinc-200">{classItem.streamKey}</span>
                       </button>
                       {classItem.srtUrl && (
                         <button
                           type="button"
                           onClick={() => copyText("SRT URL", classItem.srtUrl)}
-                          className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-zinc-700 md:col-span-2"
+                          className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 md:col-span-2"
                         >
-                          <span className="block text-zinc-500">SRT URL</span>
-                          <span className="mt-1 block truncate font-mono text-zinc-200">{classItem.srtUrl}</span>
+                          <span className="block text-slate-500 dark:text-zinc-500">SRT URL</span>
+                          <span className="mt-1 block truncate font-mono text-slate-800 dark:text-zinc-200">{classItem.srtUrl}</span>
                         </button>
                       )}
                     </div>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Button variant="outline" className="border-zinc-800 bg-zinc-950 text-zinc-200 hover:bg-zinc-800" onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)} disabled={!classItem.rtmpsUrl}>
+                  <Button variant="outline" onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)} disabled={!classItem.rtmpsUrl}>
                     Copy server
                   </Button>
-                  <Button variant="outline" className="border-zinc-800 bg-zinc-950 text-zinc-200 hover:bg-zinc-800" onClick={() => copyText("Stream key", classItem.streamKey)} disabled={!classItem.streamKey}>
+                  <Button variant="outline" onClick={() => copyText("Stream key", classItem.streamKey)} disabled={!classItem.streamKey}>
                     Copy key
                   </Button>
                 </div>
@@ -658,7 +658,7 @@ export default function LiveRoomPage() {
 
           {/* Teacher Device Settings Drawer (shows if toggled) */}
           {isTeacher && showSettings && (
-            <Card className="w-full max-w-4xl mt-4 bg-zinc-900 border border-zinc-800 text-zinc-200">
+            <Card className="w-full max-w-4xl mt-4 bg-white border border-slate-200 text-slate-800 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-200">
               <CardContent className="p-4 grid md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs text-zinc-400">Select Camera</Label>
@@ -716,17 +716,17 @@ export default function LiveRoomPage() {
         </section>
 
         {/* Right Side: Interactive Side Panel (Chat / Hands List) */}
-        <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-zinc-900 bg-zinc-950/80 backdrop-blur-md flex flex-col overflow-hidden shrink-0">
+        <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 bg-white/90 backdrop-blur-md flex flex-col overflow-hidden shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
           
           {/* Tab selectors */}
-          <div className="flex border-b border-zinc-900">
+          <div className="flex border-b border-slate-200 dark:border-zinc-900">
             <button
               onClick={() => setActiveTab("chat")}
               className={cn(
                 "flex-1 py-3 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 transition-all",
                 activeTab === "chat" 
-                  ? "border-red-600 text-white bg-zinc-900/10" 
-                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+                  ? "border-red-600 text-slate-950 bg-slate-100 dark:text-white dark:bg-zinc-900/10" 
+                  : "border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-500 dark:hover:text-zinc-300"
               )}
             >
               <MessageSquare className="h-3.5 w-3.5" />
@@ -742,8 +742,8 @@ export default function LiveRoomPage() {
               className={cn(
                 "flex-1 py-3 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 transition-all",
                 activeTab === "interactions" 
-                  ? "border-red-600 text-white bg-zinc-900/10" 
-                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+                  ? "border-red-600 text-slate-950 bg-slate-100 dark:text-white dark:bg-zinc-900/10" 
+                  : "border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-500 dark:hover:text-zinc-300"
               )}
             >
               <Users className="h-3.5 w-3.5" />
@@ -765,9 +765,9 @@ export default function LiveRoomPage() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
                   {chatMessages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 mt-10">
-                      <MessageSquare className="h-10 w-10 text-zinc-800 mb-2" />
-                      <p className="text-xs text-zinc-500">No messages yet.</p>
-                      <p className="text-[10px] text-zinc-650 mt-0.5">Start the conversation by typing below.</p>
+                      <MessageSquare className="h-10 w-10 text-slate-300 mb-2 dark:text-zinc-800" />
+                      <p className="text-xs text-slate-500 dark:text-zinc-500">No messages yet.</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 dark:text-zinc-650">Start the conversation by typing below.</p>
                     </div>
                   ) : (
                     chatMessages.map((msg: any) => {
@@ -777,7 +777,7 @@ export default function LiveRoomPage() {
                       return (
                         <div key={msg._id} className={cn("flex flex-col max-w-[85%]", isMe ? "ml-auto items-end" : "items-start")}>
                           <div className="flex items-center gap-1.5 mb-1 px-1">
-                            <span className="text-[10px] text-zinc-400 font-medium">{msg.senderName}</span>
+                            <span className="text-[10px] text-slate-500 font-medium dark:text-zinc-400">{msg.senderName}</span>
                             {isTeacherRole && (
                               <Badge className="bg-red-600/10 border border-red-500/20 text-[8px] text-red-500 px-1 py-0 leading-none h-3 font-semibold uppercase tracking-wider rounded">
                                 Teacher
@@ -790,8 +790,8 @@ export default function LiveRoomPage() {
                               isMe
                                 ? "bg-red-600 text-white rounded-tr-none hover:bg-red-700"
                                 : isTeacherRole
-                                ? "bg-zinc-850 border border-red-950/30 text-zinc-100 rounded-tl-none"
-                                : "bg-zinc-900 border border-zinc-850 text-zinc-300 rounded-tl-none"
+                                ? "bg-red-50 border border-red-100 text-slate-800 rounded-tl-none dark:bg-zinc-850 dark:border-red-950/30 dark:text-zinc-100"
+                                : "bg-slate-100 border border-slate-200 text-slate-800 rounded-tl-none dark:bg-zinc-900 dark:border-zinc-850 dark:text-zinc-300"
                             )}
                           >
                             {msg.content}
@@ -803,12 +803,12 @@ export default function LiveRoomPage() {
                   <div ref={chatEndRef} />
                 </div>
 
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-zinc-900 bg-zinc-950 shrink-0 flex gap-2">
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-white shrink-0 flex gap-2 dark:border-zinc-900 dark:bg-zinc-950">
                   <Input
                     placeholder="Ask a question..."
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    className="bg-zinc-900 border-zinc-800 text-xs text-zinc-200 h-9 rounded-xl focus-visible:ring-1 focus-visible:ring-red-600 focus-visible:ring-offset-0 focus-visible:border-transparent placeholder:text-zinc-600"
+                    className="text-xs h-9 rounded-xl focus-visible:ring-1 focus-visible:ring-red-600 focus-visible:ring-offset-0 focus-visible:border-transparent"
                   />
                   <Button type="submit" size="icon" className="h-9 w-9 bg-red-600 hover:bg-red-700 text-white shrink-0 rounded-xl">
                     <Send className="h-4 w-4" />
@@ -824,7 +824,7 @@ export default function LiveRoomPage() {
                 {/* Raised hands queue */}
                 <div className="mb-6 flex-1">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 dark:text-zinc-400">
                       <Hand className="h-3.5 w-3.5" />
                       Raised Hands Queue
                     </h3>
@@ -832,7 +832,7 @@ export default function LiveRoomPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-[10px] text-zinc-500 hover:text-white px-2 py-1 h-auto"
+                        className="text-[10px] text-slate-500 hover:text-slate-950 px-2 py-1 h-auto dark:text-zinc-500 dark:hover:text-white"
                         onClick={async () => {
                           for (const h of raisedHands) {
                             await lowerStudentHand({ liveClassId: id as any, studentId: h.studentId });
@@ -846,10 +846,10 @@ export default function LiveRoomPage() {
                   </div>
 
                   {raisedHands.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-6 border border-dashed border-zinc-900 rounded-xl text-center bg-zinc-900/10 min-h-[140px]">
-                      <Hand className="mb-2 h-7 w-7 text-zinc-700" />
-                      <p className="text-xs text-zinc-500">No hands raised yet</p>
-                      <p className="text-[10px] text-zinc-650 mt-0.5">Students can raise hands to ask questions.</p>
+                    <div className="flex flex-col items-center justify-center p-6 border border-dashed border-slate-200 rounded-xl text-center bg-slate-50 min-h-[140px] dark:border-zinc-900 dark:bg-zinc-900/10">
+                      <Hand className="mb-2 h-7 w-7 text-slate-300 dark:text-zinc-700" />
+                      <p className="text-xs text-slate-500 dark:text-zinc-500">No hands raised yet</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 dark:text-zinc-650">Students can raise hands to ask questions.</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -862,7 +862,7 @@ export default function LiveRoomPage() {
                             <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-500 shrink-0">
                               {hand.studentName.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-xs text-zinc-200 font-medium truncate">{hand.studentName}</span>
+                            <span className="text-xs text-slate-800 font-medium truncate dark:text-zinc-200">{hand.studentName}</span>
                           </div>
                           
                           {isTeacher && (
@@ -882,22 +882,22 @@ export default function LiveRoomPage() {
                 </div>
 
                 {/* Additional classroom metrics */}
-                <div className="mt-auto border-t border-zinc-900 pt-4 shrink-0">
-                  <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-900 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs text-zinc-400">
+                <div className="mt-auto border-t border-slate-200 pt-4 shrink-0 dark:border-zinc-900">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 dark:bg-zinc-900/40 dark:border-zinc-900">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                       <span>Live Status</span>
                       <Badge className={cn("text-[9px] py-0 font-semibold uppercase leading-none h-4", classItem.status === "live" ? "bg-red-500 text-white" : "bg-zinc-800 text-zinc-400")}>
                         {classItem.status}
                       </Badge>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-zinc-400">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                       <span>Active Interactions</span>
-                      <span className="font-semibold text-zinc-200">{raisedHands.length} hands</span>
+                      <span className="font-semibold text-slate-800 dark:text-zinc-200">{raisedHands.length} hands</span>
                     </div>
                     {classItem.maxParticipants && (
-                      <div className="flex items-center justify-between text-xs text-zinc-400">
+                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                         <span>Max Capacity</span>
-                        <span className="font-semibold text-zinc-200">{classItem.maxParticipants} students</span>
+                        <span className="font-semibold text-slate-800 dark:text-zinc-200">{classItem.maxParticipants} students</span>
                       </div>
                     )}
                   </div>
