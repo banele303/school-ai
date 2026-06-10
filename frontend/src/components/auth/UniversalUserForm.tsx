@@ -209,56 +209,15 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
     }
   }
 
-  // SA CAPS grade classes as fallback when DB has none
-  const saGradeOptions = [
-    { label: "Grade R", value: "grade-r" },
-    { label: "Grade 1", value: "grade-1" },
-    { label: "Grade 2", value: "grade-2" },
-    { label: "Grade 3", value: "grade-3" },
-    { label: "Grade 4", value: "grade-4" },
-    { label: "Grade 5", value: "grade-5" },
-    { label: "Grade 6", value: "grade-6" },
-    { label: "Grade 7", value: "grade-7" },
-    { label: "Grade 8", value: "grade-8" },
-    { label: "Grade 9", value: "grade-9" },
-    { label: "Grade 10", value: "grade-10" },
-    { label: "Grade 11", value: "grade-11" },
-    { label: "Grade 12", value: "grade-12" },
-  ];
-
-  // SA CAPS subjects as fallback when DB has none
-  const saCapsSubjects = [
-    { label: "Mathematics", value: "mathematics" },
-    { label: "Mathematical Literacy", value: "mathematical-literacy" },
-    { label: "English Home Language", value: "english-hl" },
-    { label: "Afrikaans First Additional Language", value: "afrikaans-fal" },
-    { label: "isiZulu Home Language", value: "isizulu-hl" },
-    { label: "Life Sciences", value: "life-sciences" },
-    { label: "Physical Sciences", value: "physical-sciences" },
-    { label: "History", value: "history" },
-    { label: "Geography", value: "geography" },
-    { label: "Accounting", value: "accounting" },
-    { label: "Business Studies", value: "business-studies" },
-    { label: "Economics", value: "economics" },
-    { label: "Life Orientation", value: "life-orientation" },
-    { label: "Computer Applications Technology", value: "cat" },
-    { label: "Information Technology", value: "information-technology" },
-    { label: "Visual Arts", value: "visual-arts" },
-    { label: "Music", value: "music" },
-    { label: "Agricultural Sciences", value: "agricultural-sciences" },
-    { label: "Technical Mathematics", value: "technical-mathematics" },
-    { label: "Technical Sciences", value: "technical-sciences" },
-  ];
-
   const classOptions =
     Array.isArray(classes) && classes.length > 0
       ? classes.map((c) => ({ label: c.name, value: c._id }))
-      : saGradeOptions;
+      : [];
 
   const subjectOptions =
     Array.isArray(subjects) && subjects.length > 0
       ? subjects.map((s) => ({ label: s.name, value: s._id }))
-      : saCapsSubjects;
+      : [];
 
   const roleOptions = role
     ? [{ label: role, value: role }]
@@ -308,7 +267,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
                 label="Class"
                 placeholder="Select Class"
                 options={classOptions}
-                disabled={pending}
+                disabled={pending || classOptions.length === 0}
                 loading={loading}
               />
             )}
@@ -321,7 +280,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
                 placeholder="Select subjects..."
                 options={subjectOptions}
                 loading={loadingOptions}
-                disabled={pending}
+                disabled={pending || subjectOptions.length === 0}
               />
             )}
             <CustomInput
