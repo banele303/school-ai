@@ -531,6 +531,25 @@ export default defineSchema({
   }).index("by_class", ["liveClass"])
     .index("by_student", ["student"]),
 
+  // Waiting Room Approvals
+  liveClassApprovals: defineTable({
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
+    requestedAt: v.number(),
+  }).index("by_class", ["liveClassId"])
+    .index("by_student", ["studentId"])
+    .index("by_class_and_student", ["liveClassId", "studentId"])
+    .index("by_class_and_status", ["liveClassId", "status"]),
+
+  // Live Class Reactions (Emojis)
+  liveClassReactions: defineTable({
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+    type: v.string(), // "like", "love", etc.
+    timestamp: v.number(),
+  }).index("by_class_and_time", ["liveClassId", "timestamp"]),
+
   // ─── VIDEO LIBRARY ─────────────────────────────────────────────
 
   videoLibrary: defineTable({

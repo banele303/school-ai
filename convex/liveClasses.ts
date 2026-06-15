@@ -319,3 +319,138 @@ async function userPreferences_grade(
     .first();
   return prefs?.grade;
 }
+
+// ─── WAITING ROOM (APPROVALS) ───────────────────────────────────────────────
+
+export const requestJoinClass = mutation({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    // Check if a request already exists
+    const existing = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("liveClassId", args.liveClassId).eq("studentId", userId)
+      )
+      .first();
+
+    if (existing) {
+      return existing; // Already requested or approved
+    }
+
+    const id = await ctx.db.insert("liveClassApprovals", {
+      liveClassId: args.liveClassId,
+      studentId: userId,
+      status: "pending",
+      requestedAt: Date.now(),
+    });
+
+    return await ctx.db.get(id);
+  },
+});
+
+export const getApprovalStatus = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    return await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_class_and_student", (q) =>
+        q.eq("liveClassId", args.liveClassId).eq("studentId", userId)
+      )
+      .first();
+  },
+});
+
+export const getPendingApprovals = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const classItem = await ctx.db.get(args.liveClassId);
+    // Only teacher or admin can view pending approvals
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && classItem?.teacher !== userId)) {
+      return [];
+    }
+
+    const requests = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_class_and_status", (q) =>
+        q.eq("liveClassId", args.liveClassId).eq("status", "pending")
+      )
+      .collect();
+
+    // Attach student names
+    const withNames = await Promise.all(
+      requests.map(async (req) => {
+        const student = await ctx.db.get(req.studentId);
+        return {
+          ...req,
+          studentName: student?.name || student?.email || "Unknown",
+        };
+      })
+    );
+
+    return withNames.sort((a, b) => a.requestedAt - b.requestedAt);
+  },
+});
+
+export const approveStudent = mutation({
+  args: { approvalId: v.id("liveClassApprovals"), status: v.union(v.literal("approved"), v.literal("denied")) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) throw new Error("Approval request not found");
+
+    const classItem = await ctx.db.get(approval.liveClassId);
+    const user = await ctx.db.get(userId);
+
+    if (!user || (user.role !== "admin" && classItem?.teacher !== userId)) {
+      throw new Error("Only the teacher or admin can approve students");
+    }
+
+    await ctx.db.patch(args.approvalId, { status: args.status });
+  },
+});
+
+// ─── REACTIONS (EMOJIS) ─────────────────────────────────────────────────────
+
+export const sendReaction = mutation({
+  args: { liveClassId: v.id("liveClasses"), type: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    await ctx.db.insert("liveClassReactions", {
+      liveClassId: args.liveClassId,
+      studentId: userId,
+      type: args.type,
+      timestamp: Date.now(),
+    });
+  },
+});
+
+export const getRecentReactions = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    // Return reactions from the last 10 seconds to create the floating effect
+    const tenSecondsAgo = Date.now() - 10000;
+
+    const reactions = await ctx.db
+      .query("liveClassReactions")
+      .withIndex("by_class_and_time", (q) =>
+        q.eq("liveClassId", args.liveClassId).gt("timestamp", tenSecondsAgo)
+      )
+      .collect();
+
+    return reactions;
+  },
+});

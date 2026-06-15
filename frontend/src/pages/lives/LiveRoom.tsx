@@ -47,8 +47,13 @@ export default function LiveRoomPage() {
   const sendReaction = useMutation(api.liveClasses.sendReaction);
   const recentReactions = useQuery(api.liveClasses.getRecentReactions, id ? { liveClassId: id as any } : "skip") || [];
 
+  const approvalStatus = useQuery(api.liveClasses.getApprovalStatus, id ? { liveClassId: id as any } : "skip");
+  const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, id ? { liveClassId: id as any } : "skip") || [];
+  const requestJoin = useMutation(api.liveClasses.requestJoinClass);
+  const approveStudentMutation = useMutation(api.liveClasses.approveStudent);
+
   // States
-  const [activeTab, setActiveTab] = useState<"chat" | "interactions">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "interactions" | "waiting">("chat");
   const [chatInput, setChatInput] = useState("");
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -421,6 +426,57 @@ export default function LiveRoomPage() {
     );
   }
 
+  // Waiting Room Logic
+  const needsApproval = !isTeacher && approvalStatus?.status !== "approved";
+
+  if (needsApproval) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans overflow-hidden">
+        <header className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md z-10 shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-950 dark:text-zinc-400 dark:hover:text-white" onClick={() => navigate("/lives")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h2 className="text-base font-bold tracking-tight">{classItem.title}</h2>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">Live Class Waiting Room</p>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col items-center justify-center p-6">
+          <Card className="w-full max-w-md bg-white border border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 shadow-xl rounded-2xl text-center p-8">
+            <Clock className="h-16 w-16 mx-auto text-indigo-500 mb-6 animate-pulse" />
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Waiting for Host</h3>
+            <p className="text-sm text-slate-500 dark:text-zinc-400 mb-8">
+              {approvalStatus?.status === "pending" 
+                ? "Your request has been sent. Please wait for the teacher to let you in."
+                : approvalStatus?.status === "denied"
+                ? "Your request to join this class was denied."
+                : "You need permission to join this live class."}
+            </p>
+            
+            {!approvalStatus && (
+              <Button 
+                className="w-full h-12 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition-all active:scale-95"
+                onClick={async () => {
+                  try {
+                    await requestJoin({ liveClassId: classItem._id });
+                    toast.success("Join request sent!");
+                  } catch (e: any) {
+                    toast.error(e.message || "Failed to send request");
+                  }
+                }}
+              >
+                Request to Join
+              </Button>
+            )}
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans overflow-hidden">
       
@@ -781,6 +837,20 @@ export default function LiveRoomPage() {
                 </span>
               )}
             </button>
+            {isTeacher && (
+              <button
+                className={cn(
+                  "flex-1 py-3 text-xs font-semibold tracking-wide transition-colors relative",
+                  activeTab === "waiting" 
+                    ? "text-indigo-600 dark:text-indigo-400" 
+                    : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                )}
+                onClick={() => setActiveTab("waiting")}
+              >
+                Waiting ({pendingApprovals.length})
+                {activeTab === "waiting" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400" />}
+              </button>
+            )}
           </div>
 
           {/* Tab Contents */}
@@ -929,10 +999,51 @@ export default function LiveRoomPage() {
                     )}
                   </div>
                 </div>
-                
               </div>
             )}
 
+            {/* WAITING ROOM TAB (Teacher Only) */}
+            {activeTab === "waiting" && isTeacher && (
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-zinc-950">
+                {pendingApprovals.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-zinc-600">
+                    <Clock className="h-10 w-10 mb-2 opacity-50" />
+                    <p className="text-sm font-medium">No pending requests</p>
+                  </div>
+                ) : (
+                  pendingApprovals.map((req: any) => (
+                    <div key={req._id} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
+                          {req.studentName.charAt(0).toUpperCase()}
+                        </div>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-zinc-200 truncate">
+                          {req.studentName}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 dark:border-green-900/30 dark:hover:bg-green-900/20"
+                          onClick={() => approveStudentMutation({ approvalId: req._id, status: "approved" })}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 dark:border-red-900/30 dark:hover:bg-red-900/20"
+                          onClick={() => approveStudentMutation({ approvalId: req._id, status: "denied" })}
+                        >
+                          <AlertCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </aside>
       </main>
