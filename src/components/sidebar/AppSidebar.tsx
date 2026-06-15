@@ -114,6 +114,7 @@ export const sidebardata = {
       icon: BookOpen,
       roles: ["teacher", "student", "admin"],
       items: [
+        { title: "Live Classes", url: "/lms/live", roles: ["teacher", "student", "admin"] },
         { title: "Assignments", url: "/lms/assignments" },
         { title: "Assessments", url: "/lms/exams" },
         { title: "Question Bank", url: "/lms/question-bank", roles: ["teacher", "admin"] },

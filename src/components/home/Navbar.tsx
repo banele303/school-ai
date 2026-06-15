@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import vhembeLogo from "@/assets/vhembe_logo.png";
 import { Menu, X, GraduationCap } from "lucide-react";
 import { Link } from "react-router";
 
@@ -21,9 +22,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <div className="bg-[#3ecf8e] p-1.5 rounded-lg">
-              <GraduationCap className="text-black w-6 h-6" />
-            </div>
+              <img src={vhembeLogo} alt="Vhembe Logo" className="h-8 w-8" />
             <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
               EDU<span className="text-[#3ecf8e]">NEXUS</span>
             </span>

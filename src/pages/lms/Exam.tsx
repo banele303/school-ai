@@ -11,10 +11,13 @@ import {
   Sparkles,
   CheckCircle2,
   ChevronRight,
+  BrainCircuit,
+  FileCheck2,
+  MessageSquareText,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/AuthProvider";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,8 +44,12 @@ const Exam = () => {
   const submitConvexExam = useMutation(api.submissions.submitExam);
   const toggleExam = useMutation(api.exams.toggleExamActive);
   const deleteExamM = useMutation(api.exams.deleteExam);
-  
+  const runGradeWithAI = useAction(api.aiGrading.gradeWithAI);
+  const overrideScore = useMutation(api.submissions.overrideScore);
+
   const [submitting, setSubmitting] = useState(false);
+  const [gradingSubId, setGradingSubId] = useState<string | null>(null);
+  const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submission, setSubmission] = useState<{
     score: number;
@@ -177,6 +184,22 @@ const Exam = () => {
     }
   };
 
+  const handleGradeWithAI = async (submissionId: string) => {
+    setGradingSubId(submissionId);
+    try {
+      const result: any = await runGradeWithAI({ submissionId: submissionId as any });
+      if (result?.success) {
+        toast.success(`AI grading complete! +${result.aiScore} pts from written answers`);
+      } else {
+        toast.error(result?.message || "AI grading failed");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "AI grading failed — please try again");
+    } finally {
+      setGradingSubId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm("Delete this assessment? This cannot be undone.")) return;
     try {
@@ -302,24 +325,120 @@ const Exam = () => {
       {isTeacher && (
         <div className="no-print">
           <Separator />
-          <div className="bg-card p-4 rounded-lg flex items-center justify-between border teacher-controls">
-            <div className="text-lg font-semibold">Teacher Controls</div>
-            <div className="flex gap-2 ml-2">
-              <Button onClick={() => navigate("/lms/exams")}>
+          <div className="bg-card p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border teacher-controls">
+            <div>
+              <div className="text-base font-semibold">Teacher Controls</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {convexSubmissions?.length || 0} submission{convexSubmissions?.length !== 1 ? "s" : ""} received
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={() => navigate("/lms/exams")}>
                 Back to List
               </Button>
               <Button
+                size="sm"
                 variant={exam.isActive ? "destructive" : "default"}
                 onClick={handleToggleStatus}
               >
-                {exam.isActive ? "Unpublish Exam" : "Publish Exam"}
+                {exam.isActive ? "Unpublish" : "Publish Exam"}
               </Button>
-              <Button variant="destructive" onClick={handleDelete}>
+              <Button size="sm" variant="destructive" onClick={handleDelete}>
                 Delete
               </Button>
             </div>
           </div>
-          <Separator />
+
+          {/* Teacher: Submissions with AI Grade Buttons */}
+          {convexSubmissions && convexSubmissions.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="h-4 w-4 text-violet-500" />
+                <h3 className="text-sm font-semibold">Student Submissions</h3>
+              </div>
+              {convexSubmissions.map((sub: any) => {
+                const hasOpenEnded = exam.questions?.some((q: any) =>
+                  q.type === "SHORT_ANSWER" || q.type === "ESSAY"
+                );
+                const isGrading = gradingSubId === sub._id;
+                const hasFeedback = !!sub.aiFeedback;
+                return (
+                  <div
+                    key={sub._id}
+                    className="border border-border/60 rounded-xl p-4 bg-card space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-violet-500/15 border border-violet-500/20 flex items-center justify-center">
+                          <span className="text-xs font-bold text-violet-500">
+                            #{sub.attemptNumber || 1}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">
+                            Student submission
+                            {sub.attemptNumber ? ` · Attempt ${sub.attemptNumber}` : ""}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Score: {sub.score} / {totalPoints} pts
+                            ({totalPoints > 0 ? Math.round((sub.score / totalPoints) * 100) : 0}%)
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {hasFeedback && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs gap-1.5"
+                            onClick={() =>
+                              setExpandedFeedback(
+                                expandedFeedback === sub._id ? null : sub._id
+                              )
+                            }
+                          >
+                            <MessageSquareText className="h-3.5 w-3.5" />
+                            {expandedFeedback === sub._id ? "Hide" : "AI Report"}
+                          </Button>
+                        )}
+                        {hasOpenEnded && (
+                          <Button
+                            size="sm"
+                            className="text-xs gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+                            onClick={() => handleGradeWithAI(sub._id)}
+                            disabled={isGrading}
+                            id={`ai-grade-btn-${sub._id}`}
+                          >
+                            {isGrading ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <BrainCircuit className="h-3.5 w-3.5" />
+                            )}
+                            {isGrading ? "Grading..." : hasFeedback ? "Re-grade AI" : "AI Grade"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* AI Feedback Panel */}
+                    {hasFeedback && expandedFeedback === sub._id && (
+                      <div className="mt-2 p-3 rounded-lg bg-violet-600/5 border border-violet-500/20 space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-violet-500 uppercase tracking-wide">
+                          <BrainCircuit className="h-3.5 w-3.5" />
+                          AI Marking Report
+                        </div>
+                        <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed">
+                          {sub.aiFeedback}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <Separator className="mt-4" />
         </div>
       )}
 

@@ -36,6 +36,7 @@ import StudyBuddyPage from "@/pages/StudyBuddy";
 import ProfileSettings from "@/pages/ProfileSettings";
 import ReportCardGenerator from "@/pages/academics/ReportCard";
 import AssignmentDetails from "@/pages/lms/AssignmentDetails";
+import LiveClassesPage from "@/pages/lms/LiveClasses";
 import ResourceLibrary from "@/pages/ResourceLibrary";
 import AdminResources from "@/pages/admin/ResourceManagement";
 
@@ -85,6 +86,7 @@ export const router = createBrowserRouter([
       { path: "report-cards", element: <ReportCardGenerator /> },
 
       // LMS
+      { path: "lms/live", element: <LiveClassesPage /> },
       { path: "lms/assignments", element: <AssignmentsPage /> },
       { path: "lms/assignments/:id", element: <AssignmentDetails /> },
       { path: "lms/exams", element: <Exams /> },
