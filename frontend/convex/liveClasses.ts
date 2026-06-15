@@ -36,6 +36,8 @@ export const createLiveClass = mutation({
     targetGrades: v.optional(v.array(v.number())),
     maxParticipants: v.optional(v.number()),
     notifyEnrolled: v.optional(v.boolean()),
+    invitedUsers: v.optional(v.array(v.id("users"))),
+    invitedClasses: v.optional(v.array(v.id("classes"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -75,6 +77,8 @@ export const createLiveClass = mutation({
       targetGrades: args.targetGrades,
       maxParticipants: args.maxParticipants,
       notifyEnrolled: args.notifyEnrolled ?? false,
+      invitedUsers: args.invitedUsers || [],
+      invitedClasses: args.invitedClasses || [],
     });
 
     return classId;
@@ -99,6 +103,8 @@ export const getLiveClasses = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+
+    const user = await ctx.db.get(userId);
 
     let results;
 
@@ -129,6 +135,19 @@ export const getLiveClasses = query({
           c.targetGrades.length === 0 ||
           c.targetGrades.includes(args.grade!)
       );
+    }
+
+    // Filter private classes for students
+    if (user?.role === "student") {
+      const studentClassId = user.studentClass;
+      results = results.filter((c) => {
+        if (!c.accessMode || c.accessMode !== "school-only") return true;
+        
+        const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
+        const isClassAssigned = c.class && c.class === studentClassId;
+        const isClassInvited = studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false);
+        return isUserInvited || isClassAssigned || isClassInvited;
+      });
     }
 
     // Sort by start time ascending
@@ -320,6 +339,17 @@ export const joinLiveClass = mutation({
 
     if (liveClass.status === "ended" || liveClass.status === "cancelled") {
       throw new Error("This class has already ended or was cancelled");
+    }
+
+    // Verify invitation for school-only classes
+    if (liveClass.accessMode === "school-only") {
+      const studentClassId = user?.studentClass;
+      const isUserInvited = liveClass.invitedUsers?.includes(userId) ?? false;
+      const isClassAssigned = liveClass.class && liveClass.class === studentClassId;
+      const isClassInvited = studentClassId && (liveClass.invitedClasses?.includes(studentClassId) ?? false);
+      if (!isUserInvited && !isClassAssigned && !isClassInvited) {
+        throw new Error("You are not invited to this private live class");
+      }
     }
 
     // Check if already joined
@@ -537,4 +567,122 @@ export const lowerStudentHand = mutation({
 
     return { success: true };
   },
+});
+
+export const searchUsersAndClasses = query({
+  args: { query: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Only teachers and admins can search for invitations");
+    }
+
+    const searchStr = args.query.trim().toLowerCase();
+    if (!searchStr) return { users: [], classes: [] };
+
+    // Search students
+    const students = await ctx.db
+      .query("users")
+      .collect();
+    
+    const matchedStudents = students.filter(s => 
+      s.role === "student" && 
+      ((s.name && s.name.toLowerCase().includes(searchStr)) || 
+       (s.email && s.email.toLowerCase().includes(searchStr)))
+    ).map(s => ({
+      _id: s._id,
+      name: s.name || s.email || "Student",
+      email: s.email || "",
+      role: s.role,
+    })).slice(0, 15);
+
+    // Search classes
+    const classes = await ctx.db
+      .query("classes")
+      .collect();
+
+    const matchedClasses = classes.filter(c => 
+      c.name.toLowerCase().includes(searchStr)
+    ).map(c => ({
+      _id: c._id,
+      name: c.name,
+    })).slice(0, 15);
+
+    return { users: matchedStudents, classes: matchedClasses };
+  }
+});
+
+export const inviteToLiveClass = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    invitedUsers: v.array(v.id("users")),
+    invitedClasses: v.array(v.id("classes")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized: you did not create this class");
+    }
+
+    await ctx.db.patch(args.liveClassId, {
+      invitedUsers: args.invitedUsers,
+      invitedClasses: args.invitedClasses,
+    });
+
+    return { success: true };
+  }
+});
+
+export const sendReaction = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    type: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.insert("liveClassReactions", {
+      liveClass: args.liveClassId,
+      user: userId,
+      userName: user.name || user.email || "Learner",
+      type: args.type,
+      timestamp: Date.now(),
+    });
+
+    return { success: true };
+  }
+});
+
+export const getRecentReactions = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const now = Date.now();
+    const reactions = await ctx.db
+      .query("liveClassReactions")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    // Only return reactions from the last 10 seconds
+    const recentReactions = reactions
+      .filter((r) => now - r.timestamp < 10000)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 30);
+
+    return recentReactions;
+  }
 });

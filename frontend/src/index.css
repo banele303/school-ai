@@ -64,37 +64,37 @@
 }
 
 .dark {
-  --background: #ffffff;
-  --foreground: #171717;
-  --card: #ffffff;
-  --card-foreground: #171717;
-  --popover: #ffffff;
-  --popover-foreground: #525252;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #09090b;
+  --card-foreground: #fafafa;
+  --popover: #09090b;
+  --popover-foreground: #a1a1aa;
   --primary: #dc2626;
   --primary-foreground: #ffffff;
-  --secondary: #fdfdfd;
-  --secondary-foreground: #171717;
-  --muted: #f4f4f5;
-  --muted-foreground: #525252;
-  --accent: #fee2e2;
-  --accent-foreground: #171717;
-  --destructive: #541c15;
-  --destructive-foreground: #ede9e8;
-  --border: #e5e7eb;
-  --input: #ffffff;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fef2f2;
+  --border: #27272a;
+  --input: #18181b;
   --ring: #dc2626;
   --chart-1: #dc2626;
-  --chart-2: #60a5fa;
-  --chart-3: #a78bfa;
-  --chart-4: #fbbf24;
-  --chart-5: #2dd4bf;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #525252;
+  --chart-2: #3b82f6;
+  --chart-3: #8b5cf6;
+  --chart-4: #f59e0b;
+  --chart-5: #10b981;
+  --sidebar: #09090b;
+  --sidebar-foreground: #a1a1aa;
   --sidebar-primary: #dc2626;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #fee2e2;
-  --sidebar-accent-foreground: #171717;
-  --sidebar-border: #e5e7eb;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
   --sidebar-ring: #dc2626;
   --font-sans: Outfit, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
@@ -186,15 +186,36 @@ body {
 }
 
 html,
-html.dark,
 body,
 #root {
-  background: #ffffff !important;
-  color: #171717;
+  background: var(--background) !important;
+  color: var(--foreground);
 }
 
 html.dark {
-  color-scheme: light;
+  color-scheme: dark;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 0;
+  }
+  15% {
+    transform: translateY(-20px) scale(1.2);
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-160px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+.animate-float-reaction {
+  animation: floatUp 2.2s cubic-bezier(0.08, 0.82, 0.17, 1) forwards;
 }
 
 @layer base {

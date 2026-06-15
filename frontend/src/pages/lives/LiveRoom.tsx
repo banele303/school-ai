@@ -42,6 +42,8 @@ export default function LiveRoomPage() {
 // @ts-ignore
   const startNativeLiveClass = useMutation(api.liveClasses.startNativeLiveClass);
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
+  const sendReaction = useMutation(api.liveClasses.sendReaction);
+  const recentReactions = useQuery(api.liveClasses.getRecentReactions, id ? { liveClassId: id as any } : "skip") || [];
 
   // States
   const [activeTab, setActiveTab] = useState<"chat" | "interactions">("chat");
@@ -67,7 +69,12 @@ export default function LiveRoomPage() {
   const hlsPlayerRef = useRef<Hls | null>(null);
 
   const isTeacher = user?.role === "teacher" || user?.role === "admin";
-  const myHandRaised = !isTeacher && raisedHands.some((h: any) => h.studentId === user?._id);
+  const isCreator = classItem?.teacher === user?._id || user?.role === "admin";
+  const myHandRaised = !isCreator && raisedHands.some((h: any) => h.studentId === user?._id);
+
+  const EMOJI_MAP: Record<string, string> = { like: "👍", love: "❤️", applause: "👏", laugh: "😂", surprised: "😮" };
+  const [floatingEmojis, setFloatingEmojis] = useState<{ id: string; type: string; x: number }[]>([]);
+  const renderedReactionsRef = useRef<Set<string>>(new Set());
 
   // Web Audio Hand Raise Chime
   const playHandRaiseChime = () => {
@@ -89,19 +96,47 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Detect new raised hands (for teacher)
+  // Detect new raised hands (for creator teacher)
   useEffect(() => {
-    if (isTeacher && raisedHands.length > prevRaisedCountRef.current) {
+    if (isCreator && raisedHands.length > prevRaisedCountRef.current) {
       const newestHand = raisedHands[raisedHands.length - 1];
       toast.success(`${newestHand.studentName} raised their hand`);
       playHandRaiseChime();
     }
     prevRaisedCountRef.current = raisedHands.length;
-  }, [raisedHands, isTeacher]);
+  }, [raisedHands, isCreator]);
+
+  // Listen for recent reactions and trigger floating animation
+  useEffect(() => {
+    if (recentReactions.length > 0) {
+      const newEmojis: any[] = [];
+      recentReactions.forEach((reaction: any) => {
+        if (!renderedReactionsRef.current.has(reaction._id)) {
+          renderedReactionsRef.current.add(reaction._id);
+          const x = 15 + Math.random() * 70;
+          newEmojis.push({
+            id: reaction._id,
+            type: reaction.type,
+            x,
+          });
+        }
+      });
+
+      if (newEmojis.length > 0) {
+        setFloatingEmojis((prev) => [...prev, ...newEmojis]);
+
+        newEmojis.forEach((emoji) => {
+          setTimeout(() => {
+            setFloatingEmojis((prev) => prev.filter((e) => e.id !== emoji.id));
+          }, 2200);
+        });
+      }
+    }
+  }, [recentReactions]);
 
   // Load AV Devices
   useEffect(() => {
-    if (isTeacher) {
+    if (isCreator) {
       navigator.mediaDevices.enumerateDevices().then((deviceList) => {
         const video = deviceList.filter((d) => d.kind === "videoinput");
         const audio = deviceList.filter((d) => d.kind === "audioinput");
@@ -110,7 +145,7 @@ export default function LiveRoomPage() {
         if (audio.length && !selectedAudioDevice) setSelectedAudioDevice(audio[0].deviceId);
       });
     }
-  }, [isTeacher, selectedVideoDevice, selectedAudioDevice]);
+  }, [isCreator, selectedVideoDevice, selectedAudioDevice]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -119,7 +154,7 @@ export default function LiveRoomPage() {
 
   // Handle student playback connection
   useEffect(() => {
-    if (!isTeacher && classItem && classItem.status === "live") {
+    if (!isCreator && classItem && classItem.status === "live") {
       setStreamActive(true);
       const timer = setTimeout(() => {
         setupStudentPlayer();
@@ -132,7 +167,7 @@ export default function LiveRoomPage() {
       setStreamActive(false);
       teardownStudentPlayer();
     }
-  }, [isTeacher, classItem?.status, classItem?.playbackUrl]);
+  }, [isCreator, classItem?.status, classItem?.playbackUrl]);
 
   // Teardown student player
   const teardownStudentPlayer = () => {
@@ -205,15 +240,15 @@ export default function LiveRoomPage() {
 
   // Start Camera preview when device changes
   useEffect(() => {
-    if (isTeacher && !isBroadcasting && (selectedVideoDevice || selectedAudioDevice)) {
+    if (isCreator && !isBroadcasting && (selectedVideoDevice || selectedAudioDevice)) {
       startPreview();
     }
     return () => {
-      if (isTeacher && !isBroadcasting && localStreamRef.current) {
+      if (isCreator && !isBroadcasting && localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [isTeacher, selectedVideoDevice, selectedAudioDevice, isBroadcasting]);
+  }, [isCreator, selectedVideoDevice, selectedAudioDevice, isBroadcasting]);
 
   // Go Live (Teacher)
   const handleGoLive = async () => {
@@ -360,13 +395,14 @@ export default function LiveRoomPage() {
     }
   };
 
-  const copyText = async (label: string, value?: string) => {
-    if (!value) return;
+  const handleSendReaction = async (type: string) => {
     try {
-      await navigator.clipboard.writeText(value);
-      toast.success(`${label} copied`);
-    } catch {
-      toast.error(`Could not copy ${label.toLowerCase()}`);
+      await sendReaction({
+        liveClassId: id as any,
+        type,
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send reaction");
     }
   };
 
@@ -424,7 +460,7 @@ export default function LiveRoomPage() {
             </div>
           )}
           
-          {isTeacher && (
+          {isCreator && (
             <Button
               variant="outline"
               size="icon"
@@ -445,8 +481,21 @@ export default function LiveRoomPage() {
           
           <div className="w-full max-w-4xl aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-900 relative shadow-2xl group">
             
+            {/* Emojis Floating Overlay */}
+            <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+              {floatingEmojis.map((emoji) => (
+                <span
+                  key={emoji.id}
+                  className="absolute bottom-6 text-3xl animate-float-reaction"
+                  style={{ left: `${emoji.x}%` }}
+                >
+                  {EMOJI_MAP[emoji.type] || emoji.type}
+                </span>
+              ))}
+            </div>
+
             {/* 1. TEACHER VIEW */}
-            {isTeacher && (
+            {isCreator && (
               <>
                 <video
                   ref={localVideoRef}
@@ -521,7 +570,7 @@ export default function LiveRoomPage() {
             )}
 
             {/* 2. STUDENT VIEW */}
-            {!isTeacher && (
+            {!isCreator && (
               <>
                 {streamActive ? (
                   <div className="w-full h-full relative bg-black">
@@ -600,64 +649,10 @@ export default function LiveRoomPage() {
             )}
           </div>
 
-          {isTeacher && classItem.status !== "ended" && (
-            <Card className="w-full max-w-4xl mt-4 bg-white border border-slate-200 text-slate-800 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-200">
-              <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="bg-red-600 text-white">Cloudflare Stream</Badge>
-                    <span className="text-xs text-slate-500 dark:text-zinc-500">Automatic recording enabled</span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-zinc-300">
-                    {classItem.rtmpsUrl && classItem.streamKey
-                      ? "Start your encoder with the RTMPS server and stream key, then keep chat and questions here."
-                      : "Cloudflare live input is not configured for this lesson. Classroom tools still work."}
-                  </p>
-                  {classItem.rtmpsUrl && (
-                    <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)}
-                        className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
-                      >
-                        <span className="block text-slate-500 dark:text-zinc-500">RTMPS server</span>
-                        <span className="mt-1 block truncate font-mono text-slate-800 dark:text-zinc-200">{classItem.rtmpsUrl}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => copyText("Stream key", classItem.streamKey)}
-                        className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
-                      >
-                        <span className="block text-slate-500 dark:text-zinc-500">Stream key</span>
-                        <span className="mt-1 block truncate font-mono text-slate-800 dark:text-zinc-200">{classItem.streamKey}</span>
-                      </button>
-                      {classItem.srtUrl && (
-                        <button
-                          type="button"
-                          onClick={() => copyText("SRT URL", classItem.srtUrl)}
-                          className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700 md:col-span-2"
-                        >
-                          <span className="block text-slate-500 dark:text-zinc-500">SRT URL</span>
-                          <span className="mt-1 block truncate font-mono text-slate-800 dark:text-zinc-200">{classItem.srtUrl}</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Button variant="outline" onClick={() => copyText("RTMPS server", classItem.rtmpsUrl)} disabled={!classItem.rtmpsUrl}>
-                    Copy server
-                  </Button>
-                  <Button variant="outline" onClick={() => copyText("Stream key", classItem.streamKey)} disabled={!classItem.streamKey}>
-                    Copy key
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Teacher Device Settings Drawer (shows if toggled) */}
-          {isTeacher && showSettings && (
+
+          {/* Creator Device Settings Drawer (shows if toggled) */}
+          {isCreator && showSettings && (
             <Card className="w-full max-w-4xl mt-4 bg-white border border-slate-200 text-slate-800 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-200">
               <CardContent className="p-4 grid md:grid-cols-2 gap-4">
                 <div>
@@ -690,27 +685,45 @@ export default function LiveRoomPage() {
             </Card>
           )}
 
-          {/* Student Interact Controls */}
-          {!isTeacher && classItem.status === "live" && (
-            <div className="w-full max-w-4xl flex items-center justify-between mt-4 px-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500 flex items-center gap-1">
-                  <Users className="h-3 w-3" />
+          {/* Unified Reaction and Student Controls Bar */}
+          {classItem.status === "live" && (
+            <div className="w-full max-w-4xl flex flex-wrap items-center justify-between mt-4 px-2 gap-4">
+              <div className="flex items-center gap-1 bg-white/85 dark:bg-zinc-900/85 backdrop-blur border border-slate-200/50 dark:border-zinc-800/50 p-1.5 rounded-full shadow-sm">
+                {Object.entries(EMOJI_MAP).map(([type, emoji]) => (
+                  <Button
+                    key={type}
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-lg transition-transform hover:scale-125 active:scale-90"
+                    onClick={() => handleSendReaction(type)}
+                    title={`React with ${type}`}
+                  >
+                    {emoji}
+                  </Button>
+                ))}
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1 font-medium">
+                  <Users className="h-3.5 w-3.5" />
                   {raisedHands.length} raised hands
                 </span>
-              </div>
-              <Button
-                onClick={handleRaiseHand}
-                className={cn(
-                  "gap-2 font-medium transition-all duration-300 shadow-lg px-6 rounded-full hover:scale-105 active:scale-95",
-                  myHandRaised
-                    ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 animate-pulse ring-4 ring-amber-500/20"
-                    : "bg-zinc-800 hover:bg-zinc-700 text-white"
+                
+                {!isCreator && (
+                  <Button
+                    onClick={handleRaiseHand}
+                    className={cn(
+                      "gap-2 font-semibold transition-all duration-300 shadow-md px-6 rounded-full hover:scale-105 active:scale-95 text-xs h-9",
+                      myHandRaised
+                        ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 animate-pulse ring-4 ring-amber-500/20"
+                        : "bg-slate-800 hover:bg-slate-700 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                    )}
+                  >
+                    <Hand className="h-4 w-4" />
+                    {myHandRaised ? "Lower Hand" : "Raise Hand"}
+                  </Button>
                 )}
-              >
-                <Hand className="h-4 w-4" />
-                {myHandRaised ? "Lower Hand" : "Raise Hand"}
-              </Button>
+              </div>
             </div>
           )}
         </section>
@@ -828,7 +841,7 @@ export default function LiveRoomPage() {
                       <Hand className="h-3.5 w-3.5" />
                       Raised Hands Queue
                     </h3>
-                    {isTeacher && raisedHands.length > 0 && (
+                    {isCreator && raisedHands.length > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -865,7 +878,7 @@ export default function LiveRoomPage() {
                             <span className="text-xs text-slate-800 font-medium truncate dark:text-zinc-200">{hand.studentName}</span>
                           </div>
                           
-                          {isTeacher && (
+                          {isCreator && (
                             <Button
                               variant="ghost"
                               size="sm"

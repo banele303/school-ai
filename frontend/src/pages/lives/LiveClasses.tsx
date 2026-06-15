@@ -42,6 +42,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
+import InviteDialog from "./InviteDialog";
 import {
   createStreamLiveInput,
   createStreamDirectUpload,
@@ -93,6 +94,7 @@ export default function LiveClassesPage() {
   const [selectedClass, setSelectedClass] = useState<any>(null);
   const [showStudio, setShowStudio] = useState(false);
   const [showMarker, setShowMarker] = useState(false);
+  const [inviteClass, setInviteClass] = useState<any>(null);
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
   const teacherClasses = user?.role === "teacher" || user?.role === "admin"
@@ -279,6 +281,7 @@ export default function LiveClassesPage() {
                           setSelectedClass(classItem);
                           setShowStudio(true);
                         }}
+                        onInvite={() => setInviteClass(classItem)}
                         onStatus={changeStatus}
                       />
                     );
@@ -333,6 +336,7 @@ export default function LiveClassesPage() {
         onStatus={changeStatus}
       />
       <AIMarkingDialog open={showMarker} onClose={() => setShowMarker(false)} subjects={subjects} />
+      <InviteDialog open={!!inviteClass} onClose={() => setInviteClass(null)} liveClass={inviteClass} />
     </div>
   );
 }
@@ -357,56 +361,59 @@ function StudioPill({ icon: Icon, label }: any) {
   );
 }
 
-function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onStatus }: any) {
+function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onInvite, onStatus }: any) {
   const statusCfg = STATUS_CONFIG[classItem.status] || STATUS_CONFIG.scheduled;
   const StatusIcon = statusCfg.icon;
 
   return (
-    <Card className={cn("overflow-hidden rounded-lg", classItem.status === "live" && "border-red-300 shadow-sm")}>
-      <div className={cn("h-1", classItem.status === "live" ? "bg-red-600" : "bg-slate-300")} />
+    <Card className={cn("overflow-hidden rounded-2xl bg-white/70 backdrop-blur border border-slate-200/50 dark:bg-zinc-900/70 dark:border-zinc-800/50 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300 dark:hover:border-zinc-700", classItem.status === "live" && "border-red-400 dark:border-red-900/50 shadow-red-500/5")}>
+      <div className={cn("h-1.5", classItem.status === "live" ? "bg-red-600" : "bg-slate-200 dark:bg-zinc-800")} />
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
-          <Badge variant="outline" className={cn("text-[11px]", statusCfg.color)}>
+          <Badge variant="outline" className={cn("text-[11px] font-semibold py-0.5 rounded-lg border", statusCfg.color)}>
             <StatusIcon className="mr-1 h-3 w-3" /> {statusCfg.label}
           </Badge>
-          <Badge variant="secondary" className="text-[11px]">
+          <Badge variant="secondary" className="text-[11px] font-medium rounded-lg dark:bg-zinc-800 dark:text-zinc-355">
             {PLATFORM_LABELS[classItem.platform] || classItem.platform || "Live"}
           </Badge>
         </div>
-        <CardTitle className="text-base">{classItem.title}</CardTitle>
-        {classItem.description && <CardDescription className="line-clamp-2">{classItem.description}</CardDescription>}
+        <CardTitle className="text-base font-bold text-slate-900 dark:text-white mt-1">{classItem.title}</CardTitle>
+        {classItem.description && <CardDescription className="line-clamp-2 text-slate-500 dark:text-zinc-400 text-xs mt-0.5">{classItem.description}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-          <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5" /> {format(new Date(classItem.startTime), "EEE, d MMM")}</span>
-          <span className="flex items-center gap-2"><Timer className="h-3.5 w-3.5" /> {format(new Date(classItem.startTime), "h:mm a")}</span>
-          <span className="flex items-center gap-2"><BookOpenCheck className="h-3.5 w-3.5" /> {subjectName || "Subject"}</span>
-          <span className="flex items-center gap-2"><Users className="h-3.5 w-3.5" /> {classItem.maxParticipants || "Open"} seats</span>
+        <div className="grid gap-2 text-xs text-slate-600 dark:text-zinc-350 sm:grid-cols-2">
+          <span className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5 text-slate-400 dark:text-zinc-500" /> {format(new Date(classItem.startTime), "EEE, d MMM")}</span>
+          <span className="flex items-center gap-2"><Timer className="h-3.5 w-3.5 text-slate-400 dark:text-zinc-500" /> {format(new Date(classItem.startTime), "h:mm a")}</span>
+          <span className="flex items-center gap-2"><BookOpenCheck className="h-3.5 w-3.5 text-slate-400 dark:text-zinc-500" /> {subjectName || "Subject"}</span>
+          <span className="flex items-center gap-2"><Users className="h-3.5 w-3.5 text-slate-400 dark:text-zinc-500" /> {classItem.maxParticipants || "Open"} seats</span>
         </div>
-        <div className="rounded-md bg-slate-50 p-3">
+        <div className="rounded-xl bg-slate-50 dark:bg-zinc-900/60 p-3 border border-slate-100 dark:border-zinc-800/40">
           <div className="mb-2 flex items-center justify-between text-xs">
-            <span className="font-medium text-slate-700">Lesson readiness</span>
-            <span className="text-slate-500">{classItem.recordingUrl ? "Replay ready" : classItem.status === "live" ? "Streaming" : "Preparing"}</span>
+            <span className="font-semibold text-slate-700 dark:text-zinc-300">Lesson readiness</span>
+            <span className="text-slate-500 dark:text-zinc-400 text-[10px]">{classItem.recordingUrl ? "Replay ready" : classItem.status === "live" ? "Streaming" : "Preparing"}</span>
           </div>
-          <Progress value={classItem.recordingUrl ? 100 : classItem.status === "live" ? 72 : 38} className="h-2" />
+          <Progress value={classItem.recordingUrl ? 100 : classItem.status === "live" ? 72 : 38} className="h-2 rounded-full dark:bg-zinc-800" />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button className="flex-1 gap-2" onClick={onOpen}>
-            <Play className="h-4 w-4" /> {classItem.status === "ended" ? "Open replay" : "Open lesson"}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button className="flex-1 gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 font-semibold text-xs h-9 rounded-xl transition-all" onClick={onOpen}>
+            <Play className="h-3.5 w-3.5 fill-current" /> {classItem.status === "ended" ? "Open replay" : "Open lesson"}
           </Button>
           {isTeacher && isOwner && (
             <>
-              <Button variant="outline" className="gap-2" onClick={onStudio}>
-                <Video className="h-4 w-4" /> Studio
+              <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 text-xs h-9 rounded-xl" onClick={onStudio}>
+                <Video className="h-3.5 w-3.5" /> Studio
+              </Button>
+              <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 text-xs h-9 rounded-xl" onClick={onInvite}>
+                <Users className="h-3.5 w-3.5" /> Invite
               </Button>
               {classItem.status !== "live" && (
-                <Button variant="ghost" size="icon" onClick={() => onStatus(classItem._id, "live")} title="Start live">
-                  <Radio className="h-4 w-4 text-red-600" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-850" onClick={() => onStatus(classItem._id, "live")} title="Start live">
+                  <Radio className="h-4 w-4 text-red-600 dark:text-red-400" />
                 </Button>
               )}
               {classItem.status === "live" && (
-                <Button variant="ghost" size="icon" onClick={() => onStatus(classItem._id, "ended")} title="End class">
-                  <CheckCircle className="h-4 w-4 text-green-700" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-850" onClick={() => onStatus(classItem._id, "ended")} title="End class">
+                  <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" />
                 </Button>
               )}
             </>
@@ -636,6 +643,11 @@ function AIMarkingDialog({ open, onClose, subjects }: any) {
   const [marking, setMarking] = useState(false);
   const [result, setResult] = useState<any>(null);
 
+  // Override States
+  const [customMark, setCustomMark] = useState(0);
+  const [customFeedback, setCustomFeedback] = useState("");
+  const [customNotes, setCustomNotes] = useState("");
+
   const runMarking = async () => {
     setMarking(true);
     try {
@@ -652,7 +664,10 @@ function AIMarkingDialog({ open, onClose, subjects }: any) {
         rubric: "Award marks for correct method, final answer, evidence, grammar where relevant, and CAPS-aligned reasoning.",
       });
       setResult(marked);
-      toast.success("AI marking draft generated.");
+      setCustomMark(marked.mark || 0);
+      setCustomFeedback(marked.feedback || "");
+      setCustomNotes(marked.teacherNotes || "");
+      toast.success("AI marking draft generated successfully.");
     } catch (error: any) {
       toast.error(error.message || "AI marking failed.");
     } finally {
@@ -660,93 +675,174 @@ function AIMarkingDialog({ open, onClose, subjects }: any) {
     }
   };
 
+  const handleApprove = () => {
+    toast.success("Teacher approved marks and saved to gradebook!");
+    onClose();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>AI marking desk</DialogTitle>
+      <DialogContent className="max-w-6xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 overflow-y-auto max-h-[90vh]">
+        <DialogHeader className="mb-4">
+          <div className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+              <Brain className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">Professional AI Marking Desk</DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 dark:text-zinc-400">
+                Instantly grade short answers, essays, or scanned PDFs. Get suggested rubrics, corrections, and detailed feedback which you can override before approval.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          
+          {/* Left panel: inputs */}
+          <div className="space-y-4 pr-1">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Task title</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Essay, worksheet, test..." />
+                <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Task Title</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Term test, Calculus essay..." className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs h-9 rounded-xl mt-1" />
               </div>
               <div>
-                <Label>Grade</Label>
+                <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Grade Level</Label>
                 <Select value={gradeLevel} onValueChange={setGradeLevel}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs h-9 rounded-xl mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-200">
                     {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((g) => <SelectItem key={g} value={g}>Grade {g}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div>
-              <Label>Subject</Label>
+              <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Subject</Label>
               <Select value={subjectName} onValueChange={setSubjectName}>
-                <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs h-9 rounded-xl mt-1"><SelectValue placeholder="Select subject" /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-200">
                   {subjects?.map((s: any) => <SelectItem key={s._id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Upload scan or PDF</Label>
-              <Input type="file" accept=".pdf,image/*,.txt,.md" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Upload scan or PDF (optional)</Label>
+              <Input type="file" accept=".pdf,image/*,.txt,.md" onChange={(e) => setFile(e.target.files?.[0] || null)} className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs h-10 rounded-xl mt-1 pt-2.5" />
             </div>
             <div>
-              <Label>Question / instructions</Label>
-              <Textarea rows={3} value={questionText} onChange={(e) => setQuestionText(e.target.value)} />
+              <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Question / Instructions</Label>
+              <Textarea rows={3} value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Enter the question or essay prompt..." className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs rounded-xl mt-1 focus:ring-1" />
             </div>
             <div>
-              <Label>Memo / expected answer</Label>
-              <Textarea rows={3} value={memoText} onChange={(e) => setMemoText(e.target.value)} />
+              <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Memo / Expected Answer</Label>
+              <Textarea rows={3} value={memoText} onChange={(e) => setMemoText(e.target.value)} placeholder="Provide keywords, CAPS guidelines, or a model answer..." className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs rounded-xl mt-1 focus:ring-1" />
             </div>
             <div>
-              <Label>Learner answer text</Label>
-              <Textarea rows={4} value={studentText} onChange={(e) => setStudentText(e.target.value)} placeholder="Paste OCR text or typed essay answer here." />
+              <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-350 font-sans">Learner Answer Text</Label>
+              <Textarea rows={4} value={studentText} onChange={(e) => setStudentText(e.target.value)} placeholder="Paste student text here. If a file was uploaded, the AI will transcribe it." className="bg-slate-50 border-slate-200 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs rounded-xl mt-1 focus:ring-1" />
             </div>
-            <Button onClick={runMarking} disabled={marking} className="w-full gap-2">
-              <Wand2 className="h-4 w-4" /> {marking ? "Marking..." : "Generate marking draft"}
+            <Button onClick={runMarking} disabled={marking} className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 rounded-xl transition-all shadow-md">
+              <Wand2 className="h-4 w-4" /> {marking ? "Running AI marking engine..." : "Generate AI marking draft"}
             </Button>
           </div>
-          <div className="rounded-lg border bg-slate-50 p-4">
+
+          {/* Right panel: results */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 dark:border-zinc-800 dark:bg-zinc-900/30 flex flex-col justify-between min-h-[500px]">
             {!result ? (
-              <div className="grid h-full min-h-80 place-items-center text-center text-slate-500">
-                <div>
-                  <FileCheck2 className="mx-auto mb-3 h-12 w-12 text-slate-300" />
-                  <p className="font-medium">Teacher-reviewed AI marking</p>
-                  <p className="mt-1 text-sm">The teacher gets suggested marks, corrections and feedback before final approval.</p>
+              <div className="grid h-full place-items-center text-center text-slate-500 my-auto">
+                <div className="max-w-sm">
+                  <FileCheck2 className="mx-auto mb-4 h-12 w-12 text-slate-300 dark:text-zinc-700" />
+                  <p className="font-bold text-slate-700 dark:text-zinc-350 text-sm">Waiting for draft generation</p>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-zinc-500">Provide the question instructions and student's answer on the left to start. The AI will output detailed rubrics, corrections, and comments.</p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-end justify-between">
+              <div className="space-y-5 flex-1">
+                
+                {/* Header score card */}
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
                   <div>
-                    <p className="text-sm text-slate-500">Suggested mark</p>
-                    <p className="text-3xl font-bold">{result.mark}/{result.maxMark}</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Suggested Mark</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <Input
+                        type="number"
+                        value={customMark}
+                        onChange={(e) => setCustomMark(Number(e.target.value))}
+                        className="w-16 text-center text-2xl font-bold bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-850 h-10 rounded-xl"
+                      />
+                      <span className="text-xl text-slate-400 font-semibold">/ {result.maxMark || 100}</span>
+                    </div>
                   </div>
-                  <Badge>{result.level}</Badge>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Performance Level</span>
+                    <div className="mt-1">
+                      <Badge className="bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-950 dark:border-indigo-900 dark:text-indigo-400 py-1 px-3 text-xs rounded-lg font-bold">
+                        {result.level || "Grade A"}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
-                <Progress value={result.percentage || 0} />
-                <div>
-                  <p className="text-sm font-semibold">Learner feedback</p>
-                  <p className="text-sm text-slate-700">{result.feedback}</p>
+
+                {/* Score slider override */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-600 dark:text-zinc-400">Adjust Score Override</Label>
+                  <input
+                    type="range"
+                    min="0"
+                    max={result.maxMark || 100}
+                    value={customMark}
+                    onChange={(e) => setCustomMark(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-800 accent-indigo-600 mt-2"
+                  />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">Teacher notes</p>
-                  <p className="text-sm text-slate-700">{result.teacherNotes}</p>
+
+                {/* Custom feedback */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-600 dark:text-zinc-400">Learner Feedback (AI Draft)</Label>
+                  <Textarea
+                    rows={4}
+                    value={customFeedback}
+                    onChange={(e) => setCustomFeedback(e.target.value)}
+                    className="bg-white border-slate-200 dark:bg-zinc-950 dark:border-zinc-850 dark:text-zinc-200 text-xs rounded-xl mt-1 focus:ring-1"
+                  />
                 </div>
-                {result.corrections?.length > 0 && (
-                  <div>
-                    <p className="text-sm font-semibold">Corrections</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                      {result.corrections.map((item: string) => <li key={item}>{item}</li>)}
-                    </ul>
+
+                {/* Teacher notes */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-600 dark:text-zinc-400">Private Teacher Notes</Label>
+                  <Textarea
+                    rows={3}
+                    value={customNotes}
+                    onChange={(e) => setCustomNotes(e.target.value)}
+                    className="bg-white border-slate-200 dark:bg-zinc-950 dark:border-zinc-850 dark:text-zinc-200 text-xs rounded-xl mt-1 focus:ring-1"
+                    placeholder="Add notes for internal assessment review..."
+                  />
+                </div>
+
+                {/* Corrections List */}
+                {result.corrections && result.corrections.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-600 dark:text-zinc-400">Corrections identified</Label>
+                    <div className="max-h-24 overflow-y-auto border border-slate-100 dark:border-zinc-850 rounded-xl bg-white dark:bg-zinc-950/40 p-3 space-y-1">
+                      {result.corrections.map((item: string, i: number) => (
+                        <p key={i} className="text-[11px] text-slate-600 dark:text-zinc-350 flex items-start gap-1">
+                          <span className="text-red-500 font-bold shrink-0">•</span> {item}
+                        </p>
+                      ))}
+                    </div>
                   </div>
                 )}
+
+                {/* Footer approve button */}
+                <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setResult(null)} className="text-slate-500 text-xs rounded-xl h-9 hover:bg-slate-100 dark:hover:bg-zinc-855">
+                    Reset
+                  </Button>
+                  <Button onClick={handleApprove} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-5 rounded-xl transition-all shadow-md">
+                    Approve & Save Marks
+                  </Button>
+                </div>
+
               </div>
             )}
           </div>

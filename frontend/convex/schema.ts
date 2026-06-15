@@ -512,6 +512,8 @@ export default defineSchema({
     targetGrades: v.optional(v.array(v.number())),
     maxParticipants: v.optional(v.number()),
     notifyEnrolled: v.boolean(),
+    invitedUsers: v.optional(v.array(v.id("users"))),
+    invitedClasses: v.optional(v.array(v.id("classes"))),
   }).index("by_status", ["status"])
     .index("by_subject", ["subject"])
     .index("by_start_time", ["startTime"])
@@ -545,6 +547,14 @@ export default defineSchema({
     raisedAt: v.number(),
   }).index("by_class", ["liveClass"])
     .index("by_student_class", ["student", "liveClass"]),
+
+  liveClassReactions: defineTable({
+    liveClass: v.id("liveClasses"),
+    user: v.id("users"),
+    userName: v.string(),
+    type: v.string(),
+    timestamp: v.number(),
+  }).index("by_class", ["liveClass"]),
 
   videoLibrary: defineTable({
     title: v.string(),
