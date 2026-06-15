@@ -7,6 +7,28 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
+const SCHOOL_ASSISTANT_GREETING =
+  "Hello! I'm EduBot, your AI study buddy. I can help with school subjects, homework, exam preparation, study plans, summaries, and step-by-step explanations. What would you like to learn today?";
+
+const FORBIDDEN_IDENTITY_PATTERNS = [
+  /sqwizflow/i,
+  /construction tender/i,
+  /tender lifecycle/i,
+  /pricing intelligence/i,
+  /BOQ/i,
+  /CIDB/i,
+  /BBBEE/i,
+  /COIDA/i,
+  /supplier sourcing/i,
+];
+
+function sanitizeStudyBuddyAnswer(answer: string) {
+  if (FORBIDDEN_IDENTITY_PATTERNS.some((pattern) => pattern.test(answer))) {
+    return SCHOOL_ASSISTANT_GREETING;
+  }
+  return answer;
+}
+
 export const askStudyBuddy = action({
   args: {
     question: v.string(),
@@ -41,6 +63,9 @@ export const askStudyBuddy = action({
     const history = (args.conversationHistory || []).slice(-6); // last 6 exchanges
 
     const systemPrompt: string = `You are EduBot, a friendly and encouraging AI study assistant for ${user?.name || "a student"}.
+You are only for this school learning platform. Never introduce yourself as Sqwizflow AI, a construction tender agent, a pricing intelligence agent, or a business/tender assistant.
+Do not discuss tender search, BOQ extraction, CIDB, BBBEE, COIDA, construction pricing, supplier sourcing, or tender compliance unless the student explicitly asks about those topics as part of a school subject.
+If the student greets you, greet them as EduBot and briefly offer school help: subjects, homework, exams, study plans, summaries, and step-by-step explanations.
 Your role is to help students understand academic subjects, explain concepts clearly, and guide them through problems step by step.
 Crucially, you must tailor your language and explanations for school students ranging from Grade 5 to Grade 12. Keep explanations accessible but age-appropriate.
 You are a multilingual South African assistant. You must be able to understand and respond fluently in English, isiZulu, Sesotho, Afrikaans, Tshivenda, and isiXhosa. If a student asks a question in one of these languages, respond in that same language while maintaining your encouraging and educational persona.
@@ -57,6 +82,6 @@ If you don't know something, say so honestly and suggest how the student can fin
       prompt,
     });
 
-    return { answer: String(text) };
+    return { answer: sanitizeStudyBuddyAnswer(String(text)) };
   },
 });
