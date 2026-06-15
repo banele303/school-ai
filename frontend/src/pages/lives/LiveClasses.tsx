@@ -93,7 +93,6 @@ export default function LiveClassesPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedClass, setSelectedClass] = useState<any>(null);
   const [showStudio, setShowStudio] = useState(false);
-  const [showMarker, setShowMarker] = useState(false);
   const [inviteClass, setInviteClass] = useState<any>(null);
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
@@ -317,7 +316,7 @@ export default function LiveClassesPage() {
         </section>
 
         <aside className="space-y-4">
-          <TeacherToolbox isTeacher={isTeacher} onCreate={() => setShowCreateDialog(true)} onMarker={() => setShowMarker(true)} />
+          <TeacherToolbox isTeacher={isTeacher} onCreate={() => setShowCreateDialog(true)} onMarker={() => navigate("/ai/marking")} />
           <SelfLearningPanel />
         </aside>
       </main>
@@ -335,7 +334,6 @@ export default function LiveClassesPage() {
         onClose={() => setShowStudio(false)}
         onStatus={changeStatus}
       />
-      <AIMarkingDialog open={showMarker} onClose={() => setShowMarker(false)} subjects={subjects} />
       <InviteDialog open={!!inviteClass} onClose={() => setInviteClass(null)} liveClass={inviteClass} />
     </div>
   );
@@ -398,13 +396,15 @@ function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStud
           <Button className="flex-1 gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 font-semibold text-xs h-9 rounded-xl transition-all" onClick={onOpen}>
             <Play className="h-3.5 w-3.5 fill-current" /> {classItem.status === "ended" ? "Open replay" : "Open lesson"}
           </Button>
+          {isTeacher && (
+            <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 text-xs h-9 rounded-xl" onClick={onInvite}>
+              <Users className="h-3.5 w-3.5" /> Invite
+            </Button>
+          )}
           {isTeacher && isOwner && (
             <>
               <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 text-xs h-9 rounded-xl" onClick={onStudio}>
                 <Video className="h-3.5 w-3.5" /> Studio
-              </Button>
-              <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 text-xs h-9 rounded-xl" onClick={onInvite}>
-                <Users className="h-3.5 w-3.5" /> Invite
               </Button>
               {classItem.status !== "live" && (
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-850" onClick={() => onStatus(classItem._id, "live")} title="Start live">
@@ -426,7 +426,7 @@ function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStud
 
 function EmptyLessons({ isTeacher, onCreate }: any) {
   return (
-    <div className="rounded-lg border border-dashed bg-white py-14 text-center">
+    <div className="rounded-lg border border-dashed bg-white dark:bg-zinc-950 dark:border-zinc-800 py-14 text-center">
       <Video className="mx-auto mb-4 h-12 w-12 text-slate-300" />
       <h3 className="font-semibold text-slate-700">No lessons in this view</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
@@ -528,7 +528,7 @@ function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
                 {isTeacher && <Button className="w-full justify-start gap-2"><ClipboardCheck className="h-4 w-4" /> Review submissions</Button>}
               </CardContent>
             </Card>
-            <div className="rounded-lg border bg-slate-50 p-3 text-xs text-slate-600">
+            <div className="rounded-lg border bg-slate-50 p-3 text-xs text-slate-600 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400">
               Learners can be enrolled through a school class, invited to an open support session, or use recordings independently for self-learning.
             </div>
           </div>

@@ -42,6 +42,7 @@ import LiveClassesPage from "@/pages/lives/LiveClasses";
 import LiveRoomPage from "@/pages/lives/LiveRoom";
 import VideoLibraryPage from "@/pages/videos/VideoLibrary";
 import HomeworkCheckerPage from "@/pages/ai/HomeworkChecker";
+import AIMarkingPage from "@/pages/ai/AIMarking";
 import StudyGroupsPage from "@/pages/groups/StudyGroups";
 import PeerTutoringPage from "@/pages/tutoring/PeerTutoring";
 import SchoolOnboarding from "@/pages/admin/SchoolOnboarding";
@@ -110,6 +111,7 @@ export const router = createBrowserRouter([
       { path: "lives/room/:id", element: <LiveRoomPage /> },
       { path: "videos", element: <VideoLibraryPage /> },
       { path: "ai/homework", element: <HomeworkCheckerPage /> },
+      { path: "ai/marking", element: <AIMarkingPage /> },
       { path: "groups", element: <StudyGroupsPage /> },
       { path: "tutoring", element: <PeerTutoringPage /> },
       { path: "admin/onboarding", element: <SchoolOnboarding /> },

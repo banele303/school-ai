@@ -19,11 +19,13 @@ import { cn } from "@/lib/utils";
 
 // HLS.js for fallback HLS streaming in browsers that don't support native HLS playback
 import Hls from "hls.js";
+import InviteDialog from "./InviteDialog";
 
 export default function LiveRoomPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [showInvite, setShowInvite] = useState(false);
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {}) || [];
 // @ts-ignore generated Convex types update after codegen
@@ -412,7 +414,7 @@ export default function LiveRoomPage() {
         <AlertCircle className="h-10 w-10 text-red-500 mb-4 animate-bounce" />
         <h3 className="text-xl font-bold">Classroom Not Found</h3>
         <p className="text-sm text-slate-500 mt-1 dark:text-zinc-400">This class may have been deleted or the link is invalid.</p>
-        <Button className="mt-6" onClick={() => navigate("/lives")}>
+        <Button className="mt-6 dark:bg-zinc-100 dark:text-zinc-900" onClick={() => navigate("/lives")}>
           Back to Live Classes
         </Button>
       </div>
@@ -458,6 +460,18 @@ export default function LiveRoomPage() {
               <Clock className="h-3.5 w-3.5 text-blue-400" />
               <span className="text-[11px] font-semibold text-blue-400 tracking-wider uppercase">Scheduled</span>
             </div>
+          )}
+          
+          {(user?.role === "teacher" || user?.role === "admin") && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="border-slate-200 bg-white text-slate-600 hover:text-slate-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-white dark:bg-zinc-900/40"
+              onClick={() => setShowInvite(true)}
+              title="Invite Students"
+            >
+              <Users className="h-4 w-4" />
+            </Button>
           )}
           
           {isCreator && (
@@ -592,10 +606,10 @@ export default function LiveRoomPage() {
                     {/* Custom Player Controls (bottom bar visible on hover) */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-950/90 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="flex items-center gap-3">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-white hover:bg-white/10"
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-white hover:bg-white/10 dark:hover:bg-zinc-800"
                           onClick={() => setIsAudioMuted(!isAudioMuted)}
                         >
                           {isAudioMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
@@ -923,6 +937,7 @@ export default function LiveRoomPage() {
         </aside>
       </main>
 
+      <InviteDialog open={showInvite} onClose={() => setShowInvite(false)} liveClass={classItem} />
     </div>
   );
 }

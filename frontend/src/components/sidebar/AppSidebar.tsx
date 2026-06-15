@@ -142,6 +142,7 @@ export const sidebardata = {
         { title: "Assessments", url: "/lms/exams" },
         { title: "Question Bank", url: "/lms/question-bank", roles: ["teacher", "admin"] },
         { title: "Study Materials", url: "/lms/materials" },
+        { title: "AI Marking Desk", url: "/ai/marking", roles: ["teacher", "admin"] },
       ],
     },
     {
