@@ -1,4 +1,3 @@
-// Trigger redeploy
 {
   "buildCommand": "node scripts/vercel-build.mjs",
   "installCommand": "npm install --include=dev",
