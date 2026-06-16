@@ -194,58 +194,8 @@ export default function LiveClassesPage() {
       </div>
 
       <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:px-6 xl:grid-cols-[1fr_360px]">
+
         <section className="space-y-6">
-          <Card className="overflow-hidden rounded-lg border-slate-200">
-            <CardContent className="grid gap-0 p-0 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="bg-slate-950 p-5 text-white md:p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <Badge className="border-red-400/40 bg-red-500/15 text-red-100">
-                    <Radio className="mr-1 h-3 w-3" /> Browser classroom
-                  </Badge>
-                  <span className="text-xs text-slate-300">Cloudflare-ready</span>
-                </div>
-                <div className="relative aspect-video overflow-hidden rounded-lg border border-white/10 bg-slate-900">
-                  <div className="absolute inset-0 grid place-items-center">
-                    <div className="text-center">
-                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-                        <Play className="h-7 w-7" />
-                      </div>
-                      <h2 className="text-xl font-semibold">Start teaching inside the classroom</h2>
-                      <p className="mx-auto mt-2 max-w-md text-sm text-slate-300">
-                        Teachers can open the studio, preview camera and mic, attach PDFs, then store replays through Cloudflare Stream.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <StudioPill icon={Mic} label="Mic check" />
-                  <StudioPill icon={MonitorUp} label="Share screen" />
-                  <StudioPill icon={Cloud} label="Record replay" />
-                </div>
-              </div>
-              <div className="space-y-4 p-5 md:p-6">
-                <div>
-                  <h2 className="text-lg font-semibold">What this page now supports</h2>
-                  <p className="text-sm text-slate-600">
-                    A single workspace for school learners, independent self-learners and teachers running live support sessions.
-                  </p>
-                </div>
-                {studioTools.map(({ icon: Icon, title, detail }) => (
-                  <div key={title} className="flex gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100">
-                      <Icon className="h-4 w-4 text-slate-700" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{title}</p>
-                      <p className="text-xs text-slate-600">{detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-
           <Tabs value={activeFilter} onValueChange={setActiveFilter}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-flex">

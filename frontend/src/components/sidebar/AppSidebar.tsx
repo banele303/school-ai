@@ -89,6 +89,7 @@ export const sidebardata = {
         { title: "Resource Library", url: "/resources", roles: ["admin", "teacher", "student", "parent"] },
       ],
     },
+    /*
     {
       title: "Premium Suite",
       url: "#",
@@ -107,6 +108,7 @@ export const sidebardata = {
         { title: "AI Tutor Memory", url: "/ai-tutor-memory", roles: ["admin", "teacher"] },
       ],
     },
+    */
     {
       title: "Communication",
       url: "#",
@@ -142,6 +144,14 @@ export const sidebardata = {
         { title: "Assessments", url: "/lms/exams" },
         { title: "Question Bank", url: "/lms/question-bank", roles: ["teacher", "admin"] },
         { title: "Study Materials", url: "/lms/materials" },
+      ],
+    },
+    {
+      title: "AI Marking",
+      url: "/ai/marking",
+      icon: FileText,
+      roles: ["teacher", "admin"],
+      items: [
         { title: "AI Marking Desk", url: "/ai/marking", roles: ["teacher", "admin"] },
       ],
     },

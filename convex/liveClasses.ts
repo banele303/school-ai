@@ -1,4 +1,3 @@
-"use node";
 declare const process: { env: Record<string, string | undefined> };
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
