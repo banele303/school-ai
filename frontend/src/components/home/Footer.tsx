@@ -15,7 +15,7 @@ const Footer = () => {
               />
               <div>
                 <span className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                  Mogo<span className="text-red-500">School</span>
+                  Vhembe Rising Star <span className="text-red-500">Academy</span>
                 </span>
                 <p className="text-[10px] text-gray-500 -mt-0.5">Learning Without Limits</p>
               </div>
@@ -83,7 +83,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-200 dark:border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-gray-500 gap-4">
-          <p>&copy; {new Date().getFullYear()} MogoSchool. Proudly South African. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Vhembe Rising Star Academy. Proudly South African. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <a href="#" className="hover:text-gray-900 dark:hover:text-white transition-colors">Privacy</a>
             <a href="#" className="hover:text-gray-900 dark:hover:text-white transition-colors">POPIA</a>

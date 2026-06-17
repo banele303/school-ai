@@ -54,7 +54,7 @@ export function TeamSwitcher({
                 />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">MogoSchool</span>
+                <span className="truncate font-medium">Vhembe Rising Star Academy</span>
                 <span className="truncate text-xs">{yearName}</span>
               </div>
               <ChevronsUpDown className="ml-auto" />

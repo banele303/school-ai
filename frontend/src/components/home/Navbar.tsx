@@ -25,7 +25,7 @@ const Navbar = () => {
             />
             <div>
               <span className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                Mogo<span className="text-red-500">School</span>
+                Vhembe Rising Star <span className="text-red-500">Academy</span>
               </span>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5 hidden sm:block">Learning Without Limits</p>
             </div>

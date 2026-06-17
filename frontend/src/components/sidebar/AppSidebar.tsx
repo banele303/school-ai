@@ -52,7 +52,7 @@ export interface NavItem {
 export const sidebardata = {
   teams: [
     {
-      name: "MogoSchool",
+      name: "Vhembe Rising Star Academy",
       logo: School,
       logoSrc: "/logo-school.jpeg",
     },

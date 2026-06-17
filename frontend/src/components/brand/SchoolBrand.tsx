@@ -13,7 +13,7 @@ export function SchoolBrand({ to = "/", compact = false }: SchoolBrandProps) {
         alt="MogoSchool"
         className={`${compact ? "h-8 w-auto" : "h-11 w-auto"} rounded-xl`}
       />
-      {!compact && <span className="font-extrabold tracking-tight text-gray-900 dark:text-white text-xl">MogoSchool</span>}
+      {!compact && <span className="font-extrabold tracking-tight text-gray-900 dark:text-white text-xl">Vhembe Rising Star Academy</span>}
     </div>
   );
 
