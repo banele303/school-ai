@@ -581,6 +581,15 @@ export default defineSchema({
     maxParticipants: v.optional(v.number()),
     // Auto-notify
     notifyEnrolled: v.boolean(),
+    // Stream connection details
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
+    // Invited users/classes
+    invitedUsers: v.optional(v.array(v.id("users"))),
+    invitedClasses: v.optional(v.array(v.id("classes"))),
   }).index("by_status", ["status"])
     .index("by_subject", ["subject"])
     .index("by_start_time", ["startTime"])
@@ -615,6 +624,24 @@ export default defineSchema({
     type: v.string(), // "like", "love", etc.
     timestamp: v.number(),
   }).index("by_class_and_time", ["liveClassId", "timestamp"]),
+
+  // ─── LIVE CHAT MESSAGES ────────────────────────────────────────
+  liveChatMessages: defineTable({
+    liveClassId: v.id("liveClasses"),
+    senderId: v.id("users"),
+    senderName: v.string(),
+    senderRole: v.string(),
+    content: v.string(),
+  }).index("by_live_class", ["liveClassId"]),
+
+  // ─── LIVE RAISED HANDS ─────────────────────────────────────────
+  liveRaisedHands: defineTable({
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+    studentName: v.string(),
+    raisedAt: v.number(),
+  }).index("by_live_class", ["liveClassId"])
+    .index("by_student_class", ["studentId", "liveClassId"]),
 
   // ─── VIDEO LIBRARY ─────────────────────────────────────────────
 
