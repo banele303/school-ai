@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Menu, X, GraduationCap } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Link } from "react-router";
 
 const Navbar = () => {
@@ -18,12 +18,14 @@ const Navbar = () => {
         <div className="flex justify-between items-center">
           {/* Brand */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-500 flex items-center justify-center shadow-lg shadow-red-500/20 group-hover:shadow-red-500/40 transition-shadow">
-              <GraduationCap className="w-6 h-6 text-white" />
-            </div>
+            <img
+              src="/logo-school.jpeg"
+              alt="School Logo"
+              className="h-10 w-auto rounded-lg"
+            />
             <div>
               <span className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                Edu<span className="text-red-500">Nexus</span>
+                Mogo<span className="text-red-500">School</span>
               </span>
               <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5 hidden sm:block">Learning Without Limits</p>
             </div>

@@ -1,4 +1,4 @@
-import { Twitter, Facebook, Linkedin, ArrowUp, Phone, Mail, MapPin, GraduationCap } from "lucide-react";
+import { Twitter, Facebook, Linkedin, ArrowUp, Phone, Mail, MapPin } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -8,12 +8,14 @@ const Footer = () => {
           {/* Brand */}
           <div className="space-y-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-500 flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
+              <img
+                src="/logo-school.jpeg"
+                alt="School Logo"
+                className="h-12 w-auto rounded-lg"
+              />
               <div>
                 <span className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                  Vhembe Rising Star Academy
+                  Mogo<span className="text-red-500">School</span>
                 </span>
                 <p className="text-[10px] text-gray-500 -mt-0.5">Learning Without Limits</p>
               </div>
@@ -81,7 +83,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-200 dark:border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-gray-500 gap-4">
-          <p>&copy; {new Date().getFullYear()} Vhembe Rising Star Academy. Proudly South African. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} MogoSchool. Proudly South African. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <a href="#" className="hover:text-gray-900 dark:hover:text-white transition-colors">Privacy</a>
             <a href="#" className="hover:text-gray-900 dark:hover:text-white transition-colors">POPIA</a>

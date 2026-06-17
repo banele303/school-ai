@@ -27,7 +27,7 @@ const Login = () => {
             {/* Header */}
             <div className="flex flex-col gap-2 text-center">
               <h1 className="text-2xl font-semibold tracking-tight">
-                {mode === "login" ? "Welcome back" : "Join Vhembe Rising Star Academy"}
+                {mode === "login" ? "Welcome back" : "Join MogoSchool"}
               </h1>
               <p className="text-muted-foreground text-sm">
                 {mode === "login"
@@ -43,7 +43,7 @@ const Login = () => {
             <div className="text-center text-sm">
               {mode === "login" ? (
                 <>
-                  New to Vhembe Rising Star Academy?{" "}
+                  New to MogoSchool?{" "}
                   <button
                     onClick={() => setMode("create")}
                     className="font-semibold underline underline-offset-4 hover:text-[#dc2626]"
@@ -90,7 +90,7 @@ const Login = () => {
             Built for South African Schools
           </h2>
           <p className="text-gray-200 text-sm max-w-sm">
-            From Grade R to Matric, Vhembe Rising Star Academy helps schools manage learners, timetables,
+            From Grade R to Matric, MogoSchool helps schools manage learners, timetables,
             assessments and reports, all in one place.
           </p>
         </div>

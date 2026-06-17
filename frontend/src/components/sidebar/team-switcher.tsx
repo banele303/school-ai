@@ -47,18 +47,14 @@ export function TeamSwitcher({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <div className="flex aspect-square size-9 items-center justify-center overflow-hidden rounded-md border border-red-200 bg-white">
-                {activeTeam.logoSrc ? (
-                  <img
-                    src={activeTeam.logoSrc}
-                    alt={`${activeTeam.name} logo`}
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <activeTeam.logo className="size-4 text-sidebar-primary" />
-                )}
+                <img
+                  src="/logo-school.jpeg"
+                  alt="MogoSchool logo"
+                  className="size-full object-cover"
+                />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{activeTeam.name}</span>
+                <span className="truncate font-medium">MogoSchool</span>
                 <span className="truncate text-xs">{yearName}</span>
               </div>
               <ChevronsUpDown className="ml-auto" />

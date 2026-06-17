@@ -26,7 +26,7 @@ const Hero = () => {
             <div>
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
-                  Vhembe Rising Star
+                  Mogo
                 </span>
                 <br />
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-amber-500">

@@ -52,8 +52,9 @@ export interface NavItem {
 export const sidebardata = {
   teams: [
     {
-      name: "Springfield High",
+      name: "MogoSchool",
       logo: School,
+      logoSrc: "/logo-school.jpeg",
     },
   ],
   navMain: [
