@@ -6,7 +6,6 @@ import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { StudyBuddy } from "@/components/ai/StudyBuddy";
 import { GlobalSearch } from "@/components/global/GlobalSearch";
 import { ThemeModeToggle } from "@/components/theme/ThemeModeToggle";
 
@@ -59,7 +58,6 @@ const PrivateRoutes = () => {
         <main className="flex-1 overflow-auto bg-white dark:bg-zinc-950">
           <Outlet />
         </main>
-        <StudyBuddy />
       </SidebarInset>
     </SidebarProvider>
   );

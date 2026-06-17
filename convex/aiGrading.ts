@@ -98,7 +98,7 @@ RETURN ONLY valid JSON — no markdown fences, no explanation text:
     // Build per-question feedback string
     const perQuestionFeedback = (result.gradedItems || [])
       .map((item: any) => {
-        const gItem = gradingItems.find((g) => g.questionText === item.questionText);
+        const gItem = gradingItems.find((g: any) => g.questionText === item.questionText);
         return `Q: ${item.questionText}\n→ Earned: ${item.earnedPoints}/${gItem?.maxPoints ?? "?"} pts\n   ${item.feedback}`;
       })
       .join("\n\n");

@@ -47,7 +47,7 @@ export const createGroup = mutation({
     const groupId = await ctx.db.insert("studyGroups", {
       name: args.name,
       description: args.description,
-      subject: args.subject,
+      subject: args.subject!,
       creator: userId,
       members: [userId],
       maxMembers: args.maxMembers,

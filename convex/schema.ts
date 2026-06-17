@@ -398,8 +398,29 @@ export default defineSchema({
     isRead: v.boolean(),
     subject: v.optional(v.string()),
     conversationId: v.string(), // sorted pair of user IDs: "id1_id2"
+
+    // NEW: Rich chat features
+    replyTo: v.optional(v.id("messages")),
+    messageType: v.optional(v.union(
+      v.literal("text"),
+      v.literal("file"),
+      v.literal("image"),
+      v.literal("voice"),
+      v.literal("system"),
+      v.literal("assignment"),
+      v.literal("exam")
+    )),
+    fileUrl: v.optional(v.string()),
+    fileName: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    fileType: v.optional(v.string()),
+    // CAPS curriculum context
+    curriculumTopic: v.optional(v.string()),
+    curriculumSubject: v.optional(v.string()),
+    curriculumGrade: v.optional(v.number()),
   }).index("by_conversation", ["conversationId"])
-    .index("by_recipient_read", ["recipient", "isRead"]),
+    .index("by_recipient_read", ["recipient", "isRead"])
+    .index("by_sender", ["sender"]),
 
   learningPaths: defineTable({
     student: v.id("users"),
@@ -634,6 +655,26 @@ export default defineSchema({
     lastWatchedAt: v.number(),
   }).index("by_video", ["video"])
     .index("by_student", ["student"]),
+
+  // ─── MESSAGE REACTIONS ────────────────────────────────────────
+  messageReactions: defineTable({
+    messageId: v.id("messages"),
+    userId: v.id("users"),
+    emoji: v.string(),
+  }).index("by_message", ["messageId"])
+    .index("by_user_message", ["userId", "messageId"]),
+
+  // ─── CURRICULUM CHAT HISTORY ─────────────────────────────────
+  curriculumChats: defineTable({
+    userId: v.id("users"),
+    topic: v.string(),
+    question: v.string(),
+    answer: v.string(),
+    subject: v.optional(v.string()),
+    grade: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_subject", ["subject"]),
 
   // ─── GAMIFICATION ──────────────────────────────────────────────
 

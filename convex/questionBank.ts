@@ -43,7 +43,7 @@ export const getQuestions = query({
 export const addQuestion = mutation({
   args: {
     questionText: v.string(),
-    type: v.string(),
+    type: v.union(v.literal("MCQ"), v.literal("SHORT_ANSWER"), v.literal("ESSAY"), v.literal("TRUE_FALSE"), v.literal("FILL_BLANK"), v.literal("MATCH_COLUMN"), v.literal("CALCULATION"), v.literal("DIAGRAM_LABEL")),
     options: v.array(v.string()),
     correctAnswer: v.string(),
     points: v.number(),
@@ -73,7 +73,7 @@ export const updateQuestion = mutation({
   args: {
     questionId: v.id("questionBank"),
     questionText: v.optional(v.string()),
-    type: v.optional(v.string()),
+    type: v.optional(v.union(v.literal("MCQ"), v.literal("SHORT_ANSWER"), v.literal("ESSAY"), v.literal("TRUE_FALSE"), v.literal("FILL_BLANK"), v.literal("MATCH_COLUMN"), v.literal("CALCULATION"), v.literal("DIAGRAM_LABEL"))),
     options: v.optional(v.array(v.string())),
     correctAnswer: v.optional(v.string()),
     points: v.optional(v.number()),
