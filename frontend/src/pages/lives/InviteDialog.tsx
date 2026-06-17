@@ -143,7 +143,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 overflow-hidden">
+      <DialogContent className="max-w-2xl bg-card border-border rounded-2xl shadow-2xl p-6 overflow-hidden">
         
         {/* Header */}
         <DialogHeader>
@@ -151,23 +151,23 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
             <div className="h-8 w-8 rounded-lg bg-red-600/10 flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-red-600 dark:text-red-400" />
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-950 dark:text-white">
+            <DialogTitle className="text-xl font-bold text-foreground">
               Invite Students & Classes
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-slate-500 dark:text-zinc-400">
-            Invite specific cohorts or students to <span className="font-semibold text-slate-800 dark:text-zinc-200">"{liveClass.title}"</span>. Only invited users will be able to join when access is private.
+          <DialogDescription className="text-xs text-muted-foreground">
+            Invite specific cohorts or students to <span className="font-semibold text-secondary-foreground">"{liveClass.title}"</span>. Only invited users will be able to join when access is private.
           </DialogDescription>
         </DialogHeader>
 
         {/* Selected List Tags */}
         <div className="my-4 space-y-2">
           {selectedUsers.length === 0 && selectedClasses.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 p-4 text-center text-xs text-slate-400 dark:text-zinc-500">
+            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
               No students or classes invited yet. Use the search below to invite people.
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border border-slate-100 dark:border-zinc-900 rounded-xl bg-slate-50/50 dark:bg-zinc-900/30">
+            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border border-border rounded-xl bg-muted/30">
               {selectedClasses.map((cls) => (
                 <Badge
                   key={cls._id}
@@ -205,28 +205,28 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
 
         {/* Search Input */}
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search classes or student names/emails..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-slate-50 border-slate-200 focus-visible:ring-indigo-500 focus-visible:ring-1 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100 text-xs h-10 rounded-xl"
+            className="pl-9 bg-muted border-input text-foreground focus-visible:ring-indigo-500 focus-visible:ring-1 text-xs h-10 rounded-xl"
           />
         </div>
 
         {/* Search Results Panel */}
         {searchQuery.trim() !== "" && (
-          <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden max-h-60 overflow-y-auto mb-4 bg-white dark:bg-zinc-900 shadow-lg animate-in fade-in-50 duration-150">
+          <div className="border border-border rounded-xl overflow-hidden max-h-60 overflow-y-auto mb-4 bg-card shadow-lg animate-in fade-in-50 duration-150">
             {searchResults.users.length === 0 && searchResults.classes.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-500 dark:text-zinc-500">
+              <div className="p-4 text-center text-xs text-muted-foreground">
                 No matching classes or students found.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+              <div className="divide-y divide-border">
                 {/* Classes Section */}
                 {searchResults.classes.length > 0 && (
                   <div className="p-2">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Class groups
                     </div>
                     {searchResults.classes.map((cls) => {
@@ -235,18 +235,18 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
                         <button
                           key={cls._id}
                           onClick={() => handleSelectClass(cls)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-accent transition-colors"
                         >
                           <div className="flex items-center gap-2">
                             <div className="h-7 w-7 rounded-md bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                               <Users className="h-3.5 w-3.5" />
                             </div>
-                            <span className="font-medium text-slate-800 dark:text-zinc-200">{cls.name}</span>
+                            <span className="font-medium text-foreground">{cls.name}</span>
                           </div>
                           {isSelected ? (
                             <Check className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
                           ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500">Add class</span>
+                            <span className="text-[10px] text-muted-foreground">Add class</span>
                           )}
                         </button>
                       );
@@ -257,7 +257,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
                 {/* Users Section */}
                 {searchResults.users.length > 0 && (
                   <div className="p-2">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Students
                     </div>
                     {searchResults.users.map((u) => {
@@ -266,16 +266,16 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
                         <button
                           key={u._id}
                           onClick={() => handleSelectUser(u)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-accent transition-colors"
                         >
                           <div className="flex items-center gap-2">
                             <div className="h-7 w-7 rounded-md bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                               <User className="h-3.5 w-3.5" />
                             </div>
                             <div>
-                              <span className="font-medium text-slate-800 dark:text-zinc-200 block">{u.name}</span>
+                              <span className="font-medium text-foreground block">{u.name}</span>
                               {u.email && (
-                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                   <Mail className="h-2.5 w-2.5" /> {u.email}
                                 </span>
                               )}
@@ -284,7 +284,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
                           {isSelected ? (
                             <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500">Add student</span>
+                            <span className="text-[10px] text-muted-foreground">Add student</span>
                           )}
                         </button>
                       );
@@ -302,7 +302,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
             variant="outline"
             onClick={handleCopyLink}
             type="button"
-            className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:text-slate-900 dark:border-zinc-800 dark:text-zinc-350 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-900 text-xs h-9 rounded-xl mr-auto w-full sm:w-auto"
+            className="flex items-center gap-1.5 text-xs h-9 rounded-xl mr-auto w-full sm:w-auto"
           >
             <Copy className="h-3.5 w-3.5" />
             Copy Share Link
@@ -312,7 +312,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
             variant="ghost"
             onClick={onClose}
             type="button"
-            className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-900 text-xs h-9 rounded-xl w-full sm:w-auto"
+            className="text-xs h-9 rounded-xl w-full sm:w-auto"
           >
             Cancel
           </Button>
