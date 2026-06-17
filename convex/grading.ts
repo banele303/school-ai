@@ -2,7 +2,7 @@ declare const process: { env: Record<string, string | undefined> };
 import { mutation, action, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -42,8 +42,8 @@ export const gradeWithAI = action({
     submissionId: v.id("assignmentSubmissions"),
   },
   handler: async (ctx, args) => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) return { grade: 0, feedback: "AI service is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your Convex environment." };
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) return { grade: 0, feedback: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
 
     // We need to fetch the submission and the assignment details
     // But action ctx doesn't have direct DB access. We need a query.
@@ -68,10 +68,10 @@ export const gradeWithAI = action({
       }
     `;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
       prompt,
-      model: google("gemini-2.5-flash"),
+      model: openai("deepseek-chat"),
     });
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();

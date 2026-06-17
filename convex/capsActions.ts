@@ -1,7 +1,7 @@
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -205,7 +205,7 @@ export const generateExamFromSyllabus = action({
     duration: v.number(),
   },
   handler: async (ctx, args): Promise<any> => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) return { questions: [], error: "AI not configured" };
 
     const userId = await getAuthUserId(ctx);
@@ -263,8 +263,8 @@ JSON FORMAT:
 }`;
 
     try {
-      const google = createGoogleGenerativeAI({ apiKey });
-      const { text } = await generateText({ prompt, model: google("gemini-2.5-flash") });
+      const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
+      const { text } = await generateText({ prompt, model: openai("deepseek-chat") });
       const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const start = clean.indexOf('{');
       const end = clean.lastIndexOf('}');

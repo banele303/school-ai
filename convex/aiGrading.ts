@@ -2,23 +2,23 @@
 declare const process: { env: Record<string, string | undefined> };
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
 // ─── AI EXAM GRADING ACTION ───────────────────────────────────────
-// Grades SHORT_ANSWER and ESSAY questions using Gemini AI.
+// Grades SHORT_ANSWER and ESSAY questions using AI.
 // The teacher triggers this per-submission from the Exam page.
 export const gradeWithAI = action({
   args: {
     submissionId: v.id("submissions"),
   },
   handler: async (ctx, args) => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) {
       return {
         success: false,
-        message: "AI service not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in Convex dashboard.",
+        message: "AI service not configured. Please set DEEPSEEK_API_KEY in Convex dashboard.",
       };
     }
 
@@ -78,10 +78,10 @@ RETURN ONLY valid JSON — no markdown fences, no explanation text:
   "overallFeedback": "<2-4 sentences: overall summary, strengths, areas to improve, encouragement>"
 }`;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
       prompt,
-      model: google("gemini-2.5-flash"),
+      model: openai("deepseek-chat"),
     });
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
