@@ -21,7 +21,7 @@ const Navbar = () => {
             <img
               src="/logo-school.jpeg"
               alt="Vhembe Rising Star Academy"
-              className="h-12 w-auto rounded-lg"
+              className="h-16 w-auto rounded-lg"
             />
           </Link>
 

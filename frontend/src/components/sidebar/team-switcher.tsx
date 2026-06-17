@@ -46,15 +46,14 @@ export function TeamSwitcher({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-9 items-center justify-center overflow-hidden rounded-md border border-red-200 bg-white">
+              <div className="flex aspect-square size-12 items-center justify-center overflow-hidden rounded-md border border-red-200 bg-white">
                 <img
                   src="/logo-school.jpeg"
-                  alt="MogoSchool logo"
+                  alt="Vhembe Rising Star Academy"
                   className="size-full object-cover"
                 />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">Vhembe Rising Star Academy</span>
                 <span className="truncate text-xs">{yearName}</span>
               </div>
               <ChevronsUpDown className="ml-auto" />
@@ -76,15 +75,11 @@ export function TeamSwitcher({
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center overflow-hidden rounded-md border bg-white">
-                  {team.logoSrc ? (
-                    <img
-                      src={team.logoSrc}
-                      alt={`${team.name} logo`}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <team.logo className="size-3.5 shrink-0" />
-                  )}
+                  <img
+                    src={team.logoSrc || "/logo-school.jpeg"}
+                    alt={`${team.name} logo`}
+                    className="size-full object-cover"
+                  />
                 </div>
                 {team.name}
                 <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
