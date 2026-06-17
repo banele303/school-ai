@@ -9,6 +9,7 @@ import {
   Banknote,
   Megaphone,
   BookOpen,
+  MessageCircle,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -214,6 +215,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <TeamSwitcher teams={sidebardata.teams} yearName={year?.name!} />
       </SidebarHeader>
+      {/* AI Chat Button */}
+      <div className="px-3 py-2">
+        <Button
+          className={cn(
+            "w-full gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-lg transition-all duration-300",
+            isCollapsed ? "h-10 w-10 p-0 justify-center" : "h-11"
+          )}
+          onClick={() => navigate("/study-buddy")}
+          title="AI Study Chat"
+        >
+          <MessageCircle className={cn("h-5 w-5", isCollapsed ? "" : "shrink-0")} />
+          {!isCollapsed && <span>AI Study Chat</span>}
+        </Button>
+      </div>
       <SidebarContent>
         <NavMain items={filteredNav} />
       </SidebarContent>
