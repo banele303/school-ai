@@ -40,15 +40,15 @@ export const askStudyBuddy = action({
     // Build conversation history
     const history = (args.conversationHistory || []).slice(-6); // last 6 exchanges
 
-    const systemPrompt: string = `You are EduBot, a friendly and encouraging AI study assistant for ${user?.name || "a student"}.
+    const systemPrompt: string = `You are an AI study assistant for ${user?.name || "a student"}.
 Your role is to help students understand academic subjects, explain concepts clearly, and guide them through problems step by step.
 Crucially, you must tailor your language and explanations for school students ranging from Grade 5 to Grade 12. Keep explanations accessible but age-appropriate.
 You are a multilingual South African assistant. You must be able to understand and respond fluently in English, isiZulu, Sesotho, Afrikaans, Tshivenda, and isiXhosa. If a student asks a question in one of these languages, respond in that same language while maintaining your encouraging and educational persona.
 If study materials are provided, prioritise using that information to answer questions.
 If you don't know something, say so honestly and suggest how the student can find the answer.${contextText}`;
 
-    const historyText = history.map((h: any) => `${h.role === "user" ? "Student" : "EduBot"}: ${h.content}`).join("\n");
-    const prompt: string = `${historyText ? historyText + "\n" : ""}Student: ${args.question}\nEduBot:`;
+    const historyText = history.map((h: any) => `${h.role === "user" ? "Student" : "AI"}: ${h.content}`).join("\n");
+    const prompt: string = `${historyText ? historyText + "\n" : ""}Student: ${args.question}\nAI:`;
 
     const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({

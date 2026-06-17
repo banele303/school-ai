@@ -55,7 +55,7 @@ export function StudyBuddy() {
   const [input, setInput] = useState("");
   const [subjectId, setSubjectId] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hi! I'm EduBot 🤖 Your AI study assistant. Select a subject and ask me anything — I'll use your school's study materials to help you!" },
+    { role: "assistant", content: "Hi! I'm your AI study assistant 🤖 Ask me anything about your subjects — I'll use your school's curriculum to help you!" },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -93,7 +93,7 @@ export function StudyBuddy() {
       setMessages((prev) => [...prev, { role: "assistant", content: res.answer }]);
     } catch (e: any) {
       console.error(e);
-      toast.error("EduBot couldn't answer right now. Try again!");
+      toast.error("AI couldn't answer right now. Try again!");
       setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, I had trouble generating a response. Please check your Gemini API key configuration! 🙁" }]);
     } finally {
       setIsLoading(false);
@@ -122,7 +122,7 @@ export function StudyBuddy() {
               <Bot className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-base tracking-tight drop-shadow-sm">EduBot AI</p>
+              <p className="font-bold text-base tracking-tight drop-shadow-sm">AI Study Chat</p>
               <p className="text-[11px] text-primary-foreground/90 flex items-center gap-1.5 font-medium">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" /> Edge Powered
               </p>

@@ -44,7 +44,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export async function chatWithEduBot(
+export async function chatWithAI(
   messages: ChatMessage[],
   subjectName?: string
 ): Promise<string> {
@@ -55,7 +55,7 @@ export async function chatWithEduBot(
   });
 
   if (!res.ok) {
-    throw new Error("Failed to chat with EduBot. Is the Cloudflare Worker running?");
+    throw new Error("Failed to chat with AI. Is the Cloudflare Worker running?");
   }
 
   const data = await res.json();

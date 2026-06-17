@@ -9,10 +9,6 @@ import {
   Banknote,
   Megaphone,
   BookOpen,
-  Video,
-  Rocket,
-  FileText,
-  MessageSquare,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -37,7 +33,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ThemeModeToggle } from "@/components/theme/ThemeModeToggle";
+import { ThemeToogle } from "./ThemeToogle";
 
 export interface NavItem {
   title: string;
@@ -56,19 +52,11 @@ export interface NavItem {
 export const sidebardata = {
   teams: [
     {
-      name: "Vhembe Rising Star Academy",
+      name: "Springfield High",
       logo: School,
-      logoSrc: "",
     },
   ],
   navMain: [
-    {
-      title: "Chat",
-      url: "/messages",
-      icon: MessageSquare,
-      isActive: false,
-      roles: ["admin", "teacher", "student", "parent"],
-    },
     {
       title: "Dashboard",
       url: "/dashboard",
@@ -84,40 +72,17 @@ export const sidebardata = {
       ],
     },
     {
-      title: "Learning Hub",
-      url: "#",
-      icon: Video,
-      roles: ["admin", "teacher", "student"],
+      title: "Resources",
+      url: "/resources",
+      icon: GraduationCap,
+      roles: ["admin", "teacher", "student", "parent"],
       items: [
-        { title: "Live Classes", url: "/lives", roles: ["admin", "teacher", "student"] },
-        { title: "Video Library", url: "/videos", roles: ["admin", "teacher", "student"] },
-        { title: "Study Buddy AI", url: "/study-buddy", roles: ["admin", "teacher", "student"] },
-        { title: "AI Homework", url: "/ai/homework", roles: ["admin", "teacher", "student"] },
-        { title: "Study Groups", url: "/groups", roles: ["admin", "teacher", "student"] },
-        { title: "Peer Tutoring", url: "/tutoring", roles: ["admin", "teacher", "student"] },
         { title: "Resource Library", url: "/resources", roles: ["admin", "teacher", "student", "parent"] },
+        { title: "AI Chat", url: "/study-buddy", roles: ["admin", "teacher", "student"] },
+        { title: "Past Papers", url: "/resources?type=past-papers", roles: ["admin", "teacher", "student", "parent"] },
+        { title: "Study Materials", url: "/resources?type=study-materials", roles: ["admin", "teacher", "student", "parent"] },
       ],
     },
-    /*
-    {
-      title: "Premium Suite",
-      url: "#",
-      icon: Rocket,
-      roles: ["admin", "teacher"],
-      items: [
-        { title: "Command Center", url: "/command-center", roles: ["admin"] },
-        { title: "Lesson Studio", url: "/lesson-studio", roles: ["admin", "teacher"] },
-        { title: "Student Timeline", url: "/student-timeline", roles: ["admin", "teacher"] },
-        { title: "Parent Reports", url: "/parent-reports", roles: ["admin", "teacher"] },
-        { title: "Class Engagement", url: "/class-engagement", roles: ["admin", "teacher"] },
-        { title: "Recording Studio", url: "/recording-studio", roles: ["admin", "teacher"] },
-        { title: "Marketplace", url: "/teacher-marketplace", roles: ["admin", "teacher"] },
-        { title: "Offline Mode", url: "/offline-mode", roles: ["admin"] },
-        { title: "White-Label", url: "/white-label", roles: ["admin"] },
-        { title: "AI Tutor Memory", url: "/ai-tutor-memory", roles: ["admin", "teacher"] },
-      ],
-    },
-    */
     {
       title: "Communication",
       url: "#",
@@ -125,7 +90,7 @@ export const sidebardata = {
       roles: ["admin", "teacher", "student", "parent"],
       items: [
         { title: "Announcements", url: "/announcements" },
-        { title: "Chat", url: "/messages" },
+        { title: "Messages", url: "/messages" },
         { title: "Events Calendar", url: "/events" },
       ],
     },
@@ -153,15 +118,6 @@ export const sidebardata = {
         { title: "Assessments", url: "/lms/exams" },
         { title: "Question Bank", url: "/lms/question-bank", roles: ["teacher", "admin"] },
         { title: "Study Materials", url: "/lms/materials" },
-      ],
-    },
-    {
-      title: "AI Marking",
-      url: "/ai/marking",
-      icon: FileText,
-      roles: ["teacher", "admin"],
-      items: [
-        { title: "AI Marking Desk", url: "/ai/marking", roles: ["teacher", "admin"] },
       ],
     },
     {
@@ -267,14 +223,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             isCollapsed ? "flex-row space-y-2" : "flex justify-between",
           )}
         >
-          <SidebarMenuItem title="Theme">
-            <ThemeModeToggle compact={isCollapsed} />
-          </SidebarMenuItem>
           <SidebarMenuItem title="Logout">
             <Button onClick={logout} variant={"ghost"} size="icon-sm">
               <LogOut />
             </Button>
           </SidebarMenuItem>
+          <ThemeToogle />
         </div>
         <NavUser user={userData} />
       </SidebarFooter>

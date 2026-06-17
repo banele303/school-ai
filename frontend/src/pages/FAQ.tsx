@@ -35,7 +35,7 @@ const faqs = [
       },
       {
         q: "What is the AI Study Buddy?",
-        a: "EduBot is our AI-powered study assistant. It uses your school's own study materials to help learners with homework, exam preparation, and concept understanding. It's available in English, isiZulu, Sesotho, and Afrikaans.",
+        a: "The AI Study Chat is our AI-powered study assistant. It uses your school's own curriculum materials to help learners with homework, exam preparation, and concept understanding. It's available in English, isiZulu, Sesotho, and Afrikaans.",
       },
       {
         q: "Can I generate report cards automatically?",
