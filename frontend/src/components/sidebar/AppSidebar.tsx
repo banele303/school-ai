@@ -12,6 +12,7 @@ import {
   Video,
   Rocket,
   FileText,
+  MessageSquare,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -61,6 +62,13 @@ export const sidebardata = {
     },
   ],
   navMain: [
+    {
+      title: "Chat",
+      url: "/messages",
+      icon: MessageSquare,
+      isActive: false,
+      roles: ["admin", "teacher", "student", "parent"],
+    },
     {
       title: "Dashboard",
       url: "/dashboard",
@@ -117,7 +125,7 @@ export const sidebardata = {
       roles: ["admin", "teacher", "student", "parent"],
       items: [
         { title: "Announcements", url: "/announcements" },
-        { title: "Messages", url: "/messages" },
+        { title: "Chat", url: "/messages" },
         { title: "Events Calendar", url: "/events" },
       ],
     },
