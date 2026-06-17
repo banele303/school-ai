@@ -11,6 +11,12 @@ import {
   Sparkles,
   CheckCircle2,
   ChevronRight,
+  Languages,
+  Lightbulb,
+  Mic,
+  ShieldAlert,
+  Swords,
+  Users,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/AuthProvider";
@@ -22,14 +28,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import ExamRadio from "@/components/lms/ExamRadio";
+import CognitiveRadar from "@/components/lms/CognitiveRadar";
 import { cn } from "@/lib/utils";
 
 const Exam = () => {
   const { id } = useParams();
+  const searchParams = new URLSearchParams(window.location.search);
+  const arenaId = searchParams.get("arena");
   const navigate = useNavigate();
   const { user } = useAuth();
   const isStudent = user?.role === "student";
@@ -41,6 +51,11 @@ const Exam = () => {
   const submitConvexExam = useMutation(api.submissions.submitExam);
   const toggleExam = useMutation(api.exams.toggleExamActive);
   const deleteExamM = useMutation(api.exams.deleteExam);
+  const arena = useQuery(
+    (api as any).arenas.getArena,
+    arenaId ? { arenaId: arenaId as any } : "skip"
+  );
+  const updateArenaProgress = useMutation((api as any).arenas.updateArenaProgress);
   
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,6 +66,9 @@ const Exam = () => {
   } | null>(null);
   // Student Answers State: { [questionId]: "Selected Option" }
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [language, setLanguage] = useState<"en" | "zu" | "af">("en");
+  const [hintedQuestions, setHintedQuestions] = useState<Record<string, boolean>>({});
+  const [simulatorMode, setSimulatorMode] = useState(false);
 
   // Print & PDF Customizer Options
   const [printIncludeHeader, setPrintIncludeHeader] = useState(true);
@@ -72,6 +90,68 @@ const Exam = () => {
       }
     }
   }, [isStudent, convexSubmissions]);
+
+  useEffect(() => {
+    if (!arenaId || !exam || !isStudent || submission) return;
+    const answered = exam.questions.filter((q: any) => answers[q._id] || answers[q.questionText]).length;
+    updateArenaProgress({
+      arenaId: arenaId as any,
+      progress: answered,
+    }).catch(() => undefined);
+  }, [answers, arenaId, exam, isStudent, submission, updateArenaProgress]);
+
+  useEffect(() => {
+    if (!simulatorMode) return;
+    const block = (event: Event) => event.preventDefault();
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "Strict simulator mode is active.";
+    };
+    document.addEventListener("copy", block);
+    document.addEventListener("paste", block);
+    window.addEventListener("beforeunload", warn);
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+    return () => {
+      document.removeEventListener("copy", block);
+      document.removeEventListener("paste", block);
+      window.removeEventListener("beforeunload", warn);
+    };
+  }, [simulatorMode]);
+
+  const getQuestionText = (q: any) => {
+    if (language === "zu" && q.questionTextZulu) return q.questionTextZulu;
+    if (language === "af" && q.questionTextAfrikaans) return q.questionTextAfrikaans;
+    return q.questionText;
+  };
+
+  const getOptions = (q: any) => {
+    if (language === "zu" && q.optionsZulu?.length) return q.optionsZulu;
+    if (language === "af" && q.optionsAfrikaans?.length) return q.optionsAfrikaans;
+    return q.options;
+  };
+
+  const requestHint = (q: any) => {
+    const key = q._id || q.questionText;
+    setHintedQuestions((prev) => ({ ...prev, [key]: true }));
+    toast.info(`Hint: identify the ${q.cognitiveLevel || "key"} step before answering. Hint use caps this item.`);
+  };
+
+  const startDictation = (q: any) => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech dictation is not supported in this browser");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = language === "af" ? "af-ZA" : language === "zu" ? "zu-ZA" : "en-ZA";
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join(" ");
+      setAnswers((prev) => ({ ...prev, [q._id]: `${prev[q._id] || ""} ${transcript}`.trim() }));
+    };
+    recognition.start();
+  };
 
   const totalPoints = exam
     ? (exam.totalPoints || exam.questions.reduce((s: number, q: any) => s + (q.points || 0), 0))
@@ -133,8 +213,10 @@ const Exam = () => {
           });
         }
       } else {
-        const ans = answers[q._id] || "";
-        if (!ans) unanswered++;
+        const hinted = hintedQuestions[q._id || q.questionText];
+        const baseAns = answers[q._id] || "";
+        const ans = `${baseAns}${hinted ? "\n[HINT_USED]" : ""}`;
+        if (!baseAns.trim()) unanswered++;
         payload.push({
           questionId: q.questionText,
           answer: ans,
@@ -154,6 +236,15 @@ const Exam = () => {
         examId: id as any,
         answers: payload,
       });
+
+      if (arenaId) {
+        await updateArenaProgress({
+          arenaId: arenaId as any,
+          progress: exam.questions.length,
+          score: data.score,
+          completed: true,
+        });
+      }
 
       const msg = exam.examType === "quiz"
         ? `Quiz submitted! Score: ${data.score}/${exam.totalPoints || exam.questions.reduce((s: number, q: any) => s + (q.points || 0), 0)} (Attempt ${data.attemptNumber})`
@@ -189,7 +280,7 @@ const Exam = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6 printable-area">
+    <div className={cn("mx-auto p-6 space-y-6 printable-area", arenaId ? "max-w-6xl" : "max-w-3xl")}>
       {/* Printable CSS Rules Injected Natively */}
       <style>{`
         @media print {
@@ -250,6 +341,33 @@ const Exam = () => {
           <div className="flex items-center gap-1">
             {exam.questions.length} questions • {exam.totalPoints || exam.questions.reduce((acc: number, cur: any) => acc + (cur.points || 0), 0)} pts
           </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs">
+            <Languages className="h-4 w-4" />
+            <Select value={language} onValueChange={(value) => setLanguage(value as any)}>
+              <SelectTrigger className="h-7 w-[132px] border-0 px-2 shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="zu">isiZulu</SelectItem>
+                <SelectItem value="af">Afrikaans</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {isStudent && (
+            <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
+              <ShieldAlert className="h-4 w-4 text-amber-500" />
+              Simulator
+              <Switch checked={simulatorMode} onCheckedChange={setSimulatorMode} />
+            </label>
+          )}
+          {arenaId && (
+            <Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-200">
+              <Swords className="mr-1 h-3.5 w-3.5" /> Battle mode
+            </Badge>
+          )}
         </div>
         {/* Quiz info */}
         {exam.examType === "quiz" && (
@@ -434,6 +552,7 @@ const Exam = () => {
         </CardContent>
       </Card>
 
+      <div className={cn("grid gap-6", arenaId ? "lg:grid-cols-[1fr_280px]" : "grid-cols-1")}>
       {/* questions list */}
       <div className="space-y-6">
         {exam.questions.map((q: any, index: number) => (
@@ -441,8 +560,13 @@ const Exam = () => {
             <CardHeader className="pb-3 print:pb-2">
               <CardTitle className="text-lg font-medium flex gap-2 items-start print:text-sm print:font-bold">
                 <span className="text-muted-foreground print:text-black">{index + 1}.</span>
-                <span className="flex-1">{q.questionText}</span>
+                <span className="flex-1">{getQuestionText(q)}</span>
                 <div className="flex items-center gap-2 shrink-0">
+                  {q.cognitiveLevel && (
+                    <span className="text-[10px] font-normal text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded dark:bg-cyan-950 dark:text-cyan-200">
+                      {q.cognitiveLevel.replace("_", " ")}
+                    </span>
+                  )}
                   {q.topic && (
                     <span className="text-[10px] font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded">
                       {q.topic}
@@ -455,12 +579,19 @@ const Exam = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="print:pt-1">
+              {isStudent && !submission && (
+                <div className="no-print mb-3 flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => requestHint(q)}>
+                    <Lightbulb className="mr-2 h-4 w-4" /> Hint
+                  </Button>
+                </div>
+              )}
               {/* ─── MCQ ─────────────────────────── */}
               {q.type === "MCQ" && (
                 <div>
                   {isTeacher ? (
                     <ul className="space-y-2 print:space-y-1">
-                      {q.options?.map((opt: string, i: number) => (
+                      {getOptions(q)?.map((opt: string, i: number) => (
                         <li key={i} className={`p-3 rounded-md border flex items-center gap-2 print:text-xs print:p-1.5 ${opt === q.correctAnswer ? "bg-primary font-medium print:bg-zinc-200 print:border-black print:font-bold" : "bg-black/20 dark:bg-black/70 print:bg-transparent"}`}>
                           {opt === q.correctAnswer && <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />}
                           <span className="text-sm print:text-xs">{opt}</span>
@@ -469,12 +600,12 @@ const Exam = () => {
                     </ul>
                   ) : (
                     <div className="no-print">
-                      <ExamRadio answers={answers} question={q} setAnswers={setAnswers} submission={submission as any} />
+                      <ExamRadio answers={answers} question={{ ...q, options: getOptions(q) || q.options }} setAnswers={setAnswers} submission={submission as any} />
                     </div>
                   )}
                   {!isTeacher && !submission && (
                     <ul className="hidden print:block space-y-1.5 mt-2">
-                      {q.options?.map((opt: string, i: number) => (
+                      {getOptions(q)?.map((opt: string, i: number) => (
                         <li key={i} className="flex items-center gap-2 text-xs">
                           <span className="w-3.5 h-3.5 rounded-full border border-black inline-block shrink-0" />
                           <span>{opt}</span>
@@ -569,14 +700,19 @@ const Exam = () => {
                       <p className="text-sm font-medium font-mono">{q.correctAnswer}</p>
                     </div>
                   ) : (
-                    <div className="no-print">
-                      <Input
-                        placeholder="Enter your calculated answer..."
-                        className="text-sm font-mono"
+                    <div className="no-print space-y-2">
+                      <Textarea
+                        placeholder="Show your working step by step, then state the final answer."
+                        className="min-h-[140px] text-sm font-mono"
                         value={submission ? (submission.answers.find(a => a.questionId === q._id)?.answer || "") : (answers[q._id] || "")}
                         onChange={(e) => { if (!submission) setAnswers(prev => ({ ...prev, [q._id]: e.target.value })); }}
                         disabled={!!submission}
                       />
+                      {q.calculationSteps?.length > 0 && !submission && (
+                        <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs text-muted-foreground">
+                          CAPS mark scheme will award partial credit for visible method steps.
+                        </div>
+                      )}
                       {submission && (
                         <div className={`mt-2 p-3 rounded-md text-sm ${submission.answers.find(a => a.questionId === q._id)?.answer?.trim() === q.correctAnswer.trim() ? "bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800" : "bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"}`}>
                           <span className="font-medium">Correct answer: </span>
@@ -665,10 +801,30 @@ const Exam = () => {
                       <p className="text-sm">{q.correctAnswer}</p>
                     </div>
                   ) : (
-                    <div className="no-print">
+                    <div className="no-print space-y-3">
+                      {q.diagramHotspots?.length > 0 && (
+                        <div className="relative min-h-[260px] overflow-hidden rounded-md border bg-zinc-950">
+                          {q.diagramUrl ? (
+                            <img src={q.diagramUrl} alt="Diagram hotspots" className="h-full min-h-[260px] w-full object-contain" />
+                          ) : (
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.24),transparent_32%),linear-gradient(135deg,rgba(15,23,42,1),rgba(39,39,42,1))]" />
+                          )}
+                          {q.diagramHotspots.map((spot: any, spotIndex: number) => (
+                            <div
+                              key={`${spot.label}-${spotIndex}`}
+                              className="absolute -translate-x-1/2 -translate-y-1/2"
+                              style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+                            >
+                              <div className="grid h-7 w-7 place-items-center rounded-full border border-cyan-200 bg-cyan-400 text-xs font-bold text-zinc-950 shadow-lg shadow-cyan-950/40">
+                                {spotIndex + 1}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <Textarea
-                        placeholder="Describe the diagram labels..."
-                        className="min-h-[80px] text-sm"
+                        placeholder="Enter each hotspot label, for example: 1. Nucleus"
+                        className="min-h-[100px] text-sm"
                         value={submission ? (submission.answers.find(a => a.questionId === q._id)?.answer || "") : (answers[q._id] || "")}
                         onChange={(e) => { if (!submission) setAnswers(prev => ({ ...prev, [q._id]: e.target.value })); }}
                         disabled={!!submission}
@@ -692,6 +848,13 @@ const Exam = () => {
                     </div>
                   ) : (
                     <div className="space-y-3 no-print">
+                      {!submission && (
+                        <div className="flex justify-end">
+                          <Button variant="outline" size="sm" onClick={() => startDictation(q)}>
+                            <Mic className="mr-2 h-4 w-4" /> Dictate
+                          </Button>
+                        </div>
+                      )}
                       <Textarea
                         placeholder={q.type === "ESSAY" ? "Write your essay response here..." : "Type your answer..."}
                         className={`bg-background/50 border-muted focus:border-primary transition-all resize-y text-sm leading-relaxed ${q.type === "ESSAY" ? "min-h-[200px]" : "min-h-[100px]"}`}
@@ -736,6 +899,37 @@ const Exam = () => {
             </CardContent>
           </Card>
         ))}
+      </div>
+      {arenaId && (
+        <aside className="no-print space-y-4">
+          <Card className="sticky top-4 border-cyan-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="h-4 w-4 text-cyan-500" /> Battle Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(arena?.participants || []).map((participant: any) => (
+                <div key={participant.studentId} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">{participant.name}</span>
+                    <span className="text-muted-foreground">
+                      {participant.progress}/{exam.questions.length}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-cyan-500"
+                      style={{ width: `${(participant.progress / Math.max(exam.questions.length, 1)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <CognitiveRadar questions={exam.questions} className="pt-2 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </aside>
+      )}
       </div>
 
       {/* Printable Memo Section */}

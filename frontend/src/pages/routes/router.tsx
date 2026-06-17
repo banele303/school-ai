@@ -14,6 +14,7 @@ import { Subjects } from "@/pages/academics/Subjects";
 import Timetable from "@/pages/academics/Timetable";
 import Exams from "@/pages/lms/Exams";
 import Exam from "../lms/Exam";
+import ExamArena from "@/pages/lms/ExamArena";
 import GeneralSettings from "@/pages/settings/general";
 import RolesPermissions from "@/pages/settings/roles";
 import AttendancePage from "@/pages/academics/Attendance";
@@ -98,6 +99,8 @@ export const router = createBrowserRouter([
       { path: "lms/assignments/:id", element: <AssignmentDetails /> },
       { path: "lms/exams", element: <Exams /> },
       { path: "lms/exams/:id", element: <Exam /> },
+      { path: "lms/exams/:id/arena", element: <ExamArena /> },
+      { path: "lms/exam-arena", element: <ExamArena /> },
       { path: "lms/question-bank", element: <QuestionBank /> },
       { path: "lms/materials", element: <MaterialsPage /> },
 

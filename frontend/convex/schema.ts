@@ -120,6 +120,10 @@ export default defineSchema({
     totalPoints: v.optional(v.number()),
     // Exam template used (if any)
     templateUsed: v.optional(v.string()),
+    // South African assessment metadata
+    capsPhase: v.optional(v.union(v.literal("Senior"), v.literal("FET"))),
+    grade: v.optional(v.number()),
+    southAfricanExamType: v.optional(v.string()),
     questions: v.array(
       v.object({
         questionText: v.string(),
@@ -146,11 +150,42 @@ export default defineSchema({
         diagramUrl: v.optional(v.string()),
         // Source question bank ID if reused
         bankQuestionId: v.optional(v.string()),
+        questionTextZulu: v.optional(v.string()),
+        questionTextAfrikaans: v.optional(v.string()),
+        optionsZulu: v.optional(v.array(v.string())),
+        optionsAfrikaans: v.optional(v.array(v.string())),
+        correctAnswerZulu: v.optional(v.string()),
+        correctAnswerAfrikaans: v.optional(v.string()),
+        cognitiveLevel: v.optional(v.string()),
+        calculationSteps: v.optional(v.array(v.string())),
+        diagramHotspots: v.optional(
+          v.array(v.object({ label: v.string(), x: v.number(), y: v.number() }))
+        ),
       })
     ),
   }).index("by_type", ["examType"])
     .index("by_teacher_type", ["teacher", "examType"])
     .index("by_class_type", ["class", "examType"]),
+
+  examArenas: defineTable({
+    exam: v.id("exams"),
+    status: v.union(v.literal("waiting"), v.literal("active"), v.literal("completed")),
+    code: v.string(),
+    host: v.id("users"),
+    startedAt: v.optional(v.number()),
+    duration: v.number(),
+    participants: v.array(
+      v.object({
+        studentId: v.id("users"),
+        name: v.string(),
+        avatar: v.optional(v.string()),
+        progress: v.number(),
+        score: v.number(),
+        completedAt: v.optional(v.number()),
+      })
+    ),
+  }).index("by_code", ["code"])
+    .index("by_status", ["status"]),
 
   submissions: defineTable({
     exam: v.id("exams"),
@@ -194,6 +229,17 @@ export default defineSchema({
     timesUsed: v.optional(v.number()),
     tags: v.array(v.string()),
     isPublished: v.boolean(),
+    questionTextZulu: v.optional(v.string()),
+    questionTextAfrikaans: v.optional(v.string()),
+    optionsZulu: v.optional(v.array(v.string())),
+    optionsAfrikaans: v.optional(v.array(v.string())),
+    correctAnswerZulu: v.optional(v.string()),
+    correctAnswerAfrikaans: v.optional(v.string()),
+    cognitiveLevel: v.optional(v.string()),
+    calculationSteps: v.optional(v.array(v.string())),
+    diagramHotspots: v.optional(
+      v.array(v.object({ label: v.string(), x: v.number(), y: v.number() }))
+    ),
   }).index("by_subject", ["subject"])
     .index("by_topic", ["topic"])
     .index("by_type", ["type"])

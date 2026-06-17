@@ -11,6 +11,7 @@ import {
   BookOpen,
   Video,
   Rocket,
+  FileText,
   type LucideIcon,
   LogOut,
 } from "lucide-react";

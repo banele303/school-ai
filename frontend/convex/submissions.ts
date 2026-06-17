@@ -76,15 +76,43 @@ export const submitExam = mutation({
 
       if (autoGradeTypes.includes(q.type)) {
         totalAutoGradable += q.points;
+        const maxPoints = ans.answer.includes("[HINT_USED]")
+          ? Math.ceil(q.points * 0.6)
+          : q.points;
         if (q.type === "MATCH_COLUMN") {
-          // For match column, check if answer matches correctAnswer
-          if (ans.answer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
-            score += q.points;
+          if (Array.isArray(q.matchPairs) && q.matchPairs.length > 0) {
+            const perPair = q.points / q.matchPairs.length;
+            let pairScore = 0;
+            q.matchPairs.forEach((pair: any) => {
+              const pairAnswer = args.answers.find(
+                (a) => a.questionId === `${q.questionText} [${pair.left}]`
+              );
+              if (pairAnswer?.answer.trim().toLowerCase() === pair.right.trim().toLowerCase()) {
+                pairScore += perPair;
+              }
+            });
+            score += Math.min(maxPoints, Math.round(pairScore));
+            if (pairScore > 0) autoGradedCount++;
+          } else if (ans.answer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
+            score += maxPoints;
             autoGradedCount++;
           }
+        } else if (q.type === "CALCULATION" && Array.isArray(q.calculationSteps) && q.calculationSteps.length > 0) {
+          const normalizedAnswer = ans.answer.replace("[HINT_USED]", "").trim().toLowerCase();
+          if (normalizedAnswer === q.correctAnswer.trim().toLowerCase()) {
+            score += maxPoints;
+            autoGradedCount++;
+          } else {
+            const matchedSteps = q.calculationSteps.filter((step: string) =>
+              normalizedAnswer.includes(step.toLowerCase().slice(0, Math.min(step.length, 28)))
+            ).length;
+            const partial = Math.floor((matchedSteps / q.calculationSteps.length) * q.points);
+            score += Math.min(maxPoints, partial);
+            if (partial > 0) autoGradedCount++;
+          }
         } else {
-          if (ans.answer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
-            score += q.points;
+          if (ans.answer.replace("[HINT_USED]", "").trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
+            score += maxPoints;
             autoGradedCount++;
           }
         }
