@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://trustworthy-viper-361.convex.site",
+      domain: "https://fine-caiman-328.convex.site",
       applicationID: "convex",
     },
   ],
