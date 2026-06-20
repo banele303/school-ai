@@ -19,6 +19,7 @@ import type * as capsActions from "../capsActions.js";
 import type * as capsSeed from "../capsSeed.js";
 import type * as classes from "../classes.js";
 import type * as cleanup from "../cleanup.js";
+import type * as emails from "../emails.js";
 import type * as events from "../events.js";
 import type * as examSeed from "../examSeed.js";
 import type * as exams from "../exams.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   capsSeed: typeof capsSeed;
   classes: typeof classes;
   cleanup: typeof cleanup;
+  emails: typeof emails;
   events: typeof events;
   examSeed: typeof examSeed;
   exams: typeof exams;

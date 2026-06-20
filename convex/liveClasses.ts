@@ -1,4 +1,3 @@
-declare const process: { env: Record<string, string | undefined> };
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -16,6 +15,14 @@ export const createLiveClass = mutation({
     platform: v.string(),
     joinUrl: v.string(),
     recordingUrl: v.optional(v.string()),
+    streamInputId: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    whepUrl: v.optional(v.string()),
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
     streamVideoUid: v.optional(v.string()),
     playbackUrl: v.optional(v.string()),
     roomId: v.optional(v.string()),
@@ -29,6 +36,8 @@ export const createLiveClass = mutation({
     targetGrades: v.optional(v.array(v.number())),
     maxParticipants: v.optional(v.number()),
     notifyEnrolled: v.optional(v.boolean()),
+    invitedUsers: v.optional(v.array(v.id("users"))),
+    invitedClasses: v.optional(v.array(v.id("classes"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -50,6 +59,14 @@ export const createLiveClass = mutation({
       platform: args.platform,
       joinUrl: args.joinUrl,
       recordingUrl: args.recordingUrl,
+      streamInputId: args.streamInputId,
+      whipUrl: args.whipUrl,
+      whepUrl: args.whepUrl,
+      rtmpsUrl: args.rtmpsUrl,
+      streamKey: args.streamKey,
+      srtUrl: args.srtUrl,
+      srtStreamId: args.srtStreamId,
+      srtPassphrase: args.srtPassphrase,
       streamVideoUid: args.streamVideoUid,
       playbackUrl: args.playbackUrl,
       roomId: args.roomId || crypto.randomUUID(),
@@ -60,6 +77,8 @@ export const createLiveClass = mutation({
       targetGrades: args.targetGrades,
       maxParticipants: args.maxParticipants,
       notifyEnrolled: args.notifyEnrolled ?? false,
+      invitedUsers: args.invitedUsers || [],
+      invitedClasses: args.invitedClasses || [],
     });
 
     return classId;
@@ -84,6 +103,8 @@ export const getLiveClasses = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+
+    const user = await ctx.db.get(userId);
 
     let results;
 
@@ -116,10 +137,44 @@ export const getLiveClasses = query({
       );
     }
 
+    // Filter private classes & restrict by grade for students
+    if (user?.role === "student") {
+      const studentClassId = user.studentClass;
+      const studentGrade = await userPreferences_grade(userId, ctx);
+      results = results.filter((c) => {
+        if (c.accessMode === "school-only") {
+          const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
+          const isClassAssigned = c.class && c.class === studentClassId;
+          const isClassInvited = studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false);
+          if (!isUserInvited && !isClassAssigned && !isClassInvited) {
+            return false;
+          }
+        }
+        
+        // Filter by grade if targetGrades is specified and not empty
+        if (c.targetGrades && c.targetGrades.length > 0) {
+          if (!studentGrade || !c.targetGrades.includes(studentGrade)) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+    }
+
     // Sort by start time ascending
     results.sort((a, b) => a.startTime - b.startTime);
 
-    return results;
+    const withTeacher = [];
+    for (const c of results) {
+      const teacher = await ctx.db.get(c.teacher);
+      withTeacher.push({
+        ...c,
+        teacherName: teacher?.name || teacher?.email || "Teacher",
+      });
+    }
+
+    return withTeacher;
   },
 });
 
@@ -174,11 +229,6 @@ export const updateLiveClassStatus = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    // Only the teacher who created the class or admin can update
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
-      throw new Error("Unauthorized: you are not the teacher of this class");
-    }
-
     const updates: Record<string, any> = { status: args.status };
     if (args.recordingUrl !== undefined) {
       updates.recordingUrl = args.recordingUrl;
@@ -188,6 +238,50 @@ export const updateLiveClassStatus = mutation({
     }
 
     await ctx.db.patch(args.liveClassId, updates);
+    return { success: true };
+  },
+});
+
+export const startNativeLiveClass = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    streamInputId: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    whepUrl: v.optional(v.string()),
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
+    playbackUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Only teachers and admins can start live classes");
+    }
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+
+
+    await ctx.db.patch(args.liveClassId, {
+      status: "live",
+      streamInputId: args.streamInputId || liveClass.streamInputId,
+      whipUrl: args.whipUrl || liveClass.whipUrl,
+      whepUrl: args.whepUrl || liveClass.whepUrl,
+      rtmpsUrl: args.rtmpsUrl || liveClass.rtmpsUrl,
+      streamKey: args.streamKey || liveClass.streamKey,
+      srtUrl: args.srtUrl || liveClass.srtUrl,
+      srtStreamId: args.srtStreamId || liveClass.srtStreamId,
+      srtPassphrase: args.srtPassphrase || liveClass.srtPassphrase,
+      playbackUrl: args.playbackUrl || liveClass.playbackUrl,
+    });
+
     return { success: true };
   },
 });
@@ -204,8 +298,8 @@ export const deleteLiveClass = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
-      throw new Error("Unauthorized: you are not the teacher of this class");
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Unauthorized");
     }
 
     // Delete attendance records first
@@ -216,6 +310,24 @@ export const deleteLiveClass = mutation({
 
     for (const record of attendanceRecords) {
       await ctx.db.delete(record._id);
+    }
+
+    const chatMessages = await ctx.db
+      .query("liveClassChatMessages")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    for (const message of chatMessages) {
+      await ctx.db.delete(message._id);
+    }
+
+    const raisedHands = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    for (const hand of raisedHands) {
+      await ctx.db.delete(hand._id);
     }
 
     await ctx.db.delete(args.liveClassId);
@@ -241,6 +353,17 @@ export const joinLiveClass = mutation({
 
     if (liveClass.status === "ended" || liveClass.status === "cancelled") {
       throw new Error("This class has already ended or was cancelled");
+    }
+
+    // Verify invitation for school-only classes
+    if (liveClass.accessMode === "school-only") {
+      const studentClassId = user?.studentClass;
+      const isUserInvited = liveClass.invitedUsers?.includes(userId) ?? false;
+      const isClassAssigned = liveClass.class && liveClass.class === studentClassId;
+      const isClassInvited = studentClassId && (liveClass.invitedClasses?.includes(studentClassId) ?? false);
+      if (!isUserInvited && !isClassAssigned && !isClassInvited) {
+        throw new Error("You are not invited to this private live class");
+      }
     }
 
     // Check if already joined
@@ -288,7 +411,7 @@ export const getUpcomingClassesForStudent = query({
 
     // Filter by student's class or grade
     const studentClassId = user.studentClass;
-    const studentGrade = userPreferences_grade(userId, ctx);
+    const studentGrade = await userPreferences_grade(userId, ctx);
 
     const upcoming = allClasses.filter((c) => {
       // Class is assigned to student's class
@@ -296,8 +419,7 @@ export const getUpcomingClassesForStudent = query({
       // No class restriction and grade matches or no grade restriction
       if (!c.class) {
         if (!c.targetGrades || c.targetGrades.length === 0) return true;
-        // We'll include all with matching target grades checked at query time
-        return true;
+        return studentGrade ? c.targetGrades.includes(studentGrade) : false;
       }
       return false;
     });
@@ -319,150 +441,19 @@ async function userPreferences_grade(
   return prefs?.grade;
 }
 
-// ─── WAITING ROOM (APPROVALS) ───────────────────────────────────────────────
-
-export const requestJoinClass = mutation({
-  args: { liveClassId: v.id("liveClasses") },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthorized");
-
-    // Check if a request already exists
-    const existing = await ctx.db
-      .query("liveClassApprovals")
-      .withIndex("by_class_and_student", (q) =>
-        q.eq("liveClassId", args.liveClassId).eq("studentId", userId)
-      )
-      .first();
-
-    if (existing) {
-      return existing; // Already requested or approved
-    }
-
-    const id = await ctx.db.insert("liveClassApprovals", {
-      liveClassId: args.liveClassId,
-      studentId: userId,
-      status: "pending",
-      requestedAt: Date.now(),
-    });
-
-    return await ctx.db.get(id);
-  },
-});
-
-export const getApprovalStatus = query({
-  args: { liveClassId: v.id("liveClasses") },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-
-    return await ctx.db
-      .query("liveClassApprovals")
-      .withIndex("by_class_and_student", (q) =>
-        q.eq("liveClassId", args.liveClassId).eq("studentId", userId)
-      )
-      .first();
-  },
-});
-
-export const getPendingApprovals = query({
+export const getLiveChatMessages = query({
   args: { liveClassId: v.id("liveClasses") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const classItem = await ctx.db.get(args.liveClassId);
-    // Only teacher or admin can view pending approvals
-    const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && classItem?.teacher !== userId)) {
-      return [];
-    }
-
-    const requests = await ctx.db
-      .query("liveClassApprovals")
-      .withIndex("by_class_and_status", (q) =>
-        q.eq("liveClassId", args.liveClassId).eq("status", "pending")
-      )
+    const messages = await ctx.db
+      .query("liveClassChatMessages")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
       .collect();
 
-    // Attach student names
-    const withNames = await Promise.all(
-      requests.map(async (req) => {
-        const student = await ctx.db.get(req.studentId);
-        return {
-          ...req,
-          studentName: student?.name || student?.email || "Unknown",
-        };
-      })
-    );
-
-    return withNames.sort((a, b) => a.requestedAt - b.requestedAt);
-  },
-});
-
-export const approveStudent = mutation({
-  args: { approvalId: v.id("liveClassApprovals"), status: v.union(v.literal("approved"), v.literal("denied")) },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthorized");
-
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) throw new Error("Approval request not found");
-
-    const classItem = await ctx.db.get(approval.liveClassId);
-    const user = await ctx.db.get(userId);
-
-    if (!user || (user.role !== "admin" && classItem?.teacher !== userId)) {
-      throw new Error("Only the teacher or admin can approve students");
-    }
-
-    await ctx.db.patch(args.approvalId, { status: args.status });
-  },
-});
-
-// ─── REACTIONS (EMOJIS) ─────────────────────────────────────────────────────
-
-export const sendReaction = mutation({
-  args: { liveClassId: v.id("liveClasses"), type: v.string() },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthorized");
-
-    await ctx.db.insert("liveClassReactions", {
-      liveClassId: args.liveClassId,
-      studentId: userId,
-      type: args.type,
-      timestamp: Date.now(),
-    });
-  },
-});
-
-export const getRecentReactions = query({
-  args: { liveClassId: v.id("liveClasses") },
-  handler: async (ctx, args) => {
-    // Return reactions from the last 10 seconds to create the floating effect
-    const tenSecondsAgo = Date.now() - 10000;
-
-    const reactions = await ctx.db
-      .query("liveClassReactions")
-      .withIndex("by_class_and_time", (q) =>
-        q.eq("liveClassId", args.liveClassId).gt("timestamp", tenSecondsAgo)
-      )
-      .collect();
-
-    return reactions;
-  },
-});
-
-// ─── LIVE CHAT MESSAGES ─────────────────────────────────────────────────
-
-export const getLiveChatMessages = query({
-  args: { liveClassId: v.id("liveClasses") },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("liveChatMessages")
-      .withIndex("by_live_class", (q) => q.eq("liveClassId", args.liveClassId))
-      .collect();
+    messages.sort((a, b) => a.createdAt - b.createdAt);
+    return messages;
   },
 });
 
@@ -475,28 +466,44 @@ export const sendLiveChatMessage = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
-    const user = await ctx.db.get(userId);
-    if (!user) throw new Error("User not found");
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+    if (liveClass.status === "ended" || liveClass.status === "cancelled") {
+      throw new Error("This class is closed");
+    }
 
-    await ctx.db.insert("liveChatMessages", {
-      liveClassId: args.liveClassId,
-      senderId: userId,
-      senderName: user.name || "Unknown",
-      senderRole: user.role || "student",
-      content: args.content,
+    const content = args.content.trim();
+    if (!content) throw new Error("Message cannot be empty");
+    if (content.length > 1000) throw new Error("Message is too long");
+
+    const user = await ctx.db.get(userId);
+    return await ctx.db.insert("liveClassChatMessages", {
+      liveClass: args.liveClassId,
+      sender: userId,
+      senderName: user?.name || user?.email || "Learner",
+      senderRole: user?.role,
+      content,
+      createdAt: Date.now(),
     });
   },
 });
 
-// ─── RAISED HANDS ────────────────────────────────────────────────────────
-
 export const getRaisedHands = query({
   args: { liveClassId: v.id("liveClasses") },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("liveRaisedHands")
-      .withIndex("by_live_class", (q) => q.eq("liveClassId", args.liveClassId))
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const hands = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
       .collect();
+
+    hands.sort((a, b) => a.raisedAt - b.raisedAt);
+    return hands.map((hand) => ({
+      ...hand,
+      studentId: hand.student,
+    }));
   },
 });
 
@@ -506,10 +513,21 @@ export const toggleRaiseHand = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
+    const user = await ctx.db.get(userId);
+    if (user?.role === "teacher" || user?.role === "admin") {
+      throw new Error("Only students can raise hands");
+    }
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+    if (liveClass.status !== "live") {
+      throw new Error("Hands can only be raised while the class is live");
+    }
+
     const existing = await ctx.db
-      .query("liveRaisedHands")
+      .query("liveClassRaisedHands")
       .withIndex("by_student_class", (q) =>
-        q.eq("studentId", userId).eq("liveClassId", args.liveClassId)
+        q.eq("student", userId).eq("liveClass", args.liveClassId)
       )
       .first();
 
@@ -518,11 +536,10 @@ export const toggleRaiseHand = mutation({
       return { raised: false };
     }
 
-    const user = await ctx.db.get(userId);
-    await ctx.db.insert("liveRaisedHands", {
-      liveClassId: args.liveClassId,
-      studentId: userId,
-      studentName: user?.name || "Unknown",
+    await ctx.db.insert("liveClassRaisedHands", {
+      liveClass: args.liveClassId,
+      student: userId,
+      studentName: user?.name || user?.email || "Learner",
       raisedAt: Date.now(),
     });
 
@@ -536,88 +553,80 @@ export const lowerStudentHand = mutation({
     studentId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    const isTeacher = user?.role === "teacher" || user?.role === "admin";
+    if (!isTeacher && args.studentId !== userId) {
+      throw new Error("Unauthorized");
+    }
+    if (isTeacher && liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized: you are not the teacher of this class");
+    }
+
     const existing = await ctx.db
-      .query("liveRaisedHands")
+      .query("liveClassRaisedHands")
       .withIndex("by_student_class", (q) =>
-        q.eq("studentId", args.studentId).eq("liveClassId", args.liveClassId)
+        q.eq("student", args.studentId).eq("liveClass", args.liveClassId)
       )
       .first();
 
     if (existing) {
       await ctx.db.delete(existing._id);
     }
+
+    return { success: true };
   },
 });
-
-// ─── NATIVE LIVE CLASS (STREAMING) ──────────────────────────────────────
-
-export const startNativeLiveClass = mutation({
-  args: {
-    liveClassId: v.id("liveClasses"),
-    rtmpsUrl: v.optional(v.string()),
-    streamKey: v.optional(v.string()),
-    srtUrl: v.optional(v.string()),
-    srtStreamId: v.optional(v.string()),
-    srtPassphrase: v.optional(v.string()),
-    playbackUrl: v.optional(v.string()),
-    streamInputId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthorized");
-
-    const liveClass = await ctx.db.get(args.liveClassId);
-    if (!liveClass) throw new Error("Live class not found");
-
-    await ctx.db.patch(args.liveClassId, {
-      status: "live",
-      streamInputId: args.streamInputId || liveClass.streamInputId,
-      playbackUrl: args.playbackUrl || liveClass.playbackUrl,
-      rtmpsUrl: args.rtmpsUrl || (liveClass as any).rtmpsUrl,
-      streamKey: args.streamKey || (liveClass as any).streamKey,
-      srtUrl: args.srtUrl || (liveClass as any).srtUrl,
-      srtStreamId: args.srtStreamId || (liveClass as any).srtStreamId,
-      srtPassphrase: args.srtPassphrase || (liveClass as any).srtPassphrase,
-      startTime: liveClass.startTime || Date.now(),
-    });
-  },
-});
-
-// ─── SEARCH USERS & CLASSES (FOR INVITE) ────────────────────────────────
 
 export const searchUsersAndClasses = query({
   args: { query: v.string() },
   handler: async (ctx, args) => {
-    const lower = args.query.toLowerCase();
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Only teachers and admins can search for invitations");
+    }
 
-    const users = await ctx.db.query("users").collect();
-    const filteredUsers = users.filter(
-      (u) =>
-        u.name?.toLowerCase().includes(lower) ||
-        u.email?.toLowerCase().includes(lower)
-    );
+    const searchStr = args.query.trim().toLowerCase();
+    if (!searchStr) return { users: [], classes: [] };
 
-    const classes = await ctx.db.query("classes").collect();
-    const filteredClasses = classes.filter((c) =>
-      c.name.toLowerCase().includes(lower)
-    );
+    // Search students
+    const students = await ctx.db
+      .query("users")
+      .collect();
+    
+    const matchedStudents = students.filter(s => 
+      s.role === "student" && 
+      ((s.name && s.name.toLowerCase().includes(searchStr)) || 
+       (s.email && s.email.toLowerCase().includes(searchStr)))
+    ).map(s => ({
+      _id: s._id,
+      name: s.name || s.email || "Student",
+      email: s.email || "",
+      role: s.role,
+    })).slice(0, 15);
 
-    return {
-      users: filteredUsers.map((u) => ({
-        _id: u._id,
-        name: u.name || u.email || "Unknown",
-        email: u.email,
-        role: u.role,
-      })),
-      classes: filteredClasses.map((c) => ({
-        _id: c._id,
-        name: c.name,
-      })),
-    };
-  },
+    // Search classes
+    const classes = await ctx.db
+      .query("classes")
+      .collect();
+
+    const matchedClasses = classes.filter(c => 
+      c.name.toLowerCase().includes(searchStr)
+    ).map(c => ({
+      _id: c._id,
+      name: c.name,
+    })).slice(0, 15);
+
+    return { users: matchedStudents, classes: matchedClasses };
+  }
 });
-
-// ─── INVITE TO LIVE CLASS ───────────────────────────────────────────────
 
 export const inviteToLiveClass = mutation({
   args: {
@@ -629,22 +638,203 @@ export const inviteToLiveClass = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
-    await ctx.db.patch(args.liveClassId, {
-      invitedUsers: args.invitedUsers as any,
-      invitedClasses: args.invitedClasses as any,
-    });
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
 
-    for (const invitedUserId of args.invitedUsers) {
-      await ctx.db.insert("notifications", {
-        recipient: invitedUserId,
-        title: "You've been invited to a live class!",
-        message: "A teacher has invited you to join their live class.",
-        isRead: false,
-        type: "message",
-        link: `/lives/room/${args.liveClassId}`,
-      });
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized: you did not create this class");
     }
 
+    await ctx.db.patch(args.liveClassId, {
+      invitedUsers: args.invitedUsers,
+      invitedClasses: args.invitedClasses,
+    });
+
     return { success: true };
+  }
+});
+
+export const sendReaction = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    type: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.insert("liveClassReactions", {
+      liveClass: args.liveClassId,
+      user: userId,
+      userName: user.name || user.email || "Learner",
+      type: args.type,
+      timestamp: Date.now(),
+    });
+
+    return { success: true };
+  }
+});
+
+export const getRecentReactions = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const now = Date.now();
+    const reactions = await ctx.db
+      .query("liveClassReactions")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    // Only return reactions from the last 10 seconds
+    const recentReactions = reactions
+      .filter((r) => now - r.timestamp < 10000)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 30);
+
+    return recentReactions;
+  }
+});
+
+// ─── WAITING ROOM / APPROVALS ────────────────────────────────────────────────
+
+export const getApprovalStatus = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const approval = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", userId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    return approval;
+  },
+});
+
+export const getPendingApprovals = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) return [];
+
+    // Only teachers/admins can see pending approvals
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      return [];
+    }
+
+    const approvals = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .collect();
+
+    return approvals;
+  },
+});
+
+export const requestJoinClass = mutation({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    // Check if already has an approval record
+    const existing = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", userId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    if (existing) {
+      if (existing.status === "pending") {
+        return existing._id;
+      }
+      // If denied, allow them to re-request
+      await ctx.db.patch(existing._id, {
+        status: "pending",
+        requestedAt: Date.now(),
+      });
+      return existing._id;
+    }
+
+    const approvalId = await ctx.db.insert("liveClassApprovals", {
+      liveClass: args.liveClassId,
+      student: userId,
+      studentName: user.name || user.email || "Learner",
+      status: "pending",
+      requestedAt: Date.now(),
+    });
+
+    return approvalId;
+  },
+});
+
+export const approveStudent = mutation({
+  args: {
+    approvalId: v.id("liveClassApprovals"),
+    status: v.union(v.literal("approved"), v.literal("denied")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) throw new Error("Approval record not found");
+
+    const liveClass = await ctx.db.get(approval.liveClass);
+    if (!liveClass) throw new Error("Live class not found");
+
+    // Only teachers/admins can approve
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch(args.approvalId, {
+      status: args.status,
+    });
+
+    return { success: true };
+  },
+});
+
+export const getReactionStats = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+
+    const reactions = await ctx.db
+      .query("liveClassReactions")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    const counts: Record<string, number> = { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+    for (const r of reactions) {
+      if (counts[r.type] !== undefined) {
+        counts[r.type]++;
+      }
+    }
+    return counts;
   },
 });

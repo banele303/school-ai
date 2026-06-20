@@ -120,12 +120,10 @@ export default defineSchema({
     totalPoints: v.optional(v.number()),
     // Exam template used (if any)
     templateUsed: v.optional(v.string()),
-    
-    // South African Assessment attributes
+    // South African assessment metadata
     capsPhase: v.optional(v.union(v.literal("Senior"), v.literal("FET"))),
     grade: v.optional(v.number()),
     southAfricanExamType: v.optional(v.string()),
-    
     questions: v.array(
       v.object({
         questionText: v.string(),
@@ -152,16 +150,17 @@ export default defineSchema({
         diagramUrl: v.optional(v.string()),
         // Source question bank ID if reused
         bankQuestionId: v.optional(v.string()),
-        
-        // Bilingual and CAPS additions
         questionTextZulu: v.optional(v.string()),
         questionTextAfrikaans: v.optional(v.string()),
         optionsZulu: v.optional(v.array(v.string())),
         optionsAfrikaans: v.optional(v.array(v.string())),
         correctAnswerZulu: v.optional(v.string()),
         correctAnswerAfrikaans: v.optional(v.string()),
-        cognitiveLevel: v.optional(v.string()), // e.g. "knowledge" | "routine" | "complex" | "problem_solving"
-        diagramHotspots: v.optional(v.array(v.object({ label: v.string(), x: v.number(), y: v.number() }))),
+        cognitiveLevel: v.optional(v.string()),
+        calculationSteps: v.optional(v.array(v.string())),
+        diagramHotspots: v.optional(
+          v.array(v.object({ label: v.string(), x: v.number(), y: v.number() }))
+        ),
       })
     ),
   }).index("by_type", ["examType"])
@@ -180,12 +179,13 @@ export default defineSchema({
         studentId: v.id("users"),
         name: v.string(),
         avatar: v.optional(v.string()),
-        progress: v.number(), // index of current/last answered question
+        progress: v.number(),
         score: v.number(),
         completedAt: v.optional(v.number()),
       })
     ),
-  }).index("by_code", ["code"]).index("by_status", ["status"]),
+  }).index("by_code", ["code"])
+    .index("by_status", ["status"]),
 
   submissions: defineTable({
     exam: v.id("exams"),
@@ -229,8 +229,6 @@ export default defineSchema({
     timesUsed: v.optional(v.number()),
     tags: v.array(v.string()),
     isPublished: v.boolean(),
-    
-    // Bilingual and CAPS additions
     questionTextZulu: v.optional(v.string()),
     questionTextAfrikaans: v.optional(v.string()),
     optionsZulu: v.optional(v.array(v.string())),
@@ -238,7 +236,10 @@ export default defineSchema({
     correctAnswerZulu: v.optional(v.string()),
     correctAnswerAfrikaans: v.optional(v.string()),
     cognitiveLevel: v.optional(v.string()),
-    diagramHotspots: v.optional(v.array(v.object({ label: v.string(), x: v.number(), y: v.number() }))),
+    calculationSteps: v.optional(v.array(v.string())),
+    diagramHotspots: v.optional(
+      v.array(v.object({ label: v.string(), x: v.number(), y: v.number() }))
+    ),
   }).index("by_subject", ["subject"])
     .index("by_topic", ["topic"])
     .index("by_type", ["type"])
@@ -398,26 +399,7 @@ export default defineSchema({
     isRead: v.boolean(),
     subject: v.optional(v.string()),
     conversationId: v.string(), // sorted pair of user IDs: "id1_id2"
-
-    // NEW: Rich chat features
     replyTo: v.optional(v.id("messages")),
-    messageType: v.optional(v.union(
-      v.literal("text"),
-      v.literal("file"),
-      v.literal("image"),
-      v.literal("voice"),
-      v.literal("system"),
-      v.literal("assignment"),
-      v.literal("exam")
-    )),
-    fileUrl: v.optional(v.string()),
-    fileName: v.optional(v.string()),
-    fileSize: v.optional(v.number()),
-    fileType: v.optional(v.string()),
-    // CAPS curriculum context
-    curriculumTopic: v.optional(v.string()),
-    curriculumSubject: v.optional(v.string()),
-    curriculumGrade: v.optional(v.number()),
   }).index("by_conversation", ["conversationId"])
     .index("by_recipient_read", ["recipient", "isRead"])
     .index("by_sender", ["sender"]),
@@ -546,15 +528,19 @@ export default defineSchema({
     subject: v.id("subjects"),
     class: v.optional(v.id("classes")),
     teacher: v.id("users"),
-    // When the class starts
-    startTime: v.number(), // epoch ms
-    endTime: v.optional(v.number()), // epoch ms
-    // Platform: "youtube", "zoom", "jitsi", "stream"
+    startTime: v.number(),
+    endTime: v.optional(v.number()),
     platform: v.string(),
-    // Join link (public for students)
     joinUrl: v.string(),
-    // Recording URL (after class ends)
     recordingUrl: v.optional(v.string()),
+    streamInputId: v.optional(v.string()),
+    whipUrl: v.optional(v.string()),
+    whepUrl: v.optional(v.string()),
+    rtmpsUrl: v.optional(v.string()),
+    streamKey: v.optional(v.string()),
+    srtUrl: v.optional(v.string()),
+    srtStreamId: v.optional(v.string()),
+    srtPassphrase: v.optional(v.string()),
     streamVideoUid: v.optional(v.string()),
     playbackUrl: v.optional(v.string()),
     roomId: v.optional(v.string()),
@@ -563,31 +549,17 @@ export default defineSchema({
       v.literal("school-and-public"),
       v.literal("public-support")
     )),
-    whepUrl: v.optional(v.string()),
-    whipUrl: v.optional(v.string()),
-    streamInputId: v.optional(v.string()),
     resourceUrls: v.optional(v.array(v.string())),
     lessonPlan: v.optional(v.string()),
-    // Status: "scheduled", "live", "ended", "cancelled"
     status: v.union(
       v.literal("scheduled"),
       v.literal("live"),
       v.literal("ended"),
       v.literal("cancelled")
     ),
-    // Which grades can see this (empty = all)
     targetGrades: v.optional(v.array(v.number())),
-    // Max participants (0 = unlimited)
     maxParticipants: v.optional(v.number()),
-    // Auto-notify
     notifyEnrolled: v.boolean(),
-    // Stream connection details
-    rtmpsUrl: v.optional(v.string()),
-    streamKey: v.optional(v.string()),
-    srtUrl: v.optional(v.string()),
-    srtStreamId: v.optional(v.string()),
-    srtPassphrase: v.optional(v.string()),
-    // Invited users/classes
     invitedUsers: v.optional(v.array(v.id("users"))),
     invitedClasses: v.optional(v.array(v.id("classes"))),
   }).index("by_status", ["status"])
@@ -595,73 +567,65 @@ export default defineSchema({
     .index("by_start_time", ["startTime"])
     .index("by_teacher", ["teacher"]),
 
-  // Student attendance for live classes
   liveClassAttendance: defineTable({
     liveClass: v.id("liveClasses"),
     student: v.id("users"),
     joinedAt: v.optional(v.number()),
     leftAt: v.optional(v.number()),
-    duration: v.optional(v.number()), // ms
-    watchPercentage: v.optional(v.number()), // for recordings
+    duration: v.optional(v.number()),
+    watchPercentage: v.optional(v.number()),
   }).index("by_class", ["liveClass"])
     .index("by_student", ["student"]),
 
-  // Waiting Room Approvals
-  liveClassApprovals: defineTable({
-    liveClassId: v.id("liveClasses"),
-    studentId: v.id("users"),
-    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
-    requestedAt: v.number(),
-  }).index("by_class", ["liveClassId"])
-    .index("by_student", ["studentId"])
-    .index("by_class_and_student", ["liveClassId", "studentId"])
-    .index("by_class_and_status", ["liveClassId", "status"]),
+  // ─── VIDEO LIBRARY ─────────────────────────────────────────────
 
-  // Live Class Reactions (Emojis)
-  liveClassReactions: defineTable({
-    liveClassId: v.id("liveClasses"),
-    studentId: v.id("users"),
-    type: v.string(), // "like", "love", etc.
-    timestamp: v.number(),
-  }).index("by_class_and_time", ["liveClassId", "timestamp"]),
-
-  // ─── LIVE CHAT MESSAGES ────────────────────────────────────────
-  liveChatMessages: defineTable({
-    liveClassId: v.id("liveClasses"),
-    senderId: v.id("users"),
+  liveClassChatMessages: defineTable({
+    liveClass: v.id("liveClasses"),
+    sender: v.id("users"),
     senderName: v.string(),
-    senderRole: v.string(),
+    senderRole: v.optional(v.string()),
     content: v.string(),
-  }).index("by_live_class", ["liveClassId"]),
+    createdAt: v.number(),
+  }).index("by_class", ["liveClass"]),
 
-  // ─── LIVE RAISED HANDS ─────────────────────────────────────────
-  liveRaisedHands: defineTable({
-    liveClassId: v.id("liveClasses"),
-    studentId: v.id("users"),
+  liveClassRaisedHands: defineTable({
+    liveClass: v.id("liveClasses"),
+    student: v.id("users"),
     studentName: v.string(),
     raisedAt: v.number(),
-  }).index("by_live_class", ["liveClassId"])
-    .index("by_student_class", ["studentId", "liveClassId"]),
+  }).index("by_class", ["liveClass"])
+    .index("by_student_class", ["student", "liveClass"]),
 
-  // ─── VIDEO LIBRARY ─────────────────────────────────────────────
+  liveClassReactions: defineTable({
+    liveClass: v.id("liveClasses"),
+    user: v.id("users"),
+    userName: v.string(),
+    type: v.string(),
+    timestamp: v.number(),
+  }).index("by_class", ["liveClass"]),
+
+  liveClassApprovals: defineTable({
+    liveClass: v.id("liveClasses"),
+    student: v.id("users"),
+    studentName: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
+    requestedAt: v.number(),
+  }).index("by_class", ["liveClass"])
+    .index("by_student_class", ["student", "liveClass"]),
 
   videoLibrary: defineTable({
     title: v.string(),
     description: v.optional(v.string()),
     subject: v.id("subjects"),
     teacher: v.id("users"),
-    // Video URL (YouTube embed, R2 direct, or external)
     videoUrl: v.string(),
     videoType: v.union(v.literal("youtube"), v.literal("r2"), v.literal("external")),
     thumbnailUrl: v.optional(v.string()),
-    duration: v.optional(v.number()), // seconds
+    duration: v.optional(v.number()),
     grade: v.optional(v.number()),
     topic: v.optional(v.string()),
-    // Tags for search
     tags: v.array(v.string()),
-    // Syllabus topic link
     syllabusTopic: v.optional(v.id("syllabusTopics")),
-    // Playlist / series
     playlist: v.optional(v.string()),
     playlistOrder: v.optional(v.number()),
     viewCount: v.number(),
@@ -672,70 +636,43 @@ export default defineSchema({
     .index("by_playlist", ["playlist"])
     .index("by_published", ["isPublished"]),
 
-  // Student video watch progress
   videoProgress: defineTable({
     video: v.id("videoLibrary"),
     student: v.id("users"),
-    progress: v.number(), // seconds watched
-    percentage: v.number(), // 0-100
+    progress: v.number(),
+    percentage: v.number(),
     completed: v.boolean(),
     lastWatchedAt: v.number(),
   }).index("by_video", ["video"])
     .index("by_student", ["student"]),
 
-  // ─── MESSAGE REACTIONS ────────────────────────────────────────
-  messageReactions: defineTable({
-    messageId: v.id("messages"),
-    userId: v.id("users"),
-    emoji: v.string(),
-  }).index("by_message", ["messageId"])
-    .index("by_user_message", ["userId", "messageId"]),
-
-  // ─── CURRICULUM CHAT HISTORY ─────────────────────────────────
-  curriculumChats: defineTable({
-    userId: v.id("users"),
-    topic: v.string(),
-    question: v.string(),
-    answer: v.string(),
-    subject: v.optional(v.string()),
-    grade: v.optional(v.number()),
-    createdAt: v.number(),
-  }).index("by_user", ["userId"])
-    .index("by_subject", ["subject"]),
-
   // ─── GAMIFICATION ──────────────────────────────────────────────
 
-  // XP and level per student
   studentXP: defineTable({
     student: v.id("users"),
     totalXP: v.number(),
     level: v.number(),
-    currentStreak: v.number(), // consecutive days
+    currentStreak: v.number(),
     longestStreak: v.number(),
-    lastActivityDate: v.optional(v.string()), // "YYYY-MM-DD"
-    // Weekly XP for leaderboards
+    lastActivityDate: v.optional(v.string()),
     weeklyXP: v.number(),
     weeklyResetAt: v.number(),
-    // Custom avatar/theme unlocks
     unlockedItems: v.array(v.string()),
-    // Student-chosen display title
     displayTitle: v.optional(v.string()),
   }).index("by_student", ["student"])
     .index("by_total_xp", ["totalXP"]),
 
-  // XP transaction log
   xpLog: defineTable({
     student: v.id("users"),
     amount: v.number(),
     reason: v.string(),
-    source: v.string(), // "video_watch", "class_attend", "exam_complete", "daily_login", "streak_badge"
-    referenceId: v.optional(v.string()), // e.g. video ID or class ID
+    source: v.string(),
+    referenceId: v.optional(v.string()),
   }).index("by_student", ["student"]),
 
-  // Achievements / extended badges
   achievements: defineTable({
     student: v.id("users"),
-    achievementId: v.string(), // "first_video", "streak_7", "top_of_class", etc.
+    achievementId: v.string(),
     title: v.string(),
     description: v.string(),
     icon: v.string(),
@@ -743,10 +680,10 @@ export default defineSchema({
     unlockedAt: v.number(),
     tier: v.union(v.literal("bronze"), v.literal("silver"), v.literal("gold"), v.literal("platinum")),
   }).index("by_student", ["student"]),
-  // leaderboard snapshots (weekly)
+
   leaderboard: defineTable({
-    period: v.string(), // "weekly_2026_W22"
-    category: v.string(), // "global", "grade_10", "class_id"
+    period: v.string(),
+    category: v.string(),
     entries: v.array(v.object({
       student: v.id("users"),
       name: v.string(),
@@ -762,7 +699,7 @@ export default defineSchema({
   studyGroups: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
-    subject: v.id("subjects"),
+    subject: v.optional(v.id("subjects")),
     creator: v.id("users"),
     members: v.array(v.id("users")),
     maxMembers: v.number(),
@@ -777,9 +714,7 @@ export default defineSchema({
     group: v.id("studyGroups"),
     sender: v.id("users"),
     content: v.string(),
-    // Teacher can pin messages
     isPinned: v.boolean(),
-    // For shared files/resources
     attachmentUrl: v.optional(v.string()),
     attachmentName: v.optional(v.string()),
   }).index("by_group", ["group"]),
@@ -788,20 +723,16 @@ export default defineSchema({
 
   userPreferences: defineTable({
     student: v.id("users"),
-    language: v.string(), // "en", "nso", "ts", "ve", "zu", "af"
-    // Data saver mode for low bandwidth
+    language: v.string(),
     dataSaverMode: v.boolean(),
     lowBandwidthMode: v.boolean(),
-    // Notification prefs
     emailNotifications: v.boolean(),
     pushNotifications: v.boolean(),
     whatsappNotifications: v.boolean(),
     whatsappNumber: v.optional(v.string()),
-    // Theme: "light", "dark", "system"
     theme: v.string(),
-    // Grade info for students
     grade: v.optional(v.number()),
-    province: v.optional(v.string()), // "limpopo"
+    province: v.optional(v.string()),
     schoolName: v.optional(v.string()),
   }).index("by_student", ["student"]),
 
@@ -809,8 +740,8 @@ export default defineSchema({
 
   notificationQueue: defineTable({
     recipient: v.id("users"),
-    type: v.string(), // "class_reminder", "assignment_due", "fee_balance", "study_tip"
-    channel: v.string(), // "in_app", "whatsapp", "sms", "email"
+    type: v.string(),
+    channel: v.string(),
     content: v.string(),
     scheduledFor: v.number(),
     sentAt: v.optional(v.number()),
@@ -835,13 +766,10 @@ export default defineSchema({
 
   homeworkSubmissions: defineTable({
     student: v.id("users"),
-    subject: v.id("subjects"),
+    subject: v.optional(v.id("subjects")),
     question: v.string(),
-    // Photo upload URL
     imageUrl: v.optional(v.string()),
-    // Student's written answer
     studentAnswer: v.optional(v.string()),
-    // AI-generated feedback
     aiScore: v.optional(v.number()),
     aiFeedback: v.optional(v.string()),
     aiCorrectAnswer: v.optional(v.string()),

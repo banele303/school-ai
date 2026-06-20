@@ -399,8 +399,10 @@ export default defineSchema({
     isRead: v.boolean(),
     subject: v.optional(v.string()),
     conversationId: v.string(), // sorted pair of user IDs: "id1_id2"
+    replyTo: v.optional(v.id("messages")),
   }).index("by_conversation", ["conversationId"])
-    .index("by_recipient_read", ["recipient", "isRead"]),
+    .index("by_recipient_read", ["recipient", "isRead"])
+    .index("by_sender", ["sender"]),
 
   learningPaths: defineTable({
     student: v.id("users"),
