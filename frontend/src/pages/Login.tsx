@@ -8,7 +8,10 @@ const Login = () => {
   const { user, loading, year } = useAuth();
   const [mode, setMode] = useState<"login" | "create">("login");
 
-  return <Navigate to="/dashboard" replace />;
+  // If already logged in, redirect to dashboard
+  if (!loading && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
