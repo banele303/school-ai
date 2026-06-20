@@ -324,7 +324,7 @@ export default function StudyBuddyPage() {
             />
             <Button
               size="icon"
-              className="h-[52px] w-[52px] shrink-0 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white",
+              className="h-[52px] w-[52px] shrink-0 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
             >
