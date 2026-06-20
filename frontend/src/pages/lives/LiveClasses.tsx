@@ -35,6 +35,7 @@ import {
   Upload,
   Users,
   Video,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -102,6 +103,19 @@ export default function LiveClassesPage() {
   const createLiveClass = useMutation(api.liveClasses.createLiveClass);
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
   const joinClass = useMutation(api.liveClasses.joinLiveClass);
+  const deleteLiveClass = useMutation(api.liveClasses.deleteLiveClass);
+
+  const handleDeleteClass = async (classId: any) => {
+    if (!window.confirm("Are you sure you want to delete this live class? This will delete all attendance, chat messages, and details.")) {
+      return;
+    }
+    try {
+      await deleteLiveClass({ liveClassId: classId });
+      toast.success("Live class deleted successfully");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete live class");
+    }
+  };
 
   const isTeacher = user?.role === "teacher" || user?.role === "admin";
   const classes = liveClasses || [];
@@ -220,7 +234,7 @@ export default function LiveClassesPage() {
                         classItem={classItem}
                         subjectName={subject?.name}
                         isTeacher={isTeacher}
-                        isOwner={classItem.teacher === user?._id || user?.role === "admin"}
+                        isOwner={isTeacher}
                         onOpen={() => openLesson(classItem)}
                         onStudio={() => {
                           setSelectedClass(classItem);
@@ -228,6 +242,7 @@ export default function LiveClassesPage() {
                         }}
                         onInvite={() => setInviteClass(classItem)}
                         onStatus={changeStatus}
+                        onDelete={handleDeleteClass}
                       />
                     );
                   })}
@@ -305,13 +320,12 @@ function StudioPill({ icon: Icon, label }: any) {
   );
 }
 
-function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onInvite, onStatus }: any) {
+function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onInvite, onStatus, onDelete }: any) {
   const statusCfg = STATUS_CONFIG[classItem.status] || STATUS_CONFIG.scheduled;
   const StatusIcon = statusCfg.icon;
 
   return (
     <Card className={cn("overflow-hidden rounded-2xl bg-card/70 backdrop-blur border-border/50 shadow-sm transition-all duration-300 hover:shadow-md hover:border-border", classItem.status === "live" && "border-red-400 dark:border-red-900/50 shadow-red-500/5")}>
-      <div className={cn("h-1.5", classItem.status === "live" ? "bg-red-600" : "bg-muted")} />
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <Badge variant="outline" className={cn("text-[11px] font-semibold py-0.5 rounded-lg border", statusCfg.color)}>
@@ -362,6 +376,9 @@ function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStud
                   <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" />
                 </Button>
               )}
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => onDelete(classItem._id)} title="Delete class">
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </>
           )}
         </div>
@@ -590,6 +607,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
+  const [targetGrade, setTargetGrade] = useState("all");
   const subjectOptions = Array.isArray(subjects) ? subjects : [];
   const subjectsLoading = subjects === undefined;
 
@@ -678,6 +696,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
         srtStreamId: streamData.srtStreamId,
         srtPassphrase: streamData.srtPassphrase,
         playbackUrl: streamData.playbackUrl,
+        targetGrades: targetGrade === "all" ? [] : [Number(targetGrade)],
       } as any);
 
       toast.success(accessMode === "school-only" ? "School live lesson scheduled." : "Live lesson scheduled.");
@@ -690,6 +709,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
       setJoinUrl("");
       setMaxParticipants("");
       setResourceFile(null);
+      setTargetGrade("all");
     } catch (error: any) {
       toast.error(error.message || "Could not schedule class.");
     } finally {
@@ -732,6 +752,20 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
                 <SelectItem value="zoom">Zoom Meeting</SelectItem>
                 <SelectItem value="jitsi">Jitsi Meet</SelectItem>
                 <SelectItem value="stream">Other Stream</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Target Grade</Label>
+            <Select value={targetGrade} onValueChange={setTargetGrade}>
+              <SelectTrigger><SelectValue placeholder="All Grades" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="8">Grade 8</SelectItem>
+                <SelectItem value="9">Grade 9</SelectItem>
+                <SelectItem value="10">Grade 10</SelectItem>
+                <SelectItem value="11">Grade 11</SelectItem>
+                <SelectItem value="12">Grade 12</SelectItem>
               </SelectContent>
             </Select>
           </div>

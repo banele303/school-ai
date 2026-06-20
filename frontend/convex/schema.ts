@@ -602,6 +602,15 @@ export default defineSchema({
     timestamp: v.number(),
   }).index("by_class", ["liveClass"]),
 
+  liveClassApprovals: defineTable({
+    liveClass: v.id("liveClasses"),
+    student: v.id("users"),
+    studentName: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
+    requestedAt: v.number(),
+  }).index("by_class", ["liveClass"])
+    .index("by_student_class", ["student", "liveClass"]),
+
   videoLibrary: defineTable({
     title: v.string(),
     description: v.optional(v.string()),

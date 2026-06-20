@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
   Dialog,
@@ -28,6 +28,54 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
   // Local list of selected user IDs and class IDs
   const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<any[]>([]);
+
+  // External email invitation state
+  const [externalEmail, setExternalEmail] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const sendInviteEmail = useAction(api.emails.sendLiveClassInviteEmail);
+
+  const handleSendExternalInvite = async () => {
+    const email = externalEmail.trim();
+    if (!email) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Please enter a valid email format.");
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const joinUrl = `${window.location.origin}/lives/room/${liveClass._id}`;
+      const dateStr = new Date(liveClass.startTime).toLocaleDateString("en-ZA", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      const timeStr = new Date(liveClass.startTime).toLocaleTimeString("en-ZA", {
+        hour: "numeric",
+        minute: "2-digit"
+      });
+      const startTimeStr = `${dateStr} at ${timeStr}`;
+
+      await sendInviteEmail({
+        email,
+        classTitle: liveClass.title,
+        teacherName: liveClass.teacherName || "Your Teacher",
+        startTimeStr,
+        joinUrl,
+      });
+
+      toast.success(`Invitation email sent to ${email} successfully!`);
+      setExternalEmail("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send email invitation.");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   const searchResults = useQuery(
     api.liveClasses.searchUsersAndClasses,
@@ -295,6 +343,33 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
             )}
           </div>
         )}
+
+        {/* Invite External Students Section */}
+        <div className="border-t border-border pt-4 mt-2">
+          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5">
+            <Mail className="h-3.5 w-3.5 text-indigo-500" />
+            Invite people outside the school
+          </label>
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              placeholder="Enter email address (e.g. learner@gmail.com)"
+              value={externalEmail}
+              onChange={(e) => setExternalEmail(e.target.value)}
+              className="bg-muted border-input text-foreground focus-visible:ring-indigo-500 focus-visible:ring-1 text-xs h-9 rounded-xl flex-1"
+            />
+            <Button
+              onClick={handleSendExternalInvite}
+              disabled={sendingEmail}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-9 rounded-xl px-4 shrink-0"
+            >
+              {sendingEmail ? "Inviting..." : "Send Invite"}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            This will send an email invitation with the joining link directly using Resend.
+          </p>
+        </div>
 
         {/* Footer */}
         <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">

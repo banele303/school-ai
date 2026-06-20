@@ -137,23 +137,44 @@ export const getLiveClasses = query({
       );
     }
 
-    // Filter private classes for students
+    // Filter private classes & restrict by grade for students
     if (user?.role === "student") {
       const studentClassId = user.studentClass;
+      const studentGrade = await userPreferences_grade(userId, ctx);
       results = results.filter((c) => {
-        if (!c.accessMode || c.accessMode !== "school-only") return true;
+        if (c.accessMode === "school-only") {
+          const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
+          const isClassAssigned = c.class && c.class === studentClassId;
+          const isClassInvited = studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false);
+          if (!isUserInvited && !isClassAssigned && !isClassInvited) {
+            return false;
+          }
+        }
         
-        const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
-        const isClassAssigned = c.class && c.class === studentClassId;
-        const isClassInvited = studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false);
-        return isUserInvited || isClassAssigned || isClassInvited;
+        // Filter by grade if targetGrades is specified and not empty
+        if (c.targetGrades && c.targetGrades.length > 0) {
+          if (!studentGrade || !c.targetGrades.includes(studentGrade)) {
+            return false;
+          }
+        }
+        
+        return true;
       });
     }
 
     // Sort by start time ascending
     results.sort((a, b) => a.startTime - b.startTime);
 
-    return results;
+    const withTeacher = [];
+    for (const c of results) {
+      const teacher = await ctx.db.get(c.teacher);
+      withTeacher.push({
+        ...c,
+        teacherName: teacher?.name || teacher?.email || "Teacher",
+      });
+    }
+
+    return withTeacher;
   },
 });
 
@@ -208,11 +229,6 @@ export const updateLiveClassStatus = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    // Only the teacher who created the class or admin can update
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
-      throw new Error("Unauthorized: you are not the teacher of this class");
-    }
-
     const updates: Record<string, any> = { status: args.status };
     if (args.recordingUrl !== undefined) {
       updates.recordingUrl = args.recordingUrl;
@@ -251,9 +267,7 @@ export const startNativeLiveClass = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
-      throw new Error("Unauthorized: you are not the teacher of this class");
-    }
+
 
     await ctx.db.patch(args.liveClassId, {
       status: "live",
@@ -284,8 +298,8 @@ export const deleteLiveClass = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
-      throw new Error("Unauthorized: you are not the teacher of this class");
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Unauthorized");
     }
 
     // Delete attendance records first
@@ -685,4 +699,142 @@ export const getRecentReactions = query({
 
     return recentReactions;
   }
+});
+
+// ─── WAITING ROOM / APPROVALS ────────────────────────────────────────────────
+
+export const getApprovalStatus = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const approval = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", userId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    return approval;
+  },
+});
+
+export const getPendingApprovals = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) return [];
+
+    // Only teachers/admins can see pending approvals
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      return [];
+    }
+
+    const approvals = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .collect();
+
+    return approvals;
+  },
+});
+
+export const requestJoinClass = mutation({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    // Check if already has an approval record
+    const existing = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", userId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    if (existing) {
+      if (existing.status === "pending") {
+        return existing._id;
+      }
+      // If denied, allow them to re-request
+      await ctx.db.patch(existing._id, {
+        status: "pending",
+        requestedAt: Date.now(),
+      });
+      return existing._id;
+    }
+
+    const approvalId = await ctx.db.insert("liveClassApprovals", {
+      liveClass: args.liveClassId,
+      student: userId,
+      studentName: user.name || user.email || "Learner",
+      status: "pending",
+      requestedAt: Date.now(),
+    });
+
+    return approvalId;
+  },
+});
+
+export const approveStudent = mutation({
+  args: {
+    approvalId: v.id("liveClassApprovals"),
+    status: v.union(v.literal("approved"), v.literal("denied")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) throw new Error("Approval record not found");
+
+    const liveClass = await ctx.db.get(approval.liveClass);
+    if (!liveClass) throw new Error("Live class not found");
+
+    // Only teachers/admins can approve
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch(args.approvalId, {
+      status: args.status,
+    });
+
+    return { success: true };
+  },
+});
+
+export const getReactionStats = query({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+
+    const reactions = await ctx.db
+      .query("liveClassReactions")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .collect();
+
+    const counts: Record<string, number> = { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+    for (const r of reactions) {
+      if (counts[r.type] !== undefined) {
+        counts[r.type]++;
+      }
+    }
+    return counts;
+  },
 });

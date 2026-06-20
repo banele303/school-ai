@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/hooks/AuthProvider";
+import Hls from "hls.js";
+import InviteDialog from "./InviteDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,14 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, PhoneOff, 
   Send, Users, MessageSquare, Settings, Volume2, VolumeX, 
-  Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle, Hand
+  Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle, Hand, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-// HLS.js for fallback HLS streaming in browsers that don't support native HLS playback
-import Hls from "hls.js";
-import InviteDialog from "./InviteDialog";
 
 export default function LiveRoomPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +44,7 @@ export default function LiveRoomPage() {
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
   const sendReaction = useMutation(api.liveClasses.sendReaction);
   const recentReactions = useQuery(api.liveClasses.getRecentReactions, id ? { liveClassId: id as any } : "skip") || [];
+  const reactionStats = useQuery(api.liveClasses.getReactionStats, id ? { liveClassId: id as any } : "skip") || { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
 
   const approvalStatus = useQuery(api.liveClasses.getApprovalStatus, id ? { liveClassId: id as any } : "skip");
   const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, id ? { liveClassId: id as any } : "skip") || [];
@@ -564,8 +563,28 @@ export default function LiveRoomPage() {
               ))}
             </div>
 
-            {/* 1. TEACHER VIEW */}
-            {isCreator && (
+            {/* 1. REPLAY OR LIVE/PREVIEW VIEW */}
+            {classItem.status === "ended" && classItem.recordingUrl ? (
+              <div className="w-full h-full relative bg-black flex items-center justify-center">
+                {classItem.recordingUrl.includes("videodelivery.net") || classItem.recordingUrl.includes("iframe.videodelivery.net") ? (
+                  <iframe
+                    title={classItem.title}
+                    src={classItem.recordingUrl.includes("iframe.videodelivery.net") 
+                      ? classItem.recordingUrl 
+                      : classItem.recordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
+                    className="w-full h-full aspect-video border-0"
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    src={classItem.recordingUrl}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            ) : isCreator ? (
               <>
                 <video
                   ref={localVideoRef}
@@ -637,10 +656,7 @@ export default function LiveRoomPage() {
                   )}
                 </div>
               </>
-            )}
-
-            {/* 2. STUDENT VIEW */}
-            {!isCreator && (
+            ) : (
               <>
                 {streamActive ? (
                   <div className="w-full h-full relative bg-black">
@@ -976,6 +992,32 @@ export default function LiveRoomPage() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Live Reactions Section */}
+                <div className="mb-6">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-3 dark:text-zinc-400">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    Live Class Reactions
+                  </h3>
+                  
+                  {/* Click to React Grid */}
+                  <div className="grid grid-cols-5 gap-2 mb-4 bg-slate-50 dark:bg-zinc-900/20 border border-slate-100 dark:border-zinc-900/50 p-2 rounded-xl">
+                    {Object.entries(EMOJI_MAP).map(([type, emoji]) => (
+                      <Button
+                        key={type}
+                        variant="ghost"
+                        className="h-12 flex flex-col items-center justify-center p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all hover:scale-105 active:scale-95"
+                        onClick={() => handleSendReaction(type)}
+                        title={`Send ${type}`}
+                      >
+                        <span className="text-xl mb-0.5">{emoji}</span>
+                        <span className="text-[10px] font-bold text-slate-600 dark:text-zinc-400">
+                          {reactionStats[type] || 0}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Additional classroom metrics */}
