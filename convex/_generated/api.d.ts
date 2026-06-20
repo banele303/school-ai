@@ -49,6 +49,7 @@ import type * as timetables from "../timetables.js";
 import type * as tutoring from "../tutoring.js";
 import type * as users from "../users.js";
 import type * as videoLibrary from "../videoLibrary.js";
+import type * as whiteboard from "../whiteboard.js";
 
 import type {
   ApiFromModules,
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   tutoring: typeof tutoring;
   users: typeof users;
   videoLibrary: typeof videoLibrary;
+  whiteboard: typeof whiteboard;
 }>;
 
 /**

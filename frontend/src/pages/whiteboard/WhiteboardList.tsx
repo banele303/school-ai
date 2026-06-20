@@ -1,14 +1,14 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { api } from "../../../../convex/_generated/api";
 
 const WhiteboardList: React.FC = () => {
   const whiteboards = useQuery(api.whiteboard.list);
   const createWhiteboard = useMutation(api.whiteboard.create);
 
   const handleCreate = async () => {
-    const id = await createWhiteboard({ name: "Untitled Board", content: "" });
+    const id = await createWhiteboard({ title: "Untitled Board", content: "" });
     // navigate to the new board
     window.location.href = `/whiteboard/${id}`;
   };
@@ -29,7 +29,7 @@ const WhiteboardList: React.FC = () => {
               to={`/whiteboard/${wb._id}`}
               className="text-blue-600 hover:underline"
             >
-              {wb.name || "Untitled"}
+              {wb.title || "Untitled"}
             </Link>
           </li>
         ))}

@@ -1,13 +1,17 @@
 import React, { useState } from "react";
 import { useParams } from "react-router";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import WhiteboardCanvas from "@/components/WhiteboardCanvas";
 import WhiteboardToolbar from "@/components/WhiteboardToolbar";
 
 const WhiteboardPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const board = useQuery(api.whiteboard.get, { id: id! });
+  const board = useQuery(
+    api.whiteboard.get,
+    id ? { id: id as Id<"whiteboards"> } : "skip"
+  );
   const updateBoard = useMutation(api.whiteboard.update);
 
   // Local state to hold canvas content as it changes
@@ -20,7 +24,7 @@ const WhiteboardPage: React.FC = () => {
 
   const handleSave = () => {
     if (id) {
-      void updateBoard({ id, content: canvasContent });
+      void updateBoard({ id: id as Id<"whiteboards">, content: canvasContent });
     }
   };
 
