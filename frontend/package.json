@@ -72,7 +72,7 @@
     "tailwindcss": "^4.1.18",
     "vaul": "^1.1.2",
     "konva": "^9.2.7",
-    "react-konva": "^18.2.10",
+    "react-konva": "^19.2.5",
     "zod": "^4.3.5"
   },
   "devDependencies": {
