@@ -8,11 +8,7 @@ const Login = () => {
   const { user, loading, year } = useAuth();
   const [mode, setMode] = useState<"login" | "create">("login");
 
-  if (user && !loading) {
-    if (year || user.role === "admin") {
-      return <Navigate to="/dashboard" />;
-    }
-  }
+  return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">

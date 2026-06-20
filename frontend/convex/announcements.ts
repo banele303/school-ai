@@ -2,7 +2,7 @@ declare const process: { env: Record<string, string | undefined> };
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
 // ── QUERIES ──────────────────────────────────────────────────────────────────
@@ -67,8 +67,8 @@ export const generateAnnouncement = action({
     tone: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) return { text: "AI service is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your Convex environment." };
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) return { text: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
 
     const prompt = `You are a professional South African school administrator. Write a clear, friendly school announcement based on these bullet points.
     If the bullet points imply a specific language (like isiZulu, Sesotho, Afrikaans, Tshivenda, or isiXhosa), write the announcement entirely in that language. Otherwise, use English.
@@ -78,9 +78,9 @@ Tone: ${args.tone || "professional and friendly"}
 
 Write ONLY the announcement text (title on first line, then body). No markdown, no extra explanation.`;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: openai("deepseek-chat"),
       prompt,
     });
 

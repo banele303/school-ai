@@ -777,4 +777,12 @@ export default defineSchema({
     teacherReview: v.optional(v.string()),
   }).index("by_student", ["student"])
     .index("by_subject", ["subject"]),
+  whiteboards: defineTable({
+    ownerId: v.id("users"),
+    title: v.string(),
+    content: v.optional(v.string()), // JSON of canvas
+    sharedWith: v.optional(v.array(v.id("users"))),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  }).index("by_owner", ["ownerId"]),
 });

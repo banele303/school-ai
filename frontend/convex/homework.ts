@@ -1,7 +1,7 @@
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -49,7 +49,7 @@ export const submitHomework = action({
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<any> => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
 
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
@@ -81,9 +81,9 @@ Respond in JSON format:
   "correctAnswer": "The correct answer or solution here..."
 }`;
 
-        const google = createGoogleGenerativeAI({ apiKey });
+        const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
         const { text } = await generateText({
-          model: google("gemini-2.5-flash"),
+          model: openai("deepseek-chat"),
           prompt,
         });
 

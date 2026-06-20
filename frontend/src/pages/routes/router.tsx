@@ -48,6 +48,8 @@ import StudyGroupsPage from "@/pages/groups/StudyGroups";
 import PeerTutoringPage from "@/pages/tutoring/PeerTutoring";
 import SchoolOnboarding from "@/pages/admin/SchoolOnboarding";
 import PremiumSuite from "@/pages/premium/PremiumSuite";
+import WhiteboardList from "@/pages/whiteboard/WhiteboardList";
+import WhiteboardPage from "@/pages/whiteboard/WhiteboardPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <Home /> },
@@ -105,20 +107,9 @@ export const router = createBrowserRouter([
       { path: "lms/materials", element: <MaterialsPage /> },
 
       // Finance
-      { path: "finance/fees", element: <FeesPage /> },
-      { path: "finance/expenses", element: <ExpensesPage /> },
-      { path: "finance/salary", element: <SalaryPage /> },
-
-      // ── NEW FEATURES ──
-      { path: "lives", element: <LiveClassesPage /> },
-      { path: "lives/room/:id", element: <LiveRoomPage /> },
-      { path: "videos", element: <VideoLibraryPage /> },
-      { path: "ai/homework", element: <HomeworkCheckerPage /> },
-      { path: "ai/marking", element: <AIMarkingPage /> },
-      { path: "groups", element: <StudyGroupsPage /> },
-      { path: "tutoring", element: <PeerTutoringPage /> },
-      { path: "admin/onboarding", element: <SchoolOnboarding /> },
       { path: "command-center", element: <PremiumSuite /> },
+        { path: "whiteboard", element: <WhiteboardList /> },
+        { path: "whiteboard/:id", element: <WhiteboardPage /> },
       { path: "lesson-studio", element: <PremiumSuite /> },
       { path: "student-timeline", element: <PremiumSuite /> },
       { path: "parent-reports", element: <PremiumSuite /> },

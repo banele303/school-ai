@@ -2,7 +2,7 @@ declare const process: { env: Record<string, string | undefined> };
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -50,8 +50,8 @@ export const generateLearningPath = action({
     academicYearId: v.id("academicYears"),
   },
   handler: async (ctx, args) => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) return { plan: "AI service is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your Convex environment." };
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) return { plan: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
 
     // In a real app, we would fetch the student's past grades, attendance, and missed assignments here.
     // For now, we simulate pulling that context.
@@ -70,10 +70,10 @@ export const generateLearningPath = action({
       }
     `;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
       prompt,
-      model: google("gemini-2.5-flash"),
+      model: openai("deepseek-chat"),
     });
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();

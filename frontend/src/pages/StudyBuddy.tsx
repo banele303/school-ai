@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Bot, Send, Loader2, Sparkles, Lightbulb, MessageSquare, BookOpen, GraduationCap, Hash, Trash2, History } from "lucide-react";
+import { Bot, Plus, Loader2, Sparkles, Lightbulb, MessageSquare, BookOpen, GraduationCap, Hash, Trash2, History } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
@@ -324,14 +324,14 @@ export default function StudyBuddyPage() {
             />
             <Button
               size="icon"
-              className="h-[52px] w-[52px] shrink-0 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+              className="h-[52px] w-[52px] shrink-0 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white",
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Send className="h-5 w-5" />
+                <Plus className="h-5 w-5" />
               )}
             </Button>
           </div>

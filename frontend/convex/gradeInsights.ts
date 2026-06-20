@@ -1,7 +1,7 @@
 declare const process: { env: Record<string, string | undefined> };
 import { action, query } from "./_generated/server";
 import { v } from "convex/values";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -20,7 +20,7 @@ export const getInsights = query({
 export const generateInsights = action({
   args: { examId: v.id("exams") },
   handler: async (ctx, args) => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) return;
 
     // Fetch exam and submissions
@@ -79,9 +79,9 @@ Respond in JSON format:
   "recommendedActions": ["action 1", "action 2", "action 3"]
 }`;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: openai("deepseek-chat"),
       prompt,
     });
 

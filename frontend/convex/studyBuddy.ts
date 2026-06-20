@@ -3,7 +3,7 @@ declare const process: { env: Record<string, string | undefined> };
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -39,8 +39,8 @@ export const askStudyBuddy = action({
     }))),
   },
   handler: async (ctx, args): Promise<{ answer: string }> => {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) return { answer: "AI service is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your Convex environment." };
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) return { answer: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
 
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
@@ -75,9 +75,9 @@ If you don't know something, say so honestly and suggest how the student can fin
     const historyText = history.map((h: any) => `${h.role === "user" ? "Student" : "EduBot"}: ${h.content}`).join("\n");
     const prompt: string = `${historyText ? historyText + "\n" : ""}Student: ${args.question}\nEduBot:`;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: openai("deepseek-chat"),
       system: systemPrompt,
       prompt,
     });

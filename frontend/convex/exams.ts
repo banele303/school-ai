@@ -2,7 +2,7 @@ declare const process: { env: Record<string, string | undefined> };
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -514,7 +514,7 @@ export const generateExam = action({
       southAfricanExamType,
     });
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) return { examId, questions: [] };
 
     // Build question type mix
@@ -674,17 +674,6 @@ RULES:
 11. Questions should be appropriate for ${args.difficulty} difficulty level.
 12. Use South African contexts, rand values, local provinces, CAPS terminology, NSC/IEB-style phrasing where relevant.
 13. cognitiveLevel must be one of: knowledge, routine, complex, problem_solving.`;
-
-    const google = createGoogleGenerativeAI({ apiKey });
-    const { text } = await generateText({
-      prompt,
-      model: google("gemini-2.5-flash"),
-    });
-
-    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const questions = JSON.parse(cleanJson);
-
-    // Save questions to exam
     await ctx.runMutation("exams:updateExamQuestions" as any, {
       examId,
       questions,
