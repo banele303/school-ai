@@ -51,6 +51,13 @@ private_key.pem
 b64_key.txt
 current_env.txt
 env_list.txt
+_jwks.txt
+_pk.txt
+_secret.txt
+temp_key.txt
+convex_env*.txt
+convex_env*.env
+convex_prod.env
 
 # Cloudflare Wrangler cache
 .wrangler/
