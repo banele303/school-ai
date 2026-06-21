@@ -43,12 +43,12 @@ function envLine(name, value) {
   return `${name}=${JSON.stringify(value)}\n`;
 }
 
-// Convert multiline PEM to single line with spaces for absolute safety in env parser
-const pkSingleLine = privateKey.replace(/\r?\n/g, " ");
+// Keep actual newlines for standard PKCS#8 parser support
+const pkCorrect = privateKey.replace(/\r\n/g, "\n");
 
 fs.writeFileSync(
   envFile,
-  envLine("JWT_PRIVATE_KEY", pkSingleLine) +
+  envLine("JWT_PRIVATE_KEY", pkCorrect) +
     envLine("JWKS", jwks) +
     envLine("AUTH_SECRET", authSecret),
   "utf-8"

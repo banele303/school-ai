@@ -57,8 +57,7 @@ async function main() {
 
   const keys = await generateKeyPair("RS256");
   const privateKey = (await exportPKCS8(keys.privateKey))
-    .trimEnd()
-    .replace(/\n/g, " ");
+    .trimEnd();
   const publicKey = await exportJWK(keys.publicKey);
   const jwks = JSON.stringify({ keys: [{ use: "sig", ...publicKey }] });
   const authSecret = crypto.randomBytes(32).toString("base64url");
