@@ -17,6 +17,7 @@ http.route({
         ok: response.ok,
         status: response.status,
         text,
+        // @ts-ignore
         CONVEX_SITE_URL: process.env.CONVEX_SITE_URL
       }), {
         status: 200,
