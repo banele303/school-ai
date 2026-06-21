@@ -21,8 +21,8 @@ if (hasDeployKey) {
 }
 
 const command = hasDeployKey
-  ? ["npx", ["convex", "deploy", "--cmd", "npm run build"]]
-  : ["npm", ["run", "build"]];
+  ? 'npx convex deploy --cmd "npm run build"'
+  : 'npm run build';
 
 if (!hasDeployKey) {
   console.warn(
@@ -32,7 +32,7 @@ if (!hasDeployKey) {
 
 console.log("Building with VITE_CONVEX_URL:", process.env.VITE_CONVEX_URL);
 
-const result = spawnSync(command[0], command[1], {
+const result = spawnSync(command, {
   stdio: "inherit",
   shell: true,
 });
