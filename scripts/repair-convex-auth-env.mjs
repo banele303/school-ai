@@ -55,7 +55,7 @@ async function main() {
 
   console.warn("Convex Auth JWKS is invalid; repairing auth environment.");
 
-  const keys = await generateKeyPair("RS256");
+  const keys = await generateKeyPair("RS256", { extractable: true });
   const privateKey = (await exportPKCS8(keys.privateKey))
     .trimEnd();
   const publicKey = await exportJWK(keys.publicKey);
