@@ -5,6 +5,21 @@ process.env.VITE_CONVEX_URL = "https://fine-caiman-328.convex.cloud";
 process.env.VITE_CONVEX_SITE_URL = "https://fine-caiman-328.convex.site";
 
 const hasDeployKey = Boolean(process.env.CONVEX_DEPLOY_KEY);
+if (hasDeployKey) {
+  const repair = spawnSync(
+    "node",
+    ["scripts/repair-convex-auth-env.mjs"],
+    {
+      stdio: "inherit",
+      shell: true,
+    }
+  );
+
+  if (repair.status !== 0) {
+    process.exit(repair.status ?? 1);
+  }
+}
+
 const command = hasDeployKey
   ? ["npx", ["convex", "deploy", "--cmd", "npm run build"]]
   : ["npm", ["run", "build"]];
