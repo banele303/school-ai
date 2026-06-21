@@ -146,15 +146,14 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   async function onSubmit(data: FormValues) {
     try {
       if (isLogin) {
-        const result = await signIn("password", {
+        await signIn("password", {
           email: data.email,
           password: data.password!,
           flow: "signIn",
         });
-        if (result?.signingIn) {
-          toast.success("Logged in successfully");
-          window.location.href = "/dashboard";
-        }
+        // signIn throws on failure, returns null on success
+        toast.success("Logged in successfully");
+        window.location.href = "/dashboard";
       } else if (type === "create") {
         if (!isLogin && !role) {
           // Self-signup
