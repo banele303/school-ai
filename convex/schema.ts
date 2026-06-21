@@ -401,6 +401,7 @@ export default defineSchema({
     conversationId: v.string(), // sorted pair of user IDs: "id1_id2"
     replyTo: v.optional(v.id("messages")),
     messageType: v.optional(v.string()),
+    fileUrl: v.optional(v.string()),
   }).index("by_conversation", ["conversationId"])
     .index("by_recipient_read", ["recipient", "isRead"])
     .index("by_sender", ["sender"]),
