@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: process.env.CONVEX_SITE_URL,
+      domain: "https://trustworthy-viper-361.convex.site",
       applicationID: "convex",
     },
   ],
