@@ -13,7 +13,12 @@ http.route({
     try {
       const response = await fetch("https://fine-caiman-328.convex.site/.well-known/openid-configuration");
       const text = await response.text();
-      return new Response(JSON.stringify({ ok: response.ok, status: response.status, text }), {
+      return new Response(JSON.stringify({
+        ok: response.ok,
+        status: response.status,
+        text,
+        CONVEX_SITE_URL: process.env.CONVEX_SITE_URL
+      }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
