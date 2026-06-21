@@ -400,6 +400,7 @@ export default defineSchema({
     subject: v.optional(v.string()),
     conversationId: v.string(), // sorted pair of user IDs: "id1_id2"
     replyTo: v.optional(v.id("messages")),
+    messageType: v.optional(v.string()),
   }).index("by_conversation", ["conversationId"])
     .index("by_recipient_read", ["recipient", "isRead"])
     .index("by_sender", ["sender"]),
@@ -780,9 +781,27 @@ export default defineSchema({
   whiteboards: defineTable({
     ownerId: v.id("users"),
     title: v.string(),
-    content: v.optional(v.string()),
+    content: v.optional(v.string()), // JSON of canvas
     sharedWith: v.optional(v.array(v.id("users"))),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   }).index("by_owner", ["ownerId"]),
+
+  messageReactions: defineTable({
+    messageId: v.id("messages"),
+    userId: v.id("users"),
+    emoji: v.string(),
+  })
+    .index("by_message", ["messageId"])
+    .index("by_user_message", ["userId", "messageId"]),
+
+  curriculumChats: defineTable({
+    userId: v.id("users"),
+    topic: v.string(),
+    question: v.string(),
+    answer: v.string(),
+    subject: v.optional(v.string()),
+    grade: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
 });
