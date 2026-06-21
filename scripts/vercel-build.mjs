@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 // Force production Convex URL for Vercel builds
 process.env.VITE_CONVEX_URL = "https://fine-caiman-328.convex.cloud";
 process.env.VITE_CONVEX_SITE_URL = "https://fine-caiman-328.convex.site";
+process.env.CONVEX_SITE_URL = "https://fine-caiman-328.convex.site";
 
 const hasDeployKey = Boolean(process.env.CONVEX_DEPLOY_KEY);
 if (hasDeployKey) {
