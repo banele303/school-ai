@@ -403,6 +403,11 @@ export default defineSchema({
     messageType: v.optional(v.string()),
     fileUrl: v.optional(v.string()),
     fileName: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    fileType: v.optional(v.string()),
+    curriculumTopic: v.optional(v.string()),
+    curriculumSubject: v.optional(v.string()),
+    curriculumGrade: v.optional(v.number()),
   }).index("by_conversation", ["conversationId"])
     .index("by_recipient_read", ["recipient", "isRead"])
     .index("by_sender", ["sender"]),
