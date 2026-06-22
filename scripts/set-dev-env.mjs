@@ -4,8 +4,6 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 
-const DEPLOYMENT = "fine-caiman-328";
-
 // Read private key
 const pkPath = "private_key.pem";
 if (!fs.existsSync(pkPath)) {
@@ -28,7 +26,7 @@ const jwksObj = {
       ...jwk
     }
   ]
-};
+ };
 const jwks = JSON.stringify(jwksObj);
 
 // Generate random AUTH_SECRET
@@ -37,7 +35,7 @@ const authSecret = crypto.randomBytes(32).toString("base64url");
 
 // Write to a temporary .env file
 const tmpDir = fs.realpathSync(os.tmpdir());
-const envFile = path.join(tmpDir, `convex_prod_env_${Date.now()}.env`);
+const envFile = path.join(tmpDir, `convex_dev_env_${Date.now()}.env`);
 
 function envLine(name, value) {
   return `${name}=${JSON.stringify(value)}\n`;
@@ -54,30 +52,40 @@ fs.writeFileSync(
   "utf-8"
 );
 
-console.log(`\n=== Setting environment variables on production deployment: ${DEPLOYMENT} ===\n`);
+// Read .env.local to get CONVEX_DEPLOYMENT
+let convexDeployment = "";
+const envLocalPath = ".env.local";
+if (fs.existsSync(envLocalPath)) {
+  const envLocal = fs.readFileSync(envLocalPath, "utf-8");
+  const match = envLocal.match(/^CONVEX_DEPLOYMENT=(.+)$/m);
+  if (match) {
+    convexDeployment = match[1].split("#")[0].trim();
+    console.log(`Loaded CONVEX_DEPLOYMENT from .env.local: "${convexDeployment}"`);
+  }
+}
+
+if (!convexDeployment) {
+  console.warn("⚠️ CONVEX_DEPLOYMENT not found in .env.local, setting will use current active deployment.");
+}
+
+console.log(`\n=== Setting environment variables on local/dev deployment ===\n`);
 
 try {
   const cliPath = path.join(process.cwd(), "node_modules", "convex", "dist", "cli.bundle.cjs").replace(/\\/g, "\\\\");
-  const cmd = `node -e "const os = require('os'); os.homedir = () => 'C:\\\\Users\\\\Mr Ness'; require(process.argv[1]);" "${cliPath}" env set --deployment ${DEPLOYMENT} --from-file "${envFile.replace(/\\/g, "\\\\")}" --force`;
+  const deploymentName = convexDeployment ? convexDeployment.replace("dev:", "") : "trustworthy-viper-361";
+  
+  // Use monkey-patched runner to bypass Windows user context session issues for config resolution
+  const cmd = `node -e "const os = require('os'); os.homedir = () => 'C:\\\\Users\\\\Mr Ness'; require(process.argv[1]);" "${cliPath}" env set --deployment ${deploymentName} --from-file "${envFile.replace(/\\/g, "\\\\")}" --force`;
+  
   execSync(cmd, { stdio: "inherit", shell: true });
-  console.log("\n✅ Environment variables set successfully on Convex!");
+  console.log("\n✅ Environment variables set successfully on local/dev Convex!");
 } catch (error) {
-  console.error("\n❌ Failed to set environment variables on Convex:", error.message);
+  console.error("\n❌ Failed to set environment variables on local/dev Convex:", error.message);
   try { fs.unlinkSync(envFile); } catch {}
   process.exit(1);
 }
 
 // Cleanup
 try { fs.unlinkSync(envFile); } catch {}
-
-console.log("\n=== Verifying environment variables ===");
-try {
-  execSync(`npx convex env list --deployment ${DEPLOYMENT}`, {
-    stdio: "inherit",
-    shell: true,
-  });
-} catch (error) {
-  console.warn("\n⚠️ Verification listed failed, but environment setting was completed. (Check auth manually)");
-}
 
 console.log("\n✅ Done!");
