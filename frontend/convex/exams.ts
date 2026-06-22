@@ -674,6 +674,16 @@ RULES:
 11. Questions should be appropriate for ${args.difficulty} difficulty level.
 12. Use South African contexts, rand values, local provinces, CAPS terminology, NSC/IEB-style phrasing where relevant.
 13. cognitiveLevel must be one of: knowledge, routine, complex, problem_solving.`;
+
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
+    const { text } = await generateText({
+      prompt,
+      model: openai("deepseek-chat"),
+    });
+
+    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const questions = JSON.parse(cleanJson);
+
     await ctx.runMutation("exams:updateExamQuestions" as any, {
       examId,
       questions,

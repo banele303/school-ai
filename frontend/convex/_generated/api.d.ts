@@ -12,6 +12,7 @@ import type * as academicYears from "../academicYears.js";
 import type * as adminSeed from "../adminSeed.js";
 import type * as adminUsers from "../adminUsers.js";
 import type * as announcements from "../announcements.js";
+import type * as arenas from "../arenas.js";
 import type * as attendance from "../attendance.js";
 import type * as auth from "../auth.js";
 import type * as badges from "../badges.js";
@@ -19,6 +20,7 @@ import type * as capsActions from "../capsActions.js";
 import type * as capsSeed from "../capsSeed.js";
 import type * as classes from "../classes.js";
 import type * as cleanup from "../cleanup.js";
+import type * as emails from "../emails.js";
 import type * as events from "../events.js";
 import type * as examSeed from "../examSeed.js";
 import type * as exams from "../exams.js";
@@ -48,6 +50,7 @@ import type * as timetables from "../timetables.js";
 import type * as tutoring from "../tutoring.js";
 import type * as users from "../users.js";
 import type * as videoLibrary from "../videoLibrary.js";
+import type * as whiteboard from "../whiteboard.js";
 
 import type {
   ApiFromModules,
@@ -60,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   adminSeed: typeof adminSeed;
   adminUsers: typeof adminUsers;
   announcements: typeof announcements;
+  arenas: typeof arenas;
   attendance: typeof attendance;
   auth: typeof auth;
   badges: typeof badges;
@@ -67,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   capsSeed: typeof capsSeed;
   classes: typeof classes;
   cleanup: typeof cleanup;
+  emails: typeof emails;
   events: typeof events;
   examSeed: typeof examSeed;
   exams: typeof exams;
@@ -96,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   tutoring: typeof tutoring;
   users: typeof users;
   videoLibrary: typeof videoLibrary;
+  whiteboard: typeof whiteboard;
 }>;
 
 /**
