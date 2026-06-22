@@ -13,13 +13,16 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  PieChart,
+  Activity,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface Shape {
   id: string;
-  type: "pen" | "rect" | "circle" | "triangle" | "line" | "arrow" | "axes" | "text";
+  type: "pen" | "rect" | "circle" | "triangle" | "line" | "arrow" | "axes" | "text" | "rightTriangle" | "parabola" | "circleRadius" | "pieSlice";
   x: number;
   y: number;
   points?: number[];
@@ -72,6 +75,9 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
+    // Math tools panel toggle
+    const [showMathPanel, setShowMathPanel] = useState(false);
+
     // Dark Mode Detector
     const [isDarkMode, setIsDarkMode] = useState(false);
     useEffect(() => {
@@ -91,7 +97,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
       { name: "Rose", hex: "#f43f5e" },
       { name: "Amber", hex: "#f59e0b" },
       { name: "Violet", hex: "#8b5cf6" },
-      { name: "White", hex: isDarkMode ? "#0f172a" : "#ffffff" },
+      { name: "White", hex: isDarkMode ? "#1e293b" : "#ffffff" },
     ];
 
     // Map drawing slate/white colors for dark mode visibility
@@ -131,15 +137,15 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
       }
     }, [content]);
 
-    // Push new state to history
-    const updateShapes = (newShapes: Shape[]) => {
+    // Push new state to history & notify parent ONLY when flag is true (improves latency)
+    const commitShapes = (newShapes: Shape[], notifyParent = true) => {
       setShapes(newShapes);
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push(newShapes);
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
 
-      if (onChange) {
+      if (notifyParent && onChange) {
         onChange(JSON.stringify(newShapes));
       }
     };
@@ -168,14 +174,15 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
     const clearCanvas = () => {
       if (confirm("Are you sure you want to clear the entire whiteboard?")) {
-        updateShapes([]);
+        commitShapes([], true);
         setSelectedId(null);
       }
     };
 
     const deleteSelected = () => {
       if (selectedId) {
-        updateShapes(shapes.filter((s) => s.id !== selectedId));
+        const nextShapes = shapes.filter((s) => s.id !== selectedId);
+        commitShapes(nextShapes, true);
         setSelectedId(null);
       }
     };
@@ -190,7 +197,42 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
       document.body.removeChild(link);
     };
 
-    // Expose actions to parent component via ref
+    // Keyboard Shortcuts
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        // Ignore shortcut keys if focused on text input/textarea
+        const tag = document.activeElement?.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea") return;
+
+        // Ctrl + Z (Undo)
+        if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+          e.preventDefault();
+          undo();
+        }
+        // Ctrl + Y (Redo)
+        if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+          e.preventDefault();
+          redo();
+        }
+        // Delete / Backspace (Delete selected shape)
+        if (e.key === "Delete" || e.key === "Backspace") {
+          if (selectedId) {
+            e.preventDefault();
+            deleteSelected();
+          }
+        }
+        // Mode switch keys
+        if (e.key === "v") setTool("select");
+        if (e.key === "p") setTool("pen");
+        if (e.key === "t") setTool("text");
+        if (e.key === "r") setTool("rect");
+        if (e.key === "c") setTool("circle");
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [historyIndex, history, selectedId, shapes]);
+
     useImperativeHandle(ref, () => ({
       undo,
       redo,
@@ -248,7 +290,16 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
       if (tool === "pen") {
         newShape.points = [pointer.x, pointer.y];
-      } else if (tool === "rect" || tool === "circle" || tool === "triangle" || tool === "axes") {
+      } else if (
+        tool === "rect" ||
+        tool === "circle" ||
+        tool === "triangle" ||
+        tool === "axes" ||
+        tool === "rightTriangle" ||
+        tool === "parabola" ||
+        tool === "circleRadius" ||
+        tool === "pieSlice"
+      ) {
         newShape.width = 0;
         newShape.height = 0;
       } else if (tool === "line" || tool === "arrow") {
@@ -263,7 +314,8 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         setIsDrawing(false);
       }
 
-      updateShapes([...shapes, newShape]);
+      // Do NOT notify parent on initial click (will notify on mouseUp)
+      setShapes([...shapes, newShape]);
     };
 
     const handleMouseMove = () => {
@@ -276,7 +328,16 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
       if (active.type === "pen" && active.points) {
         active.points = [...active.points, pointer.x, pointer.y];
-      } else if (active.type === "rect" || active.type === "circle" || active.type === "triangle" || active.type === "axes") {
+      } else if (
+        active.type === "rect" ||
+        active.type === "circle" ||
+        active.type === "triangle" ||
+        active.type === "axes" ||
+        active.type === "rightTriangle" ||
+        active.type === "parabola" ||
+        active.type === "circleRadius" ||
+        active.type === "pieSlice"
+      ) {
         active.width = pointer.x - active.x;
         active.height = pointer.y - active.y;
       } else if ((active.type === "line" || active.type === "arrow") && active.points) {
@@ -284,13 +345,13 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
       }
 
       updated[updated.length - 1] = active;
-      setShapes(updated);
+      setShapes(updated); // Smooth local-only rendering update
     };
 
     const handleMouseUp = () => {
       if (isDrawing) {
         setIsDrawing(false);
-        updateShapes(shapes);
+        commitShapes(shapes, true); // Push history & notify parent exactly once
       }
     };
 
@@ -305,15 +366,22 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         }
         return s;
       });
-      updateShapes(updated);
+      commitShapes(updated, true); // Save state on drag finish
     };
 
     const gridLineColor = isDarkMode ? "#1e293b" : "#e2e8f0";
     const gridDotColor = isDarkMode ? "#334155" : "#cbd5e1";
 
+    // Set cursor dynamically based on active tool
+    const getStageCursor = () => {
+      if (tool === "select") return "default";
+      if (tool === "text") return "text";
+      return "crosshair";
+    };
+
     return (
       <div
-        className="relative flex w-full h-full bg-slate-50 dark:bg-slate-950 select-none overflow-hidden"
+        className="relative flex w-full h-full bg-slate-50 dark:bg-zinc-950 select-none overflow-hidden"
         ref={containerRef}
       >
         {/* Immersive Floating Left Toolbar */}
@@ -322,7 +390,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             variant={tool === "select" ? "default" : "ghost"}
             size="icon"
             onClick={() => setTool("select")}
-            title="Select & Move"
+            title="Select & Move (v)"
           >
             <MousePointer className="h-5 w-5" />
           </Button>
@@ -331,7 +399,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             variant={tool === "pen" ? "default" : "ghost"}
             size="icon"
             onClick={() => setTool("pen")}
-            title="Freehand Pen"
+            title="Freehand Pen (p)"
           >
             <Pencil className="h-5 w-5" />
           </Button>
@@ -339,7 +407,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             variant={tool === "text" ? "default" : "ghost"}
             size="icon"
             onClick={() => setTool("text")}
-            title="Add Text Label"
+            title="Add Text Label (t)"
           >
             <Type className="h-5 w-5" />
           </Button>
@@ -348,7 +416,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             variant={tool === "rect" ? "default" : "ghost"}
             size="icon"
             onClick={() => setTool("rect")}
-            title="Rectangle Shape"
+            title="Rectangle Shape (r)"
           >
             <Square className="h-5 w-5" />
           </Button>
@@ -356,7 +424,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             variant={tool === "circle" ? "default" : "ghost"}
             size="icon"
             onClick={() => setTool("circle")}
-            title="Circle"
+            title="Circle (c)"
           >
             <CircleIcon className="h-5 w-5" />
           </Button>
@@ -376,15 +444,74 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           >
             <MoveUpRight className="h-5 w-5" />
           </Button>
+
+          {/* Math Tools Expandable Panel */}
+          <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-1" />
           <Button
-            variant={tool === "axes" ? "default" : "ghost"}
+            variant={showMathPanel ? "default" : "ghost"}
             size="icon"
-            onClick={() => setTool("axes")}
-            title="Math Coordinate Axes (X-Y)"
+            onClick={() => setShowMathPanel(!showMathPanel)}
+            title="Math Presets & Tools"
+            className="relative"
           >
-            <TrendingUp className="h-5 w-5" />
+            <Activity className="h-5 w-5" />
+            <ChevronRight
+              className={cn(
+                "h-2.5 w-2.5 absolute right-0.5 bottom-0.5 transition-transform",
+                showMathPanel && "rotate-90"
+              )}
+            />
           </Button>
         </div>
+
+        {/* Floating Math Tools Panel */}
+        {showMathPanel && (
+          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800/80 animate-in slide-in-from-left-2 duration-200">
+            <div className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Math Presets
+            </div>
+            <Button
+              variant={tool === "axes" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTool("axes")}
+              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
+            >
+              <TrendingUp className="h-4 w-4" /> Cartesian Axes
+            </Button>
+            <Button
+              variant={tool === "rightTriangle" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTool("rightTriangle")}
+              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
+            >
+              <Triangle className="h-4 w-4 rotate-90" /> Right Triangle
+            </Button>
+            <Button
+              variant={tool === "circleRadius" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTool("circleRadius")}
+              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
+            >
+              <CircleIcon className="h-4 w-4" /> Circle with Radius
+            </Button>
+            <Button
+              variant={tool === "pieSlice" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTool("pieSlice")}
+              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
+            >
+              <PieChart className="h-4 w-4" /> Pie Slice Fraction
+            </Button>
+            <Button
+              variant={tool === "parabola" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTool("parabola")}
+              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
+            >
+              <TrendingUp className="h-4 w-4 -rotate-45" /> Parabola Curve
+            </Button>
+          </div>
+        )}
 
         {/* Floating Styling and Formatting Controls (Top) */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 px-4 py-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-full shadow-lg border border-slate-200/80 dark:border-slate-800/80 max-w-[90%] overflow-x-auto">
@@ -395,7 +522,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
                 key={c.hex}
                 onClick={() => setColor(c.hex)}
                 className={cn(
-                  "h-6 w-6 rounded-full border border-slate-300 dark:border-slate-600 transition hover:scale-110",
+                  "h-6 w-6 rounded-full border border-slate-300 dark:border-slate-650 transition hover:scale-110",
                   color === c.hex && "ring-2 ring-indigo-500 ring-offset-2"
                 )}
                 style={{ backgroundColor: c.hex }}
@@ -476,7 +603,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         </div>
 
         {/* Main Drawing Stage */}
-        <div className="flex-1 w-full h-full">
+        <div className="flex-1 w-full h-full cursor-default">
           <Stage
             width={dimensions.width}
             height={dimensions.height}
@@ -488,6 +615,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             scaleY={stageScale}
             x={stagePos.x}
             y={stagePos.y}
+            style={{ cursor: getStageCursor() }}
             draggable={tool === "select"}
             onDragEnd={(e) => {
               if (e.target === stageRef.current) {
@@ -622,10 +750,9 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
                       />
                     )}
 
-                    {/* Math Coordinate Axes Preset */}
+                    {/* Math Cartesian Axes Preset */}
                     {shape.type === "axes" && (
                       <Group x={shape.x} y={shape.y}>
-                        {/* X axis */}
                         <Arrow
                           points={[-(shape.width || 100), 0, (shape.width || 100), 0]}
                           pointerLength={8}
@@ -642,8 +769,6 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
                           fontStyle="italic"
                           fill={shapeColor}
                         />
-
-                        {/* Y axis */}
                         <Arrow
                           points={[0, shape.height || 100, 0, -(shape.height || 100)]}
                           pointerLength={8}
@@ -660,9 +785,132 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
                           fontStyle="italic"
                           fill={shapeColor}
                         />
-
-                        {/* Origin indicator */}
                         <Circle x={0} y={0} radius={3} fill={shapeColor} />
+                      </Group>
+                    )}
+
+                    {/* Math Right Triangle Preset */}
+                    {shape.type === "rightTriangle" && (
+                      <Group x={shape.x} y={shape.y}>
+                        <Line
+                          points={[
+                            0,
+                            0,
+                            0,
+                            shape.height || 80,
+                            shape.width || 120,
+                            shape.height || 80,
+                            0,
+                            0,
+                          ]}
+                          closed
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                          fill={shape.fillColor}
+                        />
+                        {/* Right angle indicator box */}
+                        <Line
+                          points={[
+                            0,
+                            (shape.height || 80) - 10,
+                            10,
+                            (shape.height || 80) - 10,
+                            10,
+                            shape.height || 80,
+                          ]}
+                          stroke={shapeColor}
+                          strokeWidth={1}
+                        />
+                      </Group>
+                    )}
+
+                    {/* Math Circle with Radius Preset */}
+                    {shape.type === "circleRadius" && (
+                      <Group x={shape.x} y={shape.y}>
+                        <Circle
+                          x={0}
+                          y={0}
+                          radius={Math.max(Math.abs(shape.width || 50), 10)}
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                          fill={shape.fillColor}
+                        />
+                        <Line
+                          points={[0, 0, Math.max(Math.abs(shape.width || 50), 10), 0]}
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                        />
+                        <Text
+                          x={Math.max(Math.abs(shape.width || 50), 10) / 2 - 5}
+                          y={-15}
+                          text="r"
+                          fontSize={12}
+                          fontStyle="italic"
+                          fill={shapeColor}
+                        />
+                        <Circle x={0} y={0} radius={3} fill={shapeColor} />
+                      </Group>
+                    )}
+
+                    {/* Math Parabola algebra preset */}
+                    {shape.type === "parabola" && (
+                      <Group x={shape.x} y={shape.y}>
+                        <Line
+                          points={(() => {
+                            const pts = [];
+                            const w = shape.width || 100;
+                            const h = shape.height || 80;
+                            for (let dx = -w; dx <= w; dx += 5) {
+                              const dy = (dx * dx) / w; // standard parabola dy = x^2
+                              pts.push(dx, dy * (h / w));
+                            }
+                            return pts;
+                          })()}
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                          tension={0.5}
+                        />
+                        <Text
+                          x={0}
+                          y={(shape.height || 80) + 5}
+                          text="y = ax²"
+                          fontSize={12}
+                          fontStyle="italic"
+                          fill={shapeColor}
+                        />
+                      </Group>
+                    )}
+
+                    {/* Math Pie Fraction Preset */}
+                    {shape.type === "pieSlice" && (
+                      <Group x={shape.x} y={shape.y}>
+                        <Circle
+                          x={0}
+                          y={0}
+                          radius={Math.max(Math.abs(shape.width || 50), 10)}
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                          fill={shape.fillColor}
+                        />
+                        {/* Cut lines for a standard quarter slice fraction */}
+                        <Line
+                          points={[0, 0, 0, -Math.max(Math.abs(shape.width || 50), 10)]}
+                          stroke={shapeColor}
+                          strokeWidth={Math.max(shape.strokeWidth - 1, 1)}
+                        />
+                        <Line
+                          points={[0, 0, Math.max(Math.abs(shape.width || 50), 10), 0]}
+                          stroke={shapeColor}
+                          strokeWidth={Math.max(shape.strokeWidth - 1, 1)}
+                        />
+                        <Text
+                          x={12}
+                          y={-20}
+                          text="1/4"
+                          fontSize={12}
+                          fontWeight="bold"
+                          fill={shapeColor}
+                        />
                       </Group>
                     )}
 

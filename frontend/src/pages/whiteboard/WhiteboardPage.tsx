@@ -48,11 +48,11 @@ const WhiteboardPage: React.FC = () => {
     setCanvasContent(newContent);
     setSaveStatus("unsaved");
 
-    // Debounced Auto-Save (auto saves after 1.5 seconds of inactivity)
+    // Debounced Auto-Save (auto saves after 4.0 seconds of inactivity)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       void saveChanges(newContent, title);
-    }, 1500);
+    }, 4000);
   };
 
   const saveChanges = async (contentToSave = canvasContent, titleToSave = title) => {
@@ -78,7 +78,7 @@ const WhiteboardPage: React.FC = () => {
 
   if (!board) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-zinc-950">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           <span className="text-sm font-medium text-slate-500">Loading whiteboard canvas...</span>
@@ -88,7 +88,7 @@ const WhiteboardPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-zinc-950 overflow-hidden">
       {/* Immersive Whiteboard Header */}
       <header className="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-20 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
