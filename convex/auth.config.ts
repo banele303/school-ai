@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://fine-caiman-328.convex.site",
+      domain: process.env.JW_ISSUER_DOMAIN!,
       applicationID: "convex",
     },
   ],
