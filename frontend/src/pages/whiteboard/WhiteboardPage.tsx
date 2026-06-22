@@ -90,7 +90,7 @@ const WhiteboardPage: React.FC = () => {
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-zinc-950 overflow-hidden">
       {/* Immersive Whiteboard Header */}
-      <header className="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-20 shadow-sm shrink-0">
+      <header className="flex items-center justify-between px-6 py-3 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 z-20 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -128,7 +128,7 @@ const WhiteboardPage: React.FC = () => {
 
         {/* Action Controls & Save Status Indicator */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 border-r border-slate-200 dark:border-slate-800 pr-4">
+          <div className="flex items-center gap-1 border-r border-zinc-200 dark:border-zinc-800 pr-4">
             <Button
               variant="ghost"
               size="icon"

@@ -381,11 +381,11 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
     return (
       <div
-        className="relative flex w-full h-full bg-slate-50 dark:bg-zinc-950 select-none overflow-hidden"
+        className="relative flex w-full h-full bg-zinc-50 dark:bg-zinc-950 select-none overflow-hidden"
         ref={containerRef}
       >
         {/* Immersive Floating Left Toolbar */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800/80 animate-in fade-in slide-in-from-left-4 duration-300">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 animate-in fade-in slide-in-from-left-4 duration-300">
           <Button
             variant={tool === "select" ? "default" : "ghost"}
             size="icon"
@@ -394,7 +394,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           >
             <MousePointer className="h-5 w-5" />
           </Button>
-          <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-1" />
+          <div className="h-[1px] bg-zinc-200 dark:bg-zinc-800 my-1" />
           <Button
             variant={tool === "pen" ? "default" : "ghost"}
             size="icon"
@@ -411,7 +411,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           >
             <Type className="h-5 w-5" />
           </Button>
-          <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-1" />
+          <div className="h-[1px] bg-zinc-200 dark:bg-zinc-800 my-1" />
           <Button
             variant={tool === "rect" ? "default" : "ghost"}
             size="icon"
@@ -446,7 +446,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           </Button>
 
           {/* Math Tools Expandable Panel */}
-          <div className="h-[1px] bg-slate-200 dark:bg-slate-800 my-1" />
+          <div className="h-[1px] bg-zinc-200 dark:bg-zinc-800 my-1" />
           <Button
             variant={showMathPanel ? "default" : "ghost"}
             size="icon"
@@ -466,8 +466,8 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
         {/* Floating Math Tools Panel */}
         {showMathPanel && (
-          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800/80 animate-in slide-in-from-left-2 duration-200">
-            <div className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 animate-in slide-in-from-left-2 duration-200">
+            <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
               Math Presets
             </div>
             <Button
@@ -514,15 +514,15 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         )}
 
         {/* Floating Styling and Formatting Controls (Top) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 px-4 py-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-full shadow-lg border border-slate-200/80 dark:border-slate-800/80 max-w-[90%] overflow-x-auto">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 px-4 py-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/80 dark:border-zinc-800/80 max-w-[90%] overflow-x-auto">
           {/* Colors */}
-          <div className="flex gap-1.5 items-center pr-3 border-r border-slate-200 dark:border-slate-800">
+          <div className="flex gap-1.5 items-center pr-3 border-r border-zinc-200 dark:border-zinc-800">
             {PALETTE.map((c) => (
               <button
                 key={c.hex}
                 onClick={() => setColor(c.hex)}
                 className={cn(
-                  "h-6 w-6 rounded-full border border-slate-300 dark:border-slate-650 transition hover:scale-110",
+                  "h-6 w-6 rounded-full border border-zinc-300 dark:border-zinc-700 transition hover:scale-110",
                   color === c.hex && "ring-2 ring-indigo-500 ring-offset-2"
                 )}
                 style={{ backgroundColor: c.hex }}
@@ -532,17 +532,17 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           </div>
 
           {/* Thickness */}
-          <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200 dark:border-slate-800">
-            <span className="text-xs text-slate-500 font-medium">Stroke</span>
+          <div className="flex items-center gap-1.5 pr-3 border-r border-zinc-200 dark:border-zinc-800">
+            <span className="text-xs text-zinc-500 font-medium">Stroke</span>
             {[2, 4, 8].map((size) => (
               <button
                 key={size}
                 onClick={() => setStrokeWidth(size)}
                 className={cn(
-                  "px-2 py-0.5 rounded text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition",
+                  "px-2 py-0.5 rounded text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition",
                   strokeWidth === size
-                    ? "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                    : "text-slate-500"
+                    ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                    : "text-zinc-500"
                 )}
               >
                 {size === 2 ? "Thin" : size === 4 ? "Med" : "Thick"}
@@ -551,17 +551,17 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           </div>
 
           {/* Fill Style */}
-          <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200 dark:border-slate-800">
-            <span className="text-xs text-slate-500 font-medium">Fill</span>
+          <div className="flex items-center gap-1.5 pr-3 border-r border-zinc-200 dark:border-zinc-800">
+            <span className="text-xs text-zinc-500 font-medium">Fill</span>
             {(["none", "semi", "solid"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setFillMode(mode)}
                 className={cn(
-                  "px-2 py-0.5 rounded text-xs font-semibold capitalize hover:bg-slate-100 dark:hover:bg-slate-800 transition",
+                  "px-2 py-0.5 rounded text-xs font-semibold capitalize hover:bg-zinc-100 dark:hover:bg-zinc-800 transition",
                   fillMode === mode
-                    ? "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                    : "text-slate-500"
+                    ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                    : "text-zinc-500"
                 )}
               >
                 {mode}
@@ -587,11 +587,11 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         </div>
 
         {/* Navigation Controls (Bottom Right) */}
-        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 p-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-lg shadow border border-slate-200 dark:border-slate-800">
+        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 p-1.5 bg-white/90 dark:bg-zinc-900/90 backdrop-blur rounded-lg shadow border border-zinc-200 dark:border-zinc-800">
           <Button variant="ghost" size="icon" onClick={() => handleZoom(0.85)} title="Zoom Out">
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-xs font-semibold w-12 text-center text-slate-700 dark:text-slate-300">
+          <span className="text-xs font-semibold w-12 text-center text-zinc-700 dark:text-zinc-300">
             {Math.round(stageScale * 100)}%
           </span>
           <Button variant="ghost" size="icon" onClick={() => handleZoom(1.15)} title="Zoom In">

@@ -447,60 +447,6 @@ function SelfLearningPanel() {
   );
 }
 
-function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
-  if (!lesson) return null;
-  const playbackUrl = lesson.recordingUrl?.includes("videodelivery.net")
-    ? lesson.recordingUrl
-    : lesson.recordingUrl
-      ? lesson.recordingUrl
-      : "";
-
-  return (
-    <Dialog open={!!lesson} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>{lesson.title}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-          <div className="overflow-hidden rounded-lg bg-slate-950">
-            {playbackUrl ? (
-              playbackUrl.includes("iframe.videodelivery.net") ? (
-                <iframe title={lesson.title} src={playbackUrl} className="aspect-video w-full" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen />
-              ) : (
-                <video src={playbackUrl} controls className="aspect-video w-full" />
-              )
-            ) : (
-              <div className="grid aspect-video place-items-center text-center text-white">
-                <div>
-                  <Radio className="mx-auto mb-3 h-10 w-10 text-red-400" />
-                  <h3 className="font-semibold">Live room ready</h3>
-                  <p className="mt-1 max-w-md text-sm text-slate-300">When the teacher starts broadcasting, students stay inside this lesson room.</p>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="space-y-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Class tools</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start gap-2"><MessageSquareText className="h-4 w-4" /> Ask a question</Button>
-                <Button variant="outline" className="w-full justify-start gap-2"><FileText className="h-4 w-4" /> Upload answer PDF</Button>
-                <Button variant="outline" className="w-full justify-start gap-2"><Brain className="h-4 w-4" /> Generate revision plan</Button>
-                {isTeacher && <Button className="w-full justify-start gap-2"><ClipboardCheck className="h-4 w-4" /> Review submissions</Button>}
-              </CardContent>
-            </Card>
-            <div className="rounded-lg border bg-muted p-3 text-xs text-muted-foreground">
-              Learners can be enrolled through a school class, invited to an open support session, or use recordings independently for self-learning.
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraOn, setCameraOn] = useState(false);
@@ -540,48 +486,48 @@ function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
-        <DialogHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
-          <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">Teacher Live Studio</DialogTitle>
+      <DialogContent className="max-w-6xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+        <DialogHeader className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
+          <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">Teacher Live Studio</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px] pt-4">
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr] pt-4">
           <div className="space-y-4">
-            <div className="relative overflow-hidden rounded-xl bg-slate-950 aspect-video w-full flex items-center justify-center border border-slate-800">
+            <div className="relative overflow-hidden rounded-xl bg-black aspect-video w-full flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
               {cameraOn ? (
                 <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
               ) : (
-                <div className="text-center text-slate-300 p-6">
-                  <Video className="mx-auto mb-3 h-12 w-12 text-slate-400" />
-                  <p className="font-semibold text-base text-slate-200">Preview Camera before going Live</p>
-                  <p className="text-xs text-slate-500 mt-1">Allow camera access to display your live preview here.</p>
+                <div className="text-center text-zinc-600 dark:text-zinc-400 p-6">
+                  <Video className="mx-auto mb-3 h-12 w-12 text-zinc-400" />
+                  <p className="font-semibold text-base text-zinc-800 dark:text-zinc-200">Preview Camera before going Live</p>
+                  <p className="text-xs text-zinc-500 mt-1">Allow camera access to display your live preview here.</p>
                 </div>
               )}
             </div>
             <div className="flex flex-wrap gap-3">
               <Button onClick={startPreview} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs py-2 px-4 rounded-xl shadow-md"><Video className="h-4 w-4" /> Camera preview</Button>
-              <Button variant="outline" className="gap-2 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl"><MonitorUp className="h-4 w-4" /> Share screen</Button>
-              {lesson && <Button variant="outline" className="gap-2 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl" onClick={() => onStatus(lesson._id, "live")}><Radio className="h-4 w-4 text-red-500 animate-pulse" /> Mark live</Button>}
-              {lesson && <Button variant="outline" className="gap-2 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl" onClick={() => onStatus(lesson._id, "ended")}><CheckCircle className="h-4 w-4 text-emerald-500" /> End class</Button>}
+              <Button variant="outline" className="gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl"><MonitorUp className="h-4 w-4" /> Share screen</Button>
+              {lesson && <Button variant="outline" className="gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl" onClick={() => onStatus(lesson._id, "live")}><Radio className="h-4 w-4 text-red-500 animate-pulse" /> Mark live</Button>}
+              {lesson && <Button variant="outline" className="gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl" onClick={() => onStatus(lesson._id, "ended")}><CheckCircle className="h-4 w-4 text-emerald-500" /> End class</Button>}
             </div>
           </div>
           <div className="space-y-4">
-            <Card className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+            <Card className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold text-slate-900 dark:text-white">Cloudflare Stream Recording</CardTitle>
-                <CardDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">Upload a recorded lesson for in-app replay.</CardDescription>
+                <CardTitle className="text-sm font-bold text-zinc-900 dark:text-white">Cloudflare Stream Recording</CardTitle>
+                <CardDescription className="text-xs text-zinc-500 dark:text-zinc-450 mt-1">Upload a recorded lesson for in-app replay.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Input type="file" accept="video/*" onChange={(e) => setRecordingFile(e.target.files?.[0] || null)} className="bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-xs" />
+                <Input type="file" accept="video/*" onChange={(e) => setRecordingFile(e.target.files?.[0] || null)} className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-lg text-xs" />
                 <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl" onClick={uploadRecording} disabled={uploading}>
                   <Cloud className="h-4 w-4" /> {uploading ? "Uploading..." : "Upload replay"}
                 </Button>
               </CardContent>
             </Card>
-            <Card className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+            <Card className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold text-slate-900 dark:text-white">Teaching Checklist</CardTitle>
+                <CardTitle className="text-sm font-bold text-zinc-900 dark:text-white">Teaching Checklist</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
+              <CardContent className="space-y-2 text-xs text-zinc-700 dark:text-zinc-300 font-medium">
                 <p className="flex items-center gap-2">✓ Camera and microphone checked</p>
                 <p className="flex items-center gap-2">✓ Question paper or slides uploaded</p>
                 <p className="flex items-center gap-2">✓ Chat moderation enabled</p>
@@ -719,19 +665,19 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
-        <DialogHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
-          <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">Create Live Learning Session</DialogTitle>
+      <DialogContent className="max-w-5xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+        <DialogHeader className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
+          <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">Create Live Learning Session</DialogTitle>
         </DialogHeader>
         <div className="grid gap-5 md:grid-cols-2 pt-4">
           <div className="md:col-span-2">
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Lesson Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Grade 12 Maths: Calculus revision" className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs" />
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Lesson Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Grade 12 Maths: Calculus revision" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs" />
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Subject</Label>
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Subject</Label>
             <Select value={subjectId} onValueChange={setSubjectId}>
-              <SelectTrigger disabled={subjectsLoading || subjectOptions.length === 0} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs">
+              <SelectTrigger disabled={subjectsLoading || subjectOptions.length === 0} className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs">
                 <SelectValue placeholder={subjectsLoading ? "Loading subjects..." : subjectOptions.length === 0 ? "No subjects available" : "Select subject"} />
               </SelectTrigger>
               <SelectContent>
@@ -743,9 +689,9 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             )}
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Platform</Label>
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Platform</Label>
             <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="native">Native Classroom (Cloudflare)</SelectItem>
                 <SelectItem value="youtube">YouTube Live</SelectItem>
@@ -756,9 +702,9 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             </Select>
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Target Grade</Label>
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Target Grade</Label>
             <Select value={targetGrade} onValueChange={setTargetGrade}>
-              <SelectTrigger className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs"><SelectValue placeholder="All Grades" /></SelectTrigger>
+              <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs"><SelectValue placeholder="All Grades" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Grades</SelectItem>
                 <SelectItem value="8">Grade 8</SelectItem>
@@ -771,14 +717,14 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
           </div>
           {platform !== "native" && (
             <div>
-              <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Join URL *</Label>
-              <Input value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="https://..." className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs" />
+              <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Join URL *</Label>
+              <Input value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="https://..." className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs" />
             </div>
           )}
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Access</Label>
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Access</Label>
             <Select value={accessMode} onValueChange={setAccessMode}>
-              <SelectTrigger className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="school-and-public">School and self-learners</SelectItem>
                 <SelectItem value="school-only">School class only</SelectItem>
@@ -787,31 +733,83 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             </Select>
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs" />
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs" />
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Time</Label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs" />
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Time</Label>
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs" />
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Max Learners</Label>
-            <Input type="number" value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)} placeholder="Unlimited" className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs" />
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Max Learners</Label>
+            <Input type="number" value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)} placeholder="Unlimited" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs" />
           </div>
           <div>
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Attach PDF / Worksheet</Label>
-            <Input type="file" accept=".pdf,.txt,.md,image/*" onChange={(e) => setResourceFile(e.target.files?.[0] || null)} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl h-10 text-xs py-1 px-3" />
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Attach PDF / Worksheet</Label>
+            <Input type="file" accept=".pdf,.txt,.md,image/*" onChange={(e) => setResourceFile(e.target.files?.[0] || null)} className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl h-10 text-xs py-1 px-3" />
           </div>
           <div className="md:col-span-2">
-            <Label className="text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs block">Lesson Plan</Label>
-            <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objectives, resources, homework, marks allocation..." className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs" />
+            <Label className="text-zinc-700 dark:text-zinc-300 font-semibold mb-1 text-xs block">Lesson Plan</Label>
+            <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objectives, resources, homework, marks allocation..." className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-xl text-xs" />
           </div>
-          <div className="md:col-span-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/80 p-3.5 text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+          <div className="md:col-span-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-150 dark:border-zinc-800/80 p-3.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium leading-relaxed">
             💡 This creates an in-app lesson. Teachers can start the studio from the lesson card, learners join inside the app, and recordings/resources can be stored through Cloudflare.
           </div>
           <Button className="md:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm h-11 rounded-xl shadow-lg mt-2" onClick={handleCreate} disabled={creating}>
             {creating ? "Creating..." : "Create lesson"}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
+  if (!lesson) return null;
+  const playbackUrl = lesson.recordingUrl?.includes("videodelivery.net")
+    ? lesson.recordingUrl
+    : lesson.recordingUrl
+      ? lesson.recordingUrl
+      : "";
+
+  return (
+    <Dialog open={!!lesson} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+        <DialogHeader className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
+          <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">{lesson.title}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr] pt-4">
+          <div className="overflow-hidden rounded-xl bg-black aspect-video w-full flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
+            {playbackUrl ? (
+              playbackUrl.includes("iframe.videodelivery.net") ? (
+                <iframe title={lesson.title} src={playbackUrl} className="w-full h-full aspect-video" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen />
+              ) : (
+                <video src={playbackUrl} controls className="w-full h-full object-contain" />
+              )
+            ) : (
+              <div className="text-center text-zinc-300 p-6">
+                <Radio className="mx-auto mb-3 h-12 w-12 text-red-500 animate-pulse" />
+                <h3 className="font-semibold text-lg text-zinc-850 dark:text-zinc-200">Live room is ready</h3>
+                <p className="mt-2 max-w-md text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">When the teacher starts broadcasting, students will stay inside this lesson room and stream live video.</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-4">
+            <Card className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-bold text-zinc-900 dark:text-white">Class Tools</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                <Button variant="outline" className="w-full justify-start gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl"><MessageSquareText className="h-4 w-4" /> Ask a question</Button>
+                <Button variant="outline" className="w-full justify-start gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl"><FileText className="h-4 w-4" /> Upload answer PDF</Button>
+                <Button variant="outline" className="w-full justify-start gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl"><Brain className="h-4 w-4" /> Generate revision plan</Button>
+                {isTeacher && <Button className="w-full justify-start gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"><ClipboardCheck className="h-4 w-4" /> Review submissions</Button>}
+              </CardContent>
+            </Card>
+            <div className="rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800/80 p-3.5 text-[11px] text-zinc-650 dark:text-zinc-400 font-medium leading-relaxed">
+              📝 Learners can be enrolled through a school class, invited to an open support session, or use recordings independently for self-learning.
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

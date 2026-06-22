@@ -191,193 +191,218 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden">
+      <DialogContent className="max-w-4xl w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 sm:p-8 overflow-hidden">
         
         {/* Header */}
-        <DialogHeader>
+        <DialogHeader className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
           <div className="flex items-center gap-2 mb-1">
             <div className="h-8 w-8 rounded-lg bg-red-600/10 flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-red-600 dark:text-red-400" />
             </div>
-            <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
+            <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">
               Invite Students & Classes
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-            Invite specific cohorts or students to <span className="font-semibold text-slate-800 dark:text-slate-250">"{liveClass.title}"</span>. Only invited users will be able to join when access is private.
+          <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400">
+            Invite specific cohorts or students to <span className="font-semibold text-zinc-800 dark:text-zinc-200">"{liveClass.title}"</span>. Only invited users will be able to join when access is private.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Selected List Tags */}
-        <div className="my-4 space-y-2">
-          {selectedUsers.length === 0 && selectedClasses.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-              No students or classes invited yet. Use the search below to invite people.
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border border-border rounded-xl bg-muted/30">
-              {selectedClasses.map((cls) => (
-                <Badge
-                  key={cls._id}
-                  className="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900 dark:text-indigo-300 flex items-center gap-1 py-1 px-2.5 rounded-lg text-xs"
-                >
-                  <Users className="h-3 w-3 shrink-0" />
-                  {cls.name}
-                  <button
-                    onClick={() => handleRemoveClass(cls._id)}
-                    className="hover:bg-indigo-200/50 dark:hover:bg-indigo-900/50 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-
-              {selectedUsers.map((u) => (
-                <Badge
-                  key={u._id}
-                  className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-300 flex items-center gap-1 py-1 px-2.5 rounded-lg text-xs"
-                >
-                  <User className="h-3 w-3 shrink-0" />
-                  {u.name}
-                  <button
-                    onClick={() => handleRemoveUser(u._id)}
-                    className="hover:bg-emerald-200/50 dark:hover:bg-emerald-900/50 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Search Input */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search classes or student names/emails..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-muted border-input text-foreground focus-visible:ring-indigo-500 focus-visible:ring-1 text-xs h-10 rounded-xl"
-          />
-        </div>
-
-        {/* Search Results Panel */}
-        {searchQuery.trim() !== "" && (
-          <div className="border border-border rounded-xl overflow-hidden max-h-60 overflow-y-auto mb-4 bg-card shadow-lg animate-in fade-in-50 duration-150">
-            {searchResults.users.length === 0 && searchResults.classes.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                No matching classes or students found.
+        {/* Two Column Grid */}
+        <div className="grid gap-6 md:grid-cols-2 pt-4">
+          
+          {/* Left Column: Search & Select */}
+          <div className="space-y-3.5">
+            <div>
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">
+                Search Students or Class Groups
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+                <Input
+                  placeholder="Search classes or student names/emails..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus-visible:ring-indigo-500 focus-visible:ring-1 text-xs h-10 rounded-xl"
+                />
               </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {/* Classes Section */}
-                {searchResults.classes.length > 0 && (
-                  <div className="p-2">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Class groups
-                    </div>
-                    {searchResults.classes.map((cls) => {
-                      const isSelected = selectedClasses.some((c) => c._id === cls._id);
-                      return (
-                        <button
-                          key={cls._id}
-                          onClick={() => handleSelectClass(cls)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-accent transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="h-7 w-7 rounded-md bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                              <Users className="h-3.5 w-3.5" />
+            </div>
+
+            {/* Search Results Panel */}
+            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden h-[240px] overflow-y-auto bg-zinc-50 dark:bg-zinc-900/20">
+              {searchQuery.trim() === "" ? (
+                <div className="p-8 text-center text-xs text-zinc-400 dark:text-zinc-500 h-full flex items-center justify-center">
+                  Type a query to search database
+                </div>
+              ) : searchResults.users.length === 0 && searchResults.classes.length === 0 ? (
+                <div className="p-8 text-center text-xs text-zinc-400 dark:text-zinc-500 h-full flex items-center justify-center">
+                  No matching classes or students found.
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {/* Classes Section */}
+                  {searchResults.classes.length > 0 && (
+                    <div className="p-2">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                        Class groups
+                      </div>
+                      {searchResults.classes.map((cls) => {
+                        const isSelected = selectedClasses.some((c) => c._id === cls._id);
+                        return (
+                          <button
+                            key={cls._id}
+                            onClick={() => handleSelectClass(cls)}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800/60 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-md bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                <Users className="h-3.5 w-3.5" />
+                              </div>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-150">{cls.name}</span>
                             </div>
-                            <span className="font-medium text-foreground">{cls.name}</span>
-                          </div>
-                          {isSelected ? (
-                            <Check className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">Add class</span>
-                          )}
+                            {isSelected ? (
+                              <Check className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                            ) : (
+                              <span className="text-[10px] text-zinc-500">Add class</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Users Section */}
+                  {searchResults.users.length > 0 && (
+                    <div className="p-2">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                        Students
+                      </div>
+                      {searchResults.users.map((u) => {
+                        const isSelected = selectedUsers.some((user) => user._id === u._id);
+                        return (
+                          <button
+                            key={u._id}
+                            onClick={() => handleSelectUser(u)}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800/60 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-md bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                <User className="h-3.5 w-3.5" />
+                              </div>
+                              <div>
+                                <span className="font-medium text-zinc-900 dark:text-zinc-150 block">{u.name}</span>
+                                {u.email && (
+                                  <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                    <Mail className="h-2.5 w-2.5" /> {u.email}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            ) : (
+                              <span className="text-[10px] text-zinc-500">Add student</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Selected & External */}
+          <div className="space-y-4 flex flex-col justify-between">
+            
+            {/* Selected Tags list */}
+            <div>
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">
+                Invited Recipients
+              </label>
+              
+              <div className="h-[120px]">
+                {selectedUsers.length === 0 && selectedClasses.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 p-4 text-center text-xs text-zinc-400 dark:text-zinc-500 h-full flex items-center justify-center">
+                    No active invitations. Use the search to add.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2 max-h-full overflow-y-auto p-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-900/20">
+                    {selectedClasses.map((cls) => (
+                      <Badge
+                        key={cls._id}
+                        className="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900 dark:text-indigo-300 flex items-center gap-1 py-1 px-2.5 rounded-lg text-xs"
+                      >
+                        <Users className="h-3 w-3 shrink-0" />
+                        {cls.name}
+                        <button
+                          onClick={() => handleRemoveClass(cls._id)}
+                          className="hover:bg-indigo-200/50 dark:hover:bg-indigo-900/50 rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
                         </button>
-                      );
-                    })}
+                      </Badge>
+                    ))}
+
+                    {selectedUsers.map((u) => (
+                      <Badge
+                        key={u._id}
+                        className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-300 flex items-center gap-1 py-1 px-2.5 rounded-lg text-xs"
+                      >
+                        <User className="h-3 w-3 shrink-0" />
+                        {u.name}
+                        <button
+                          onClick={() => handleRemoveUser(u._id)}
+                          className="hover:bg-emerald-200/50 dark:hover:bg-emerald-900/50 rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
                 )}
-
-                {/* Users Section */}
-                {searchResults.users.length > 0 && (
-                  <div className="p-2">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Students
-                    </div>
-                    {searchResults.users.map((u) => {
-                      const isSelected = selectedUsers.some((user) => user._id === u._id);
-                      return (
-                        <button
-                          key={u._id}
-                          onClick={() => handleSelectUser(u)}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs hover:bg-accent transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="h-7 w-7 rounded-md bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                              <User className="h-3.5 w-3.5" />
-                            </div>
-                            <div>
-                              <span className="font-medium text-foreground block">{u.name}</span>
-                              {u.email && (
-                                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                  <Mail className="h-2.5 w-2.5" /> {u.email}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {isSelected ? (
-                            <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">Add student</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
-            )}
-          </div>
-        )}
+            </div>
 
-        {/* Invite External Students Section */}
-        <div className="border-t border-border pt-4 mt-2">
-          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5">
-            <Mail className="h-3.5 w-3.5 text-indigo-500" />
-            Invite people outside the school
-          </label>
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              placeholder="Enter email address (e.g. learner@gmail.com)"
-              value={externalEmail}
-              onChange={(e) => setExternalEmail(e.target.value)}
-              className="bg-muted border-input text-foreground focus-visible:ring-indigo-500 focus-visible:ring-1 text-xs h-9 rounded-xl flex-1"
-            />
-            <Button
-              onClick={handleSendExternalInvite}
-              disabled={sendingEmail}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-9 rounded-xl px-4 shrink-0"
-            >
-              {sendingEmail ? "Inviting..." : "Send Invite"}
-            </Button>
+            {/* Invite External Students Section */}
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-3">
+              <label className="text-xs font-bold text-zinc-900 dark:text-zinc-300 flex items-center gap-1.5 mb-1.5">
+                <Mail className="h-3.5 w-3.5 text-indigo-500" />
+                Invite outside the school
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="Enter email address (e.g. learner@gmail.com)"
+                  value={externalEmail}
+                  onChange={(e) => setExternalEmail(e.target.value)}
+                  className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus-visible:ring-indigo-500 focus-visible:ring-1 text-xs h-9 rounded-xl flex-1"
+                />
+                <Button
+                  onClick={handleSendExternalInvite}
+                  disabled={sendingEmail}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-9 rounded-xl px-3 shrink-0"
+                >
+                  {sendingEmail ? "Inviting..." : "Send Invite"}
+                </Button>
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-1">
+                Sends an email invite with the joining link directly via Resend.
+              </p>
+            </div>
+
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            This will send an email invitation with the joining link directly using Resend.
-          </p>
+
         </div>
 
         {/* Footer */}
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6 pt-4 border-t border-zinc-150 dark:border-zinc-800">
           <Button
             variant="outline"
             onClick={handleCopyLink}
             type="button"
-            className="flex items-center gap-1.5 text-xs h-9 rounded-xl mr-auto w-full sm:w-auto"
+            className="flex items-center gap-1.5 text-xs h-9 rounded-xl mr-auto w-full sm:w-auto border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
           >
             <Copy className="h-3.5 w-3.5" />
             Copy Share Link
@@ -387,7 +412,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
             variant="ghost"
             onClick={onClose}
             type="button"
-            className="text-xs h-9 rounded-xl w-full sm:w-auto"
+            className="text-xs h-9 rounded-xl w-full sm:w-auto text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900"
           >
             Cancel
           </Button>
@@ -395,7 +420,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
           <Button
             onClick={handleSave}
             type="button"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-9 rounded-xl px-5 w-full sm:w-auto"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs h-9 rounded-xl px-5 w-full sm:w-auto shadow-md"
           >
             Save Invitations
           </Button>
