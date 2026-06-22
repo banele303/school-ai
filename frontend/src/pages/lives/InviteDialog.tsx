@@ -191,7 +191,7 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-card border-border rounded-2xl shadow-2xl p-6 overflow-hidden">
+      <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 overflow-hidden">
         
         {/* Header */}
         <DialogHeader>
@@ -199,19 +199,19 @@ export default function InviteDialog({ open, onClose, liveClass }: InviteDialogP
             <div className="h-8 w-8 rounded-lg bg-red-600/10 flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-red-600 dark:text-red-400" />
             </div>
-            <DialogTitle className="text-xl font-bold text-foreground">
+            <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
               Invite Students & Classes
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Invite specific cohorts or students to <span className="font-semibold text-secondary-foreground">"{liveClass.title}"</span>. Only invited users will be able to join when access is private.
+          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+            Invite specific cohorts or students to <span className="font-semibold text-slate-800 dark:text-slate-250">"{liveClass.title}"</span>. Only invited users will be able to join when access is private.
           </DialogDescription>
         </DialogHeader>
 
         {/* Selected List Tags */}
         <div className="my-4 space-y-2">
           {selectedUsers.length === 0 && selectedClasses.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+            <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-4 text-center text-xs text-slate-400 dark:text-slate-500">
               No students or classes invited yet. Use the search below to invite people.
             </div>
           ) : (
