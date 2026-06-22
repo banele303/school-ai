@@ -14,15 +14,20 @@ import {
   ZoomOut,
   Maximize2,
   PieChart,
-  Activity,
   ChevronRight,
+  Hexagon,
+  FlaskConical,
+  Zap,
+  Battery,
+  Dna,
+  Atom,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface Shape {
   id: string;
-  type: "pen" | "rect" | "circle" | "triangle" | "line" | "arrow" | "axes" | "text" | "rightTriangle" | "parabola" | "circleRadius" | "pieSlice";
+  type: "pen" | "rect" | "circle" | "triangle" | "line" | "arrow" | "axes" | "text" | "rightTriangle" | "parabola" | "circleRadius" | "pieSlice" | "benzene" | "beaker" | "resistor" | "battery" | "dna";
   x: number;
   y: number;
   points?: number[];
@@ -298,7 +303,12 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         tool === "rightTriangle" ||
         tool === "parabola" ||
         tool === "circleRadius" ||
-        tool === "pieSlice"
+        tool === "pieSlice" ||
+        tool === "benzene" ||
+        tool === "beaker" ||
+        tool === "resistor" ||
+        tool === "battery" ||
+        tool === "dna"
       ) {
         newShape.width = 0;
         newShape.height = 0;
@@ -336,7 +346,12 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         active.type === "rightTriangle" ||
         active.type === "parabola" ||
         active.type === "circleRadius" ||
-        active.type === "pieSlice"
+        active.type === "pieSlice" ||
+        active.type === "benzene" ||
+        active.type === "beaker" ||
+        active.type === "resistor" ||
+        active.type === "battery" ||
+        active.type === "dna"
       ) {
         active.width = pointer.x - active.x;
         active.height = pointer.y - active.y;
@@ -451,10 +466,10 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             variant={showMathPanel ? "default" : "ghost"}
             size="icon"
             onClick={() => setShowMathPanel(!showMathPanel)}
-            title="Math Presets & Tools"
+            title="STEM Presets & Tools"
             className="relative"
           >
-            <Activity className="h-5 w-5" />
+            <Atom className="h-5 w-5" />
             <ChevronRight
               className={cn(
                 "h-2.5 w-2.5 absolute right-0.5 bottom-0.5 transition-transform",
@@ -464,52 +479,104 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           </Button>
         </div>
 
-        {/* Floating Math Tools Panel */}
+        {/* Floating STEM Tools Panel */}
         {showMathPanel && (
-          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 animate-in slide-in-from-left-2 duration-200">
-            <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-              Math Presets
+          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-3 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-left-2 duration-200 w-44 max-h-[80vh] overflow-y-auto">
+            <div>
+              <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                Math Tools
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <Button
+                  variant={tool === "axes" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("axes")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <TrendingUp className="h-4 w-4 text-indigo-500" /> Cartesian Axes
+                </Button>
+                <Button
+                  variant={tool === "rightTriangle" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("rightTriangle")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <Triangle className="h-4 w-4 rotate-90 text-indigo-500" /> Right Triangle
+                </Button>
+                <Button
+                  variant={tool === "circleRadius" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("circleRadius")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <CircleIcon className="h-4 w-4 text-indigo-500" /> Circle & Radius
+                </Button>
+                <Button
+                  variant={tool === "pieSlice" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("pieSlice")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <PieChart className="h-4 w-4 text-indigo-500" /> Pie Fraction
+                </Button>
+                <Button
+                  variant={tool === "parabola" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("parabola")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <TrendingUp className="h-4 w-4 -rotate-45 text-indigo-500" /> Parabola Curve
+                </Button>
+              </div>
             </div>
-            <Button
-              variant={tool === "axes" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTool("axes")}
-              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
-            >
-              <TrendingUp className="h-4 w-4" /> Cartesian Axes
-            </Button>
-            <Button
-              variant={tool === "rightTriangle" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTool("rightTriangle")}
-              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
-            >
-              <Triangle className="h-4 w-4 rotate-90" /> Right Triangle
-            </Button>
-            <Button
-              variant={tool === "circleRadius" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTool("circleRadius")}
-              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
-            >
-              <CircleIcon className="h-4 w-4" /> Circle with Radius
-            </Button>
-            <Button
-              variant={tool === "pieSlice" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTool("pieSlice")}
-              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
-            >
-              <PieChart className="h-4 w-4" /> Pie Slice Fraction
-            </Button>
-            <Button
-              variant={tool === "parabola" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTool("parabola")}
-              className="justify-start gap-2 h-9 rounded-xl text-xs px-3 font-medium"
-            >
-              <TrendingUp className="h-4 w-4 -rotate-45" /> Parabola Curve
-            </Button>
+
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
+              <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                Science Tools
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <Button
+                  variant={tool === "benzene" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("benzene")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <Hexagon className="h-4 w-4 text-emerald-500" /> Benzene Ring
+                </Button>
+                <Button
+                  variant={tool === "beaker" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("beaker")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <FlaskConical className="h-4 w-4 text-sky-500" /> Beaker Flask
+                </Button>
+                <Button
+                  variant={tool === "dna" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("dna")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <Dna className="h-4 w-4 text-purple-500" /> DNA Helix
+                </Button>
+                <Button
+                  variant={tool === "resistor" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("resistor")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <Zap className="h-4 w-4 text-amber-500" /> Resistor
+                </Button>
+                <Button
+                  variant={tool === "battery" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setTool("battery")}
+                  className="justify-start gap-2 h-9 rounded-xl text-xs px-2.5 font-medium"
+                >
+                  <Battery className="h-4 w-4 text-red-500" /> Circuit Cell
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -911,6 +978,175 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
                           fontWeight="bold"
                           fill={shapeColor}
                         />
+                      </Group>
+                    )}
+
+                    {/* STEM Benzene Ring Preset */}
+                    {shape.type === "benzene" && (
+                      <Group x={shape.x} y={shape.y}>
+                        <Line
+                          points={(() => {
+                            const R = Math.max(Math.abs(shape.width || 40), 10);
+                            const pts = [];
+                            for (let i = 0; i < 6; i++) {
+                              const angle = (i * Math.PI) / 3;
+                              pts.push(R * Math.cos(angle), R * Math.sin(angle));
+                            }
+                            return pts;
+                          })()}
+                          closed
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                          fill={shape.fillColor}
+                        />
+                        <Circle
+                          x={0}
+                          y={0}
+                          radius={Math.max(Math.abs(shape.width || 40), 10) * 0.65}
+                          stroke={shapeColor}
+                          strokeWidth={shape.strokeWidth}
+                        />
+                      </Group>
+                    )}
+
+                    {/* STEM Chemistry Beaker Preset */}
+                    {shape.type === "beaker" && (
+                      <Group x={shape.x} y={shape.y}>
+                        {(() => {
+                          const w = Math.max(Math.abs(shape.width || 50), 15);
+                          const h = Math.max(Math.abs(shape.height || 60), 15);
+                          return (
+                            <>
+                              {/* Beaker fluid fill */}
+                              {shape.fillColor && (
+                                <Line
+                                  points={[-w/2, h/4, -w/2, h/2, w/2, h/2, w/2, h/4]}
+                                  closed
+                                  fill={shape.fillColor}
+                                  stroke="transparent"
+                                />
+                              )}
+                              {/* Outer outline with top lips */}
+                              <Line
+                                points={[-w/2 - 4, -h/2, -w/2, -h/2, -w/2, h/2, w/2, h/2, w/2, -h/2, w/2 + 4, -h/2]}
+                                stroke={shapeColor}
+                                strokeWidth={shape.strokeWidth}
+                              />
+                              {/* Graduations/measurements */}
+                              <Line points={[w/2 - w/4, -h/4, w/2, -h/4]} stroke={shapeColor} strokeWidth={1} />
+                              <Line points={[w/2 - w/4, 0, w/2, 0]} stroke={shapeColor} strokeWidth={1} />
+                              <Line points={[w/2 - w/4, h/4, w/2, h/4]} stroke={shapeColor} strokeWidth={1} />
+                            </>
+                          );
+                        })()}
+                      </Group>
+                    )}
+
+                    {/* STEM Electrical Resistor Preset */}
+                    {shape.type === "resistor" && (
+                      <Group x={shape.x} y={shape.y}>
+                        {(() => {
+                          const w = shape.width || 80;
+                          const h = shape.height || 20;
+                          const points = [
+                            -w/2, 0,
+                            -w/3, 0,
+                            -w/4, -h/2,
+                            -w/8, h/2,
+                            0, -h/2,
+                            w/8, h/2,
+                            w/4, -h/2,
+                            w/3, 0,
+                            w/2, 0
+                          ];
+                          return (
+                            <Line
+                              points={points}
+                              stroke={shapeColor}
+                              strokeWidth={shape.strokeWidth}
+                            />
+                          );
+                        })()}
+                      </Group>
+                    )}
+
+                    {/* STEM Circuit Battery Preset */}
+                    {shape.type === "battery" && (
+                      <Group x={shape.x} y={shape.y}>
+                        {(() => {
+                          const w = Math.max(Math.abs(shape.width || 50), 15);
+                          const h = Math.max(Math.abs(shape.height || 30), 10);
+                          return (
+                            <>
+                              {/* Left wire */}
+                              <Line points={[-w/2, 0, -w/6, 0]} stroke={shapeColor} strokeWidth={shape.strokeWidth} />
+                              {/* First plate (positive - longer) */}
+                              <Line points={[-w/6, -h/2, -w/6, h/2]} stroke={shapeColor} strokeWidth={shape.strokeWidth} />
+                              {/* Second plate (negative - shorter & thicker) */}
+                              <Line points={[-w/12, -h/3, -w/12, h/3]} stroke={shapeColor} strokeWidth={shape.strokeWidth * 2.2} />
+                              {/* Third plate (positive) */}
+                              <Line points={[w/12, -h/2, w/12, h/2]} stroke={shapeColor} strokeWidth={shape.strokeWidth} />
+                              {/* Fourth plate (negative) */}
+                              <Line points={[w/6, -h/3, w/6, h/3]} stroke={shapeColor} strokeWidth={shape.strokeWidth * 2.2} />
+                              {/* Right wire */}
+                              <Line points={[w/6, 0, w/2, 0]} stroke={shapeColor} strokeWidth={shape.strokeWidth} />
+                              
+                              <Text x={-w/3} y={-h/2 - 12} text="+" fontSize={12} fill={shapeColor} />
+                              <Text x={w/4} y={-h/2 - 12} text="-" fontSize={12} fill={shapeColor} />
+                            </>
+                          );
+                        })()}
+                      </Group>
+                    )}
+
+                    {/* STEM DNA Double Helix Preset */}
+                    {shape.type === "dna" && (
+                      <Group x={shape.x} y={shape.y}>
+                        {(() => {
+                          const w = Math.max(Math.abs(shape.width || 100), 20);
+                          const h = Math.max(Math.abs(shape.height || 40), 10);
+                          const strand1 = [];
+                          const strand2 = [];
+                          const rungs = [];
+                          const steps = 10;
+                          for (let i = 0; i <= steps; i++) {
+                            const pct = i / steps;
+                            const dx = -w/2 + pct * w;
+                            const angle = pct * Math.PI * 3; // 1.5 full helix turns
+                            const dy1 = Math.sin(angle) * (h/2);
+                            const dy2 = Math.sin(angle + Math.PI) * (h/2);
+                            strand1.push(dx, dy1);
+                            strand2.push(dx, dy2);
+                            if (i > 0 && i < steps) {
+                              rungs.push({ x1: dx, y1: dy1, x2: dx, y2: dy2 });
+                            }
+                          }
+                          return (
+                            <>
+                              {rungs.map((r, idx) => (
+                                <Line
+                                  key={idx}
+                                  points={[r.x1, r.y1, r.x2, r.y2]}
+                                  stroke={shapeColor}
+                                  strokeWidth={Math.max(shape.strokeWidth - 1, 1)}
+                                  opacity={0.65}
+                                />
+                              ))}
+                              <Line
+                                points={strand1}
+                                stroke={shapeColor}
+                                strokeWidth={shape.strokeWidth}
+                                tension={0.5}
+                              />
+                              <Line
+                                points={strand2}
+                                stroke={shapeColor}
+                                strokeWidth={shape.strokeWidth}
+                                tension={0.5}
+                              />
+                            </>
+                          );
+                        })()}
                       </Group>
                     )}
 
