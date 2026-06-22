@@ -121,6 +121,8 @@ export const sidebardata = {
         { title: "Assessments", url: "/lms/exams" },
         { title: "Question Bank", url: "/lms/question-bank", roles: ["teacher", "admin"] },
         { title: "Study Materials", url: "/lms/materials" },
+        { title: "Live Classes", url: "/lives" },
+        { title: "Video Lessons", url: "/videos" },
       ],
     },
     {

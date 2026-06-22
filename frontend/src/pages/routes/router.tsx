@@ -74,6 +74,7 @@ export const router = createBrowserRouter([
       // Live Classes
       { path: "lives", element: <LiveClassesPage /> },
       { path: "lives/room/:id", element: <LiveRoomPage /> },
+      { path: "videos", element: <VideoLibraryPage /> },
 
       // Communication
       { path: "announcements", element: <AnnouncementsPage /> },
