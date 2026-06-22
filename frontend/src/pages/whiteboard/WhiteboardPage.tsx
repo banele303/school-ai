@@ -21,7 +21,7 @@ const WhiteboardPage: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [canvasContent, setCanvasContent] = useState<string>("");
 
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync title when board loads
   useEffect(() => {
