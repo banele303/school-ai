@@ -81,6 +81,7 @@ export const sidebardata = {
       items: [
         { title: "Resource Library", url: "/resources", roles: ["admin", "teacher", "student", "parent"] },
         { title: "AI Chat", url: "/study-buddy", roles: ["admin", "teacher", "student"] },
+        { title: "Whiteboard (Miro)", url: "/whiteboard", roles: ["admin", "teacher", "student", "parent"] },
         { title: "Past Papers", url: "/resources?type=past-papers", roles: ["admin", "teacher", "student", "parent"] },
         { title: "Study Materials", url: "/resources?type=study-materials", roles: ["admin", "teacher", "student", "parent"] },
       ],

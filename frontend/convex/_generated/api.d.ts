@@ -38,6 +38,7 @@ import type * as messages from "../messages.js";
 import type * as notifications from "../notifications.js";
 import type * as parents from "../parents.js";
 import type * as questionBank from "../questionBank.js";
+import type * as repairDb from "../repairDb.js";
 import type * as schoolSettings from "../schoolSettings.js";
 import type * as search from "../search.js";
 import type * as seed from "../seed.js";
@@ -89,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   parents: typeof parents;
   questionBank: typeof questionBank;
+  repairDb: typeof repairDb;
   schoolSettings: typeof schoolSettings;
   search: typeof search;
   seed: typeof seed;
