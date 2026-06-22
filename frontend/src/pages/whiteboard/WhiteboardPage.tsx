@@ -4,8 +4,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import WhiteboardCanvas from "@/components/WhiteboardCanvas";
+import type { WhiteboardCanvasRef } from "@/components/WhiteboardCanvas";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, CloudCheck, CloudUpload, Edit3 } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  CloudCheck,
+  CloudUpload,
+  Edit3,
+  RotateCcw,
+  RotateCw,
+  Trash2,
+  Download,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 const WhiteboardPage: React.FC = () => {
@@ -15,6 +26,8 @@ const WhiteboardPage: React.FC = () => {
 
   const board = useQuery(api.whiteboard.get, id ? { id: boardId } : "skip");
   const updateBoard = useMutation(api.whiteboard.update);
+
+  const canvasRef = useRef<WhiteboardCanvasRef>(null);
 
   const [title, setTitle] = useState("Untitled Whiteboard");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -65,7 +78,7 @@ const WhiteboardPage: React.FC = () => {
 
   if (!board) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           <span className="text-sm font-medium text-slate-500">Loading whiteboard canvas...</span>
@@ -75,7 +88,7 @@ const WhiteboardPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
       {/* Immersive Whiteboard Header */}
       <header className="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-20 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
@@ -113,9 +126,64 @@ const WhiteboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Save Status Indicator */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+        {/* Action Controls & Save Status Indicator */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 border-r border-slate-200 dark:border-slate-800 pr-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => canvasRef.current?.undo()}
+              title="Undo"
+              className="h-8 w-8"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => canvasRef.current?.redo()}
+              title="Redo"
+              className="h-8 w-8"
+            >
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => canvasRef.current?.deleteSelected()}
+              title="Delete Selected Shape"
+              className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => canvasRef.current?.clearCanvas()}
+              title="Clear Whiteboard"
+              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => canvasRef.current?.exportAsImage()}
+              title="Export as PNG"
+              className="h-8 w-8"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void saveChanges()}
+              className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow px-3 ml-1"
+            >
+              Save
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 min-w-[125px]">
             {saveStatus === "saved" && (
               <>
                 <CloudCheck className="h-4 w-4 text-emerald-500" />
@@ -141,10 +209,10 @@ const WhiteboardPage: React.FC = () => {
       {/* Main Canvas Component */}
       <div className="flex-1 w-full h-full relative overflow-hidden">
         <WhiteboardCanvas
+          ref={canvasRef}
           content={board.content || ""}
           onChange={handleCanvasChange}
           title={title}
-          onSave={() => void saveChanges()}
         />
       </div>
     </div>
