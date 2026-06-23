@@ -582,6 +582,8 @@ export default defineSchema({
     leftAt: v.optional(v.number()),
     duration: v.optional(v.number()),
     watchPercentage: v.optional(v.number()),
+    isMuted: v.optional(v.boolean()),
+    isCameraBlocked: v.optional(v.boolean()),
   }).index("by_class", ["liveClass"])
     .index("by_student", ["student"]),
 
