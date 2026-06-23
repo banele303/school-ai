@@ -111,6 +111,8 @@ export async function createStreamLiveInput(payload: {
   srtUrl?: string;
   srtStreamId?: string;
   srtPassphrase?: string;
+  whipUrl?: string;
+  whepUrl?: string;
   playbackUrl?: string;
   iframeUrl?: string;
 }> {

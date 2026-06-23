@@ -866,22 +866,56 @@ export const getLiveClassParticipants = query({
     const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
     if (!liveClassId) return [];
 
+    const liveClass = await ctx.db.get(liveClassId);
+    if (!liveClass) return [];
+
+    // Get active participants currently in the room
     const attendance = await ctx.db
       .query("liveClassAttendance")
       .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
-    const participants = [];
+    const activeMap = new Map();
     for (const record of attendance) {
-      if (record.leftAt !== undefined) {
-        continue;
+      if (record.leftAt === undefined) {
+        activeMap.set(record.student, record);
       }
+    }
+
+    const participants = [];
+    
+    // If the live class is assigned to a school class, get all students from that class
+    if (liveClass.class) {
+      const classDoc = await ctx.db.get(liveClass.class);
+      if (classDoc && classDoc.students) {
+        for (const studentId of classDoc.students) {
+          const student = await ctx.db.get(studentId);
+          if (student) {
+            const record = activeMap.get(studentId);
+            participants.push({
+              studentId: student._id,
+              name: student.name || student.email || "Student",
+              email: student.email || "",
+              isOnline: record !== undefined,
+              isMuted: record?.isMuted ?? false,
+              isCameraBlocked: record?.isCameraBlocked ?? false,
+            });
+          }
+        }
+        return participants;
+      }
+    }
+
+    // Fallback: if no class assigned, just return the active ones in the room
+    for (const record of attendance) {
+      if (record.leftAt !== undefined) continue;
       const student = await ctx.db.get(record.student);
       if (student) {
         participants.push({
           studentId: student._id,
           name: student.name || student.email || "Student",
           email: student.email || "",
+          isOnline: true,
           isMuted: record.isMuted ?? false,
           isCameraBlocked: record.isCameraBlocked ?? false,
         });

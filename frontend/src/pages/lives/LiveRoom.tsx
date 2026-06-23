@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, PhoneOff, 
   Send, Users, MessageSquare, Settings, Volume2, VolumeX, 
-  Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle, Hand, Sparkles
+  Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle, Hand, Sparkles,
+  Presentation, Smile, Subtitles, MoreVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,10 @@ export default function LiveRoomPage() {
   const [devices, setDevices] = useState<{ video: MediaDeviceInfo[]; audio: MediaDeviceInfo[] }>({ video: [], audio: [] });
   const [selectedVideoDevice, setSelectedVideoDevice] = useState("");
   const [selectedAudioDevice, setSelectedAudioDevice] = useState("");
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showReactionsMenu, setShowReactionsMenu] = useState(false);
+  const [timeStr, setTimeStr] = useState("");
+  const [isCcEnabled, setIsCcEnabled] = useState(false);
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -85,6 +90,178 @@ export default function LiveRoomPage() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const prevRaisedCountRef = useRef(0);
   const hlsPlayerRef = useRef<Hls | null>(null);
+  const whipPcRef = useRef<RTCPeerConnection | null>(null);
+  const studentPcRef = useRef<RTCPeerConnection | null>(null);
+
+  // Clock state updater
+  useEffect(() => {
+    const updateTime = () => {
+      const d = new Date();
+      let hours = d.getHours();
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      setTimeStr(`${hours}:${minutes} ${ampm}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (whipPcRef.current) whipPcRef.current.close();
+      if (studentPcRef.current) studentPcRef.current.close();
+    };
+  }, []);
+
+  const getRoomCode = () => {
+    if (!id) return "";
+    const clean = id.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (clean.length >= 9) {
+      return `${clean.slice(0, 3)}-${clean.slice(3, 7)}-${clean.slice(7, 10)}`;
+    }
+    return id;
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const toggleSidebarTab = (tab: "chat" | "interactions" | "waiting") => {
+    if (showSidebar && activeTab === tab) {
+      setShowSidebar(false);
+    } else {
+      setActiveTab(tab);
+      setShowSidebar(true);
+    }
+  };
+
+  // WebRTC WHIP publisher (Teacher)
+  const publishWhip = async (stream: MediaStream, whipUrl: string) => {
+    if (whipPcRef.current) {
+      whipPcRef.current.close();
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302"
+        }
+      ]
+    });
+    whipPcRef.current = pc;
+
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // Wait for ICE candidates
+    await new Promise((resolve) => {
+      if (pc.iceGatheringState === "complete") {
+        resolve(null);
+      } else {
+        const check = () => {
+          if (pc.iceGatheringState === "complete") {
+            pc.removeEventListener("icegatheringstatechange", check);
+            resolve(null);
+          }
+        };
+        pc.addEventListener("icegatheringstatechange", check);
+        setTimeout(resolve, 1000);
+      }
+    });
+
+    const response = await fetch(whipUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/sdp",
+      },
+      body: pc.localDescription?.sdp
+    });
+
+    if (!response.ok) {
+      throw new Error(`WHIP publish failed: ${response.statusText}`);
+    }
+
+    const answerSdp = await response.text();
+    await pc.setRemoteDescription(new RTCSessionDescription({
+      type: "answer",
+      sdp: answerSdp
+    }));
+  };
+
+  // WebRTC WHEP subscriber (Student)
+  const playWhep = async (whepUrl: string) => {
+    if (studentPcRef.current) {
+      studentPcRef.current.close();
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302"
+        }
+      ]
+    });
+    studentPcRef.current = pc;
+
+    pc.addTransceiver("video", { direction: "recvonly" });
+    pc.addTransceiver("audio", { direction: "recvonly" });
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // Wait for ICE candidates
+    await new Promise((resolve) => {
+      if (pc.iceGatheringState === "complete") {
+        resolve(null);
+      } else {
+        const check = () => {
+          if (pc.iceGatheringState === "complete") {
+            pc.removeEventListener("icegatheringstatechange", check);
+            resolve(null);
+          }
+        };
+        pc.addEventListener("icegatheringstatechange", check);
+        setTimeout(resolve, 1000);
+      }
+    });
+
+    const response = await fetch(whepUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/sdp",
+      },
+      body: pc.localDescription?.sdp
+    });
+
+    if (!response.ok) {
+      throw new Error(`WHEP playback failed: ${response.statusText}`);
+    }
+
+    const answerSdp = await response.text();
+    await pc.setRemoteDescription(new RTCSessionDescription({
+      type: "answer",
+      sdp: answerSdp
+    }));
+  };
+
 
   const isTeacher = user?.role === "teacher" || user?.role === "admin";
   const isCreator = classItem?.teacher === user?._id || user?.role === "admin";
@@ -202,7 +379,7 @@ export default function LiveRoomPage() {
       setStreamActive(false);
       teardownStudentPlayer();
     }
-  }, [isCreator, classItem?.status, classItem?.playbackUrl]);
+  }, [isCreator, classItem?.status, classItem?.playbackUrl, classItem?.whepUrl]);
 
   // Teardown student player
   const teardownStudentPlayer = () => {
@@ -210,16 +387,30 @@ export default function LiveRoomPage() {
       hlsPlayerRef.current.destroy();
       hlsPlayerRef.current = null;
     }
+    if (studentPcRef.current) {
+      studentPcRef.current.close();
+      studentPcRef.current = null;
+    }
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
       remoteVideoRef.current.src = "";
     }
   };
 
-  // Setup Student Video Player (Cloudflare HLS playback)
+  // Setup Student Video Player (Cloudflare WHEP WebRTC or HLS playback)
   const setupStudentPlayer = async () => {
     teardownStudentPlayer();
     if (!remoteVideoRef.current || !classItem) return;
+
+    if (classItem.whepUrl) {
+      try {
+        await playWhep(classItem.whepUrl);
+        toast.success("Connected to live classroom WebRTC stream.");
+        return;
+      } catch (err: any) {
+        console.error("WHEP playback failed, falling back to HLS:", err);
+      }
+    }
 
     if (classItem.playbackUrl) {
       playHls(classItem.playbackUrl);
@@ -307,7 +498,10 @@ export default function LiveRoomPage() {
         streamInputId: classItem.streamInputId || `mock_${id}`,
       });
 
-      if (classItem.rtmpsUrl && classItem.streamKey) {
+      if (classItem.whipUrl && localStreamRef.current) {
+        await publishWhip(localStreamRef.current, classItem.whipUrl);
+        toast.success("Stream published successfully to Cloudflare via WebRTC!");
+      } else if (classItem.rtmpsUrl && classItem.streamKey) {
         toast.success("Class is live. Start sending video from OBS to Cloudflare.");
       } else {
         toast.success("Class is live in classroom fallback mode.");
@@ -322,6 +516,10 @@ export default function LiveRoomPage() {
   const handleEndStream = async () => {
     setIsBroadcasting(false);
     try {
+      if (whipPcRef.current) {
+        whipPcRef.current.close();
+        whipPcRef.current = null;
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
@@ -368,7 +566,10 @@ export default function LiveRoomPage() {
         // Switch back to webcam
         setIsScreenSharing(false);
         await startPreview();
-        if (isBroadcasting) {
+        if (isBroadcasting && classItem?.whipUrl && localStreamRef.current) {
+          await publishWhip(localStreamRef.current, classItem.whipUrl);
+          toast.info("Switched stream back to webcam feed.");
+        } else if (isBroadcasting) {
           toast.info("Streaming switched to webcam feed. Restart broadcasting.");
           handleEndStream();
         }
@@ -381,9 +582,13 @@ export default function LiveRoomPage() {
         }
 
         // Handle stop sharing clicked inside browser
-        stream.getVideoTracks()[0].onended = () => {
+        stream.getVideoTracks()[0].onended = async () => {
           setIsScreenSharing(false);
-          startPreview();
+          await startPreview();
+          if (isBroadcasting && classItem?.whipUrl && localStreamRef.current) {
+            await publishWhip(localStreamRef.current, classItem.whipUrl);
+            toast.info("Switched stream back to webcam feed.");
+          }
         };
 
         if (localStreamRef.current) {
@@ -391,7 +596,10 @@ export default function LiveRoomPage() {
         }
         localStreamRef.current = stream;
         
-        if (isBroadcasting) {
+        if (isBroadcasting && classItem?.whipUrl) {
+          await publishWhip(stream, classItem.whipUrl);
+          toast.success("Screen sharing stream published.");
+        } else if (isBroadcasting) {
           toast.success("Screen sharing stream ready.");
         }
       }
@@ -506,90 +714,57 @@ export default function LiveRoomPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
       
-      {/* ── HEADER ── */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md z-10 shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-950 dark:text-zinc-400 dark:hover:text-white" onClick={() => navigate("/lives")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold tracking-tight">{classItem.title}</h2>
-              <Badge variant="outline" className="text-[10px] py-0 border-slate-200 text-slate-500 bg-slate-100 dark:border-zinc-800 dark:text-zinc-400 dark:bg-zinc-900/40">
-                {classItem.platform === "native" ? "Native Classroom" : classItem.platform}
-              </Badge>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400">Scheduled by Teacher (Real-time Broadcast)</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {classItem.status === "live" ? (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/50 border border-red-900/30">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span className="text-[11px] font-semibold text-red-400 tracking-wider uppercase">Live Now</span>
-            </div>
-          ) : classItem.status === "ended" ? (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 dark:bg-zinc-900 dark:border-zinc-800">
-              <CheckCircle className="h-3.5 w-3.5 text-slate-500 dark:text-zinc-400" />
-              <span className="text-[11px] font-semibold text-slate-500 tracking-wider uppercase dark:text-zinc-400">Class Ended</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950/50 border border-blue-900/30">
-              <Clock className="h-3.5 w-3.5 text-blue-400" />
-              <span className="text-[11px] font-semibold text-blue-400 tracking-wider uppercase">Scheduled</span>
-            </div>
-          )}
-          
-          {(user?.role === "teacher" || user?.role === "admin") && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="border-slate-200 bg-white text-slate-600 hover:text-slate-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-white dark:bg-zinc-900/40"
-              onClick={() => setShowInvite(true)}
-              title="Invite Students"
-            >
-              <Users className="h-4 w-4" />
-            </Button>
-          )}
-          
-          {isCreator && (
-            <Button
-              variant="outline"
-              size="icon"
-              className={cn("border-slate-200 bg-white text-slate-600 hover:text-slate-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-white dark:bg-zinc-900/40", showSettings && "bg-slate-100 text-slate-950 dark:bg-zinc-800 dark:text-white")}
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {/* ── MAIN WORKSPACE ── */}
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative">
         
-        {/* Left Side: Video Stream Arena */}
-        <section className="flex-1 flex flex-col bg-slate-50 p-4 md:p-6 overflow-y-auto min-w-0 justify-center items-center dark:bg-zinc-950">
+        {/* Left Side: Video Viewport */}
+        <section className="flex-1 flex flex-col bg-zinc-950 p-4 md:p-6 overflow-hidden justify-center items-center relative">
           
-          <div className="w-full max-w-4xl aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-900 relative shadow-2xl group">
+          {/* Top-Left Floating Room Info Badge */}
+          <div className="absolute top-6 left-6 z-20 flex items-center gap-3">
+            <div className="text-xs font-semibold text-white/90 tracking-wide px-3.5 py-2 rounded-full bg-zinc-900/80 backdrop-blur border border-zinc-800 flex items-center gap-2 shadow-lg">
+              <span className="text-zinc-200">{timeStr}</span>
+              <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
+              <span className="text-zinc-300 font-mono tracking-wider">{getRoomCode()}</span>
+            </div>
+            {classItem.status === "live" && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur shadow-lg">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                <span className="text-[10px] font-bold text-red-400 tracking-wider uppercase">Live</span>
+              </div>
+            )}
+          </div>
+
+          {/* Top-Right Floating Status Badges */}
+          <div className="absolute top-6 right-6 z-20 flex items-center gap-2.5">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 text-red-200 text-xs font-semibold shadow-lg backdrop-blur border border-red-500/35">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              Transcribing
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/20 text-sky-200 text-xs font-semibold shadow-lg backdrop-blur border border-sky-500/35">
+              <Sparkles className="w-3.5 h-3.5 text-sky-450" />
+              Gemini is taking notes
+            </div>
+          </div>
+
+          {/* Video Arena Viewport */}
+          <div className="w-full h-full rounded-2xl overflow-hidden bg-zinc-900/60 border border-zinc-900 relative shadow-2xl group flex items-center justify-center">
             
             {/* Muted or Camera Blocked Alert overlay */}
             {(myMuteStatus || myBlockCameraStatus) && (
-              <div className="absolute top-4 left-4 flex flex-col gap-2 z-35 pointer-events-none max-w-xs md:max-w-sm">
+              <div className="absolute top-20 left-6 flex flex-col gap-2 z-35 pointer-events-none max-w-xs md:max-w-sm">
                 {myMuteStatus && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-650/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-550/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
                     <MicOff className="h-3.5 w-3.5" />
                     <span>Microphone muted by teacher</span>
                   </div>
                 )}
                 {myBlockCameraStatus && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-650/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-550/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
                     <VideoOff className="h-3.5 w-3.5" />
                     <span>Camera blocked by teacher</span>
                   </div>
@@ -615,14 +790,14 @@ export default function LiveRoomPage() {
               <div className="w-full h-full relative bg-black flex items-center justify-center">
                 {classItem.recordingUrl.includes("videodelivery.net") || classItem.recordingUrl.includes("iframe.videodelivery.net") ? (
                   <iframe
-                    title={classItem.title}
-                    src={classItem.recordingUrl.includes("iframe.videodelivery.net") 
-                      ? classItem.recordingUrl 
-                      : classItem.recordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
-                    className="w-full h-full aspect-video border-0"
-                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                    allowFullScreen
-                  />
+                     title={classItem.title}
+                     src={classItem.recordingUrl.includes("iframe.videodelivery.net") 
+                       ? classItem.recordingUrl 
+                       : classItem.recordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
+                     className="w-full h-full aspect-video border-0"
+                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                     allowFullScreen
+                   />
                 ) : (
                   <video
                     src={classItem.recordingUrl}
@@ -642,66 +817,38 @@ export default function LiveRoomPage() {
                 />
                 
                 {/* Local status labels */}
-                <div className="absolute top-4 left-4 flex gap-2">
-                  <Badge className="bg-zinc-900/80 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
+                <div className="absolute bottom-6 left-6 flex gap-2 z-10">
+                  <Badge className="bg-zinc-950/80 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
                     {isScreenSharing ? "Screen Sharing" : "Camera Feed"}
                   </Badge>
                   {isBroadcasting && (
-                    <Badge className="bg-red-600/90 text-white animate-pulse">
+                    <Badge className="bg-red-600/90 text-white font-semibold animate-pulse">
                       Broadcasting
                     </Badge>
                   )}
                 </div>
 
-                {/* Device controls overlay */}
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-full bg-zinc-900/90 backdrop-blur-md border border-zinc-800 shadow-xl opacity-90 hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn("h-10 w-10 rounded-full", isMuted ? "bg-red-950 text-red-400 hover:bg-red-900" : "text-zinc-300 hover:bg-zinc-800")}
-                    onClick={toggleMute}
-                  >
-                    {isMuted ? <MicOff className="h-4.5 w-4.5" /> : <Mic className="h-4.5 w-4.5" />}
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn("h-10 w-10 rounded-full", isVideoOff ? "bg-red-950 text-red-400 hover:bg-red-900" : "text-zinc-300 hover:bg-zinc-800")}
-                    onClick={toggleVideo}
-                  >
-                    {isVideoOff ? <VideoOff className="h-4.5 w-4.5" /> : <VideoIcon className="h-4.5 w-4.5" />}
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn("h-10 w-10 rounded-full", isScreenSharing ? "bg-red-600 text-white hover:bg-red-700" : "text-zinc-300 hover:bg-zinc-800")}
-                    onClick={toggleScreenShare}
-                  >
-                    <Monitor className="h-4.5 w-4.5" />
-                  </Button>
-
-                  <div className="h-6 w-px bg-zinc-800 mx-1" />
-
-                  {isBroadcasting ? (
+                {/* If not broadcasting yet, show a big "Start Live Class" overlay in the middle */}
+                {!isBroadcasting && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 z-10 transition-all">
+                    <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-2">
+                      <VideoIcon className="h-8 w-8 animate-pulse" />
+                    </div>
+                    <div className="text-center">
+                      <h4 className="text-lg font-bold text-white">Start Your Live Class</h4>
+                      <p className="text-sm text-zinc-400 max-w-sm mt-1 px-4">
+                        Configure your camera/microphone and click "Go Live" below to start streaming to your students.
+                      </p>
+                    </div>
                     <Button 
-                      className="bg-red-600 hover:bg-red-700 text-white rounded-full px-5 py-1.5 h-10 gap-1.5"
-                      onClick={handleEndStream}
-                    >
-                      <PhoneOff className="h-4 w-4" />
-                      End Stream
-                    </Button>
-                  ) : (
-                    <Button 
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-5 py-1.5 h-10 gap-1.5 animate-pulse"
+                      className="bg-red-650 hover:bg-red-700 text-white rounded-xl px-6 py-2.5 h-11 gap-2 font-bold shadow-lg shadow-red-600/20 active:scale-95 transition-all mt-2"
                       onClick={handleGoLive}
                     >
-                      <Play className="h-4 w-4 fill-current" />
+                      <Play className="h-4.5 w-4.5 fill-current" />
                       Go Live
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -716,19 +863,19 @@ export default function LiveRoomPage() {
                     />
 
                     {/* Custom student overlays */}
-                    <div className="absolute top-4 left-4 flex gap-2">
-                      <Badge className="bg-zinc-900/80 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
-                        Stream: Cloudflare HLS
+                    <div className="absolute bottom-6 left-6 flex gap-2">
+                      <Badge className="bg-zinc-950/85 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
+                        Stream: Cloudflare Live (Sub-second WebRTC)
                       </Badge>
                     </div>
 
                     {/* Custom Player Controls (bottom bar visible on hover) */}
-                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-950/90 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-955/90 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-15">
                       <div className="flex items-center gap-3">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-white hover:bg-white/10 dark:hover:bg-zinc-800"
+                          className="h-8 w-8 text-white hover:bg-white/10"
                           onClick={() => setIsAudioMuted(!isAudioMuted)}
                         >
                           {isAudioMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
@@ -757,22 +904,24 @@ export default function LiveRoomPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-                    <div className="w-16 h-16 rounded-full bg-zinc-850 flex items-center justify-center text-zinc-500 mb-4 border border-zinc-800">
-                      <Wifi className="h-8 w-8" />
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#201d16] via-[#16140f] to-[#0c0a07] p-6 text-center select-none">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-amber-600/20 to-amber-700/35 border border-amber-500/30 flex items-center justify-center shadow-2xl mb-6 animate-pulse">
+                      <span className="text-3xl font-bold text-amber-400 tracking-wider font-serif">
+                        {getInitials(classItem.title)}
+                      </span>
                     </div>
                     {classItem.status === "ended" ? (
                       <>
                         <h4 className="text-lg font-bold text-zinc-300">This class has ended</h4>
-                        <p className="text-sm text-zinc-500 max-w-sm text-center mt-1">
+                        <p className="text-sm text-zinc-550 max-w-sm mt-1">
                           You can find the recording in the Live Classes directory once it finishes processing.
                         </p>
                       </>
                     ) : (
                       <>
-                        <h4 className="text-lg font-bold text-zinc-300">Waiting for teacher to start stream</h4>
-                        <p className="text-sm text-zinc-500 max-w-sm text-center mt-1">
-                          This class is scheduled. As soon as the teacher starts broadcasting, your player will connect automatically.
+                        <h4 className="text-lg font-bold text-zinc-305">Waiting for teacher to start stream</h4>
+                        <p className="text-sm text-zinc-500 max-w-sm mt-1">
+                          This class is scheduled. As soon as the teacher starts broadcasting, your player will connect automatically with sub-second WebRTC latency.
                         </p>
                       </>
                     )}
@@ -780,23 +929,30 @@ export default function LiveRoomPage() {
                 )}
               </>
             )}
+
+            {/* Closed Captions Transcription Overlay */}
+            {isCcEnabled && (
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-xl border border-zinc-800 text-center max-w-xl text-sm font-light tracking-wide backdrop-blur z-20">
+                <span className="text-zinc-400 font-semibold uppercase text-[10px] block mb-1">Live Transcription</span>
+                "Welcome class! Today we're going to dive into advanced coding techniques and look at the structure of our application..."
+              </div>
+            )}
+
           </div>
 
-
-
-          {/* Creator Device Settings Drawer (shows if toggled) */}
+          {/* Teacher Device Settings Drawer overlay (shows if toggled) */}
           {isCreator && showSettings && (
-            <Card className="w-full max-w-4xl mt-4 bg-white border border-slate-200 text-slate-800 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-200">
+            <Card className="w-full max-w-lg mt-4 bg-zinc-900 border-zinc-800 text-zinc-205 shadow-2xl z-20">
               <CardContent className="p-4 grid md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs text-zinc-400">Select Camera</Label>
                   <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice}>
-                    <SelectTrigger className="bg-zinc-950 border-zinc-800 mt-1 h-9">
+                    <SelectTrigger className="bg-zinc-950 border-zinc-800 mt-1 h-9 text-zinc-200">
                       <SelectValue placeholder="Default camera" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200">
+                    <SelectContent className="bg-zinc-950 border-zinc-805 text-zinc-200">
                       {devices.video.map((d) => (
-                        <SelectItem key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0,5)}`}</SelectItem>
+                        <SelectItem key={d.deviceId} value={d.deviceId} className="hover:bg-zinc-805">{d.label || `Camera ${d.deviceId.slice(0,5)}`}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -804,12 +960,12 @@ export default function LiveRoomPage() {
                 <div>
                   <Label className="text-xs text-zinc-400">Select Microphone</Label>
                   <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
-                    <SelectTrigger className="bg-zinc-950 border-zinc-800 mt-1 h-9">
+                    <SelectTrigger className="bg-zinc-950 border-zinc-800 mt-1 h-9 text-zinc-200">
                       <SelectValue placeholder="Default microphone" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-200">
+                    <SelectContent className="bg-zinc-950 border-zinc-805 text-zinc-200">
                       {devices.audio.map((d) => (
-                        <SelectItem key={d.deviceId} value={d.deviceId}>{d.label || `Microphone ${d.deviceId.slice(0,5)}`}</SelectItem>
+                        <SelectItem key={d.deviceId} value={d.deviceId} className="hover:bg-zinc-805">{d.label || `Microphone ${d.deviceId.slice(0,5)}`}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -818,422 +974,658 @@ export default function LiveRoomPage() {
             </Card>
           )}
 
-          {/* Unified Reaction and Student Controls Bar */}
-          {classItem.status === "live" && (
-            <div className="w-full max-w-4xl flex flex-wrap items-center justify-between mt-4 px-2 gap-4">
-              <div className="flex items-center gap-1 bg-white/85 dark:bg-zinc-900/85 backdrop-blur border border-slate-200/50 dark:border-zinc-800/50 p-1.5 rounded-full shadow-sm">
+        </section>
+
+        {/* Right Side: Interactive Side Panel         {/* Right Side: Collapsible Sidebar */}
+        {showSidebar && (
+          <aside className="w-full md:w-80 border-l border-zinc-900 bg-zinc-950 flex flex-col overflow-hidden shrink-0 z-20">
+            
+            {/* Tab selectors */}
+            <div className="flex border-b border-zinc-900 bg-zinc-950 shrink-0">
+              <button
+                onClick={() => setActiveTab("chat")}
+                className={cn(
+                  "flex-1 py-3 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 transition-all",
+                  activeTab === "chat" 
+                    ? "border-red-655 text-white bg-zinc-900/30" 
+                    : "border-transparent text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Chat
+                {chatMessages.length > 0 && (
+                  <span className="bg-zinc-800 text-[10px] text-zinc-300 px-1.5 py-0.5 rounded-full ml-1 font-normal">
+                    {chatMessages.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("interactions")}
+                className={cn(
+                  "flex-1 py-3 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 transition-all",
+                  activeTab === "interactions" 
+                    ? "border-red-655 text-white bg-zinc-900/30" 
+                    : "border-transparent text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <Users className="h-3.5 w-3.5" />
+                People
+                {raisedHands.length > 0 && (
+                  <span className="bg-amber-500/15 text-[10px] text-amber-500 px-1.5 py-0.5 rounded-full ml-1 font-semibold animate-pulse border border-amber-500/10">
+                    {raisedHands.length}
+                  </span>
+                )}
+              </button>
+              {isTeacher && (
+                <button
+                  className={cn(
+                    "flex-1 py-3 text-xs font-semibold tracking-wide transition-colors relative",
+                    activeTab === "waiting" 
+                      ? "text-indigo-400" 
+                      : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                  onClick={() => setActiveTab("waiting")}
+                >
+                  Waiting ({pendingApprovals.length})
+                  {activeTab === "waiting" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
+                </button>
+              )}
+            </div>
+
+            {/* Tab Contents */}
+            <div className="flex-1 overflow-hidden relative flex flex-col bg-zinc-950">
+              
+              {/* 1. CHAT TAB */}
+              {activeTab === "chat" && (
+                <>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                    {chatMessages.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-6 mt-10">
+                        <MessageSquare className="h-10 w-10 text-zinc-800 mb-2" />
+                        <p className="text-xs text-zinc-500">No messages yet.</p>
+                        <p className="text-[10px] text-zinc-650 mt-0.5">Start the conversation by typing below.</p>
+                      </div>
+                    ) : (
+                      chatMessages.map((msg: any) => {
+                        const isMe = msg.senderId === user?._id;
+                        const isTeacherRole = msg.senderRole === "teacher" || msg.senderRole === "admin";
+                        
+                        return (
+                          <div key={msg._id} className={cn("flex flex-col max-w-[85%]", isMe ? "ml-auto items-end" : "items-start")}>
+                            <div className="flex items-center gap-1.5 mb-1 px-1">
+                              <span className="text-[10px] text-zinc-400 font-medium">{msg.senderName}</span>
+                              {isTeacherRole && (
+                                <Badge className="bg-red-500/10 border border-red-500/20 text-[8px] text-red-500 px-1 py-0 leading-none h-3 font-semibold uppercase tracking-wider rounded">
+                                  Teacher
+                                </Badge>
+                              )}
+                            </div>
+                            <div
+                              className={cn(
+                                "px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words shadow-sm transition-transform duration-200 scale-95 origin-bottom",
+                                isMe
+                                  ? "bg-red-600 text-white rounded-tr-none hover:bg-red-700"
+                                  : isTeacherRole
+                                  ? "bg-zinc-805 border border-red-950/30 text-zinc-100 rounded-tl-none"
+                                  : "bg-zinc-900 border border-zinc-850 text-zinc-200 rounded-tl-none"
+                              )}
+                            >
+                              {msg.content}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  <form onSubmit={handleSendMessage} className="p-3 border-t border-zinc-900 bg-zinc-950 shrink-0 flex gap-2">
+                    <Input
+                      placeholder="Ask a question..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      className="text-xs h-9 rounded-xl border-zinc-850 bg-zinc-900 focus-visible:ring-1 focus-visible:ring-red-600 focus-visible:ring-offset-0 focus-visible:border-transparent text-white"
+                    />
+                    <Button type="submit" size="icon" className="h-9 w-9 bg-red-600 hover:bg-red-700 text-white shrink-0 rounded-xl">
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </form>
+                </>
+              )}
+
+              {/* 2. INTERACTIONS & ROSTER TAB */}
+              {activeTab === "interactions" && (
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col h-full space-y-5">
+                  
+                  {/* Student Hand Raising Card */}
+                  {!isCreator && (
+                    <div className="p-4 rounded-2xl border bg-gradient-to-br from-zinc-900 to-zinc-955 border-zinc-800 shadow-md shrink-0">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-bold text-zinc-200">
+                            {myHandRaised ? "Hand Raised" : "Have a Question?"}
+                          </h4>
+                          <p className="text-[11px] text-zinc-450 mt-1 leading-relaxed">
+                            {myHandRaised 
+                              ? "The teacher has been notified. You are in the queue." 
+                              : "Raise your hand to let the teacher know you'd like to ask a question."}
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleRaiseHand}
+                          className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shrink-0",
+                            myHandRaised
+                              ? "bg-amber-500 hover:bg-amber-605 text-zinc-950 animate-bounce ring-4 ring-amber-500/30"
+                              : "bg-red-600 hover:bg-red-700 text-white hover:scale-105 active:scale-95"
+                          )}
+                          title={myHandRaised ? "Lower Hand" : "Raise Hand"}
+                        >
+                          <Hand className={cn("h-5 w-5", myHandRaised ? "animate-pulse" : "")} />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raised hands queue */}
+                  <div className="shrink-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                        <Hand className="h-3.5 w-3.5" />
+                        Raised Hands Queue
+                      </h3>
+                      {isCreator && raisedHands.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[10px] text-zinc-500 hover:text-white px-2 py-1 h-auto"
+                          onClick={async () => {
+                            for (const h of raisedHands) {
+                              await lowerStudentHand({ liveClassId: id as any, studentId: h.studentId });
+                            }
+                            toast.info("Cleared raised hands queue.");
+                          }}
+                        >
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+
+                    {raisedHands.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-4 border border-dashed border-zinc-800 rounded-xl text-center bg-zinc-900/10 min-h-[100px]">
+                        <Hand className="mb-2 h-6 w-6 text-zinc-700" />
+                        <p className="text-xs text-zinc-500">No hands raised yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {raisedHands.map((hand: any) => (
+                          <div
+                            key={hand._id}
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10 shadow-sm"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-amber-505/10 border border-amber-505/20 flex items-center justify-center text-xs font-bold text-amber-500 shrink-0">
+                                {hand.studentName.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-xs text-zinc-200 font-medium truncate">{hand.studentName}</span>
+                            </div>
+                            
+                            {isCreator && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2.5 rounded-lg bg-amber-505/15 hover:bg-amber-505/25 text-[10px] text-amber-500 font-semibold"
+                                onClick={() => lowerStudentHand({ liveClassId: id as any, studentId: hand.studentId })}
+                              >
+                                Lower
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Student Roster Section (Online vs Offline) */}
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 mb-3 shrink-0">
+                      <Users className="h-3.5 w-3.5" />
+                      Student Roster
+                    </h3>
+
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                      
+                      {/* Online list */}
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-bold text-emerald-500 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Online ({participants.filter((p: any) => p.isOnline).length})
+                        </div>
+                        {participants.filter((p: any) => p.isOnline).length === 0 ? (
+                          <p className="text-[11px] text-zinc-600 italic pl-1">No students online.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {participants.filter((p: any) => p.isOnline).map((p: any) => (
+                              <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-850">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-6 h-6 rounded-full bg-emerald-950 border border-emerald-800 flex items-center justify-center text-[10px] font-bold text-emerald-450 shrink-0">
+                                    {p.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-medium text-zinc-200 truncate" title={p.name}>{p.name}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {isCreator ? (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className={cn("h-7 w-7 rounded-lg", p.isMuted ? "text-red-500 hover:bg-red-950/20" : "text-zinc-400 hover:bg-zinc-800")}
+                                        onClick={async () => {
+                                          try {
+                                            const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                            toast.success(res.isMuted ? `${p.name} muted.` : `${p.name} unmuted.`);
+                                          } catch (err: any) {
+                                            toast.error(err.message || "Failed to toggle mute.");
+                                          }
+                                        }}
+                                        title={p.isMuted ? "Unmute Student" : "Mute Student"}
+                                      >
+                                        {p.isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className={cn("h-7 w-7 rounded-lg", p.isCameraBlocked ? "text-red-500 hover:bg-red-955/20" : "text-zinc-400 hover:bg-zinc-800")}
+                                        onClick={async () => {
+                                          try {
+                                            const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                            toast.success(res.isCameraBlocked ? `${p.name} camera blocked.` : `${p.name} camera unblocked.`);
+                                          } catch (err: any) {
+                                            toast.error(err.message || "Failed to toggle camera block.");
+                                          }
+                                        }}
+                                        title={p.isCameraBlocked ? "Unblock Camera" : "Block Camera"}
+                                      >
+                                        {p.isCameraBlocked ? <VideoOff className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-7 w-7 text-red-550 hover:text-red-400 hover:bg-red-955/20 rounded-lg"
+                                        onClick={async () => {
+                                          try {
+                                            await evictStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                            toast.success(`${p.name} evicted from class.`);
+                                          } catch (err: any) {
+                                            toast.error(err.message || "Failed to evict student.");
+                                          }
+                                        }}
+                                        title="Evict Student"
+                                      >
+                                        <PhoneOff className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 px-1">
+                                      {p.isMuted && <MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Muted" />}
+                                      {p.isCameraBlocked && <VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Camera Blocked" />}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Offline list */}
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-bold text-zinc-500 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-700"></span>
+                          Offline ({participants.filter((p: any) => !p.isOnline).length})
+                        </div>
+                        {participants.filter((p: any) => !p.isOnline).length === 0 ? (
+                          <p className="text-[11px] text-zinc-650 italic pl-1">All students are online.</p>
+                        ) : (
+                          <div className="space-y-1.5 opacity-60">
+                            {participants.filter((p: any) => !p.isOnline).map((p: any) => (
+                              <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-900">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">
+                                    {p.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-medium text-zinc-400 truncate" title={p.name}>{p.name}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* 3. WAITING ROOM TAB (Teacher Only) */}
+              {activeTab === "waiting" && isTeacher && (
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-zinc-950">
+                  {pendingApprovals.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-zinc-650">
+                      <Clock className="h-10 w-10 mb-2 opacity-50" />
+                      <p className="text-sm font-medium">No pending requests</p>
+                    </div>
+                  ) : (
+                    pendingApprovals.map((req: any) => (
+                      <div key={req._id} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-sm">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="h-8 w-8 rounded-full bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400 font-bold shrink-0">
+                            {req.studentName.charAt(0).toUpperCase()}
+                          </div>
+                          <p className="text-sm font-semibold text-zinc-200 truncate">
+                            {req.studentName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-950/20 border-zinc-800"
+                            onClick={() => approveStudentMutation({ approvalId: req._id, status: "approved" })}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-8 w-8 text-red-500 hover:text-red-405 hover:bg-red-955/20 border-zinc-800"
+                            onClick={() => approveStudentMutation({ approvalId: req._id, status: "denied" })}
+                          >
+                            <AlertCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {/* ── BOTTOM CONTROL BAR (GOOGLE MEET/TEAMS STYLE) ── */}
+      <footer className="h-20 bg-zinc-955 flex items-center justify-between px-6 border-t border-zinc-900 z-30 shrink-0 select-none">
+        
+        {/* Left Column: Room clock and code */}
+        <div className="flex items-center gap-4 text-sm font-medium text-zinc-400 min-w-[200px]">
+          <span className="text-white font-medium">{timeStr}</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-800"></span>
+          <span className="font-mono tracking-wider text-zinc-300 font-semibold">{getRoomCode()}</span>
+        </div>
+
+        {/* Center Column: Control Circle Buttons */}
+        <div className="flex items-center gap-3">
+          
+          {/* Mute Mic */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-full border transition-all relative shrink-0",
+              isMuted 
+                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
+                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+            )}
+            onClick={toggleMute}
+            title={isMuted ? "Unmute Mic" : "Mute Mic"}
+          >
+            {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            {isMuted && <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-yellow-500 border-2 border-zinc-950" />}
+          </Button>
+
+          {/* Video Camera */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-full border transition-all relative shrink-0",
+              isVideoOff 
+                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
+                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+            )}
+            onClick={toggleVideo}
+            title={isVideoOff ? "Turn On Camera" : "Turn Off Camera"}
+          >
+            {isVideoOff ? <VideoOff className="h-5 w-5" /> : <VideoIcon className="h-5 w-5" />}
+            {isVideoOff && <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-yellow-500 border-2 border-zinc-950" />}
+          </Button>
+
+          {/* Screen Share (Teacher only) */}
+          {isCreator && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-12 w-12 rounded-full border transition-all shrink-0",
+                isScreenSharing 
+                  ? "bg-emerald-500/20 border-emerald-500 text-emerald-500 hover:bg-emerald-500/30" 
+                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              )}
+              onClick={toggleScreenShare}
+              title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
+            >
+              <Monitor className="h-5 w-5" />
+            </Button>
+          )}
+
+          {/* Whiteboard Button (Opens whiteboard in a new tab) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-12 w-12 rounded-full border bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shrink-0"
+            onClick={() => window.open("/whiteboard", "_blank")}
+            title="Open Whiteboard Canvas"
+          >
+            <Presentation className="h-5 w-5" />
+          </Button>
+
+          {/* Closed Captions toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-full border transition-all shrink-0",
+              isCcEnabled 
+                ? "bg-sky-500/20 border-sky-500 text-sky-400 hover:bg-sky-500/30" 
+                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+            )}
+            onClick={() => setIsCcEnabled(!isCcEnabled)}
+            title={isCcEnabled ? "Disable Captions" : "Enable Captions"}
+          >
+            <Subtitles className="h-5 w-5" />
+          </Button>
+
+          {/* Raise Hand (Student only) */}
+          {!isCreator && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-12 w-12 rounded-full border transition-all shrink-0",
+                myHandRaised 
+                  ? "bg-amber-500 border-amber-505 text-zinc-950 hover:bg-amber-600 hover:border-amber-605" 
+                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              )}
+              onClick={handleRaiseHand}
+              title={myHandRaised ? "Lower Hand" : "Raise Hand"}
+            >
+              <Hand className="h-5 w-5" />
+            </Button>
+          )}
+
+          {/* Reactions popover trigger */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-12 w-12 rounded-full border transition-all shrink-0",
+                showReactionsMenu
+                  ? "bg-zinc-800 border-zinc-700 text-white"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              )}
+              onClick={() => setShowReactionsMenu(!showReactionsMenu)}
+              title="Reactions"
+            >
+              <Smile className="h-5 w-5" />
+            </Button>
+
+            {/* Floating Reactions Toolbar */}
+            {showReactionsMenu && (
+              <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 p-1.5 rounded-full shadow-2xl z-40 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 {Object.entries(EMOJI_MAP).map(([type, emoji]) => (
                   <Button
                     key={type}
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-lg transition-transform hover:scale-125 active:scale-90"
-                    onClick={() => handleSendReaction(type)}
+                    className="h-8 w-8 rounded-full hover:bg-zinc-800 text-lg transition-transform hover:scale-125 active:scale-90"
+                    onClick={() => {
+                      handleSendReaction(type);
+                      setShowReactionsMenu(false);
+                    }}
                     title={`React with ${type}`}
                   >
                     {emoji}
                   </Button>
                 ))}
               </div>
-              
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1 font-medium">
-                  <Users className="h-3.5 w-3.5" />
-                  {raisedHands.length} raised hands
-                </span>
-              </div>
-            </div>
+            )}
+          </div>
+
+          {/* Red Hang Up / End Class Button */}
+          {isCreator ? (
+            <Button
+              className="bg-red-600 hover:bg-red-750 text-white rounded-full px-5 py-2 h-12 gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
+              onClick={handleEndStream}
+            >
+              <PhoneOff className="h-5 w-5" />
+              <span className="hidden md:inline">End Class</span>
+            </Button>
+          ) : (
+            <Button
+              className="bg-red-650 hover:bg-red-750 text-white rounded-full px-5 py-2 h-12 gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
+              onClick={() => navigate("/lives")}
+            >
+              <PhoneOff className="h-5 w-5" />
+              <span className="hidden md:inline">Leave</span>
+            </Button>
           )}
-        </section>
 
-        {/* Right Side: Interactive Side Panel (Chat / Hands List) */}
-        <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 bg-white/90 backdrop-blur-md flex flex-col overflow-hidden shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
+        </div>
+
+        {/* Right Column: Toggle Sidebar and Settings Buttons */}
+        <div className="flex items-center gap-2 min-w-[200px] justify-end">
           
-          {/* Tab selectors */}
-          <div className="flex border-b border-slate-200 dark:border-zinc-900">
-            <button
-              onClick={() => setActiveTab("chat")}
+          {/* People Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-full transition-all relative shrink-0",
+              showSidebar && activeTab === "interactions"
+                ? "bg-zinc-800 text-white"
+                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            )}
+            onClick={() => toggleSidebarTab("interactions")}
+            title="People & Roster"
+          >
+            <Users className="h-5 w-5" />
+            {raisedHands.length > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-amber-500 text-[9px] font-bold text-zinc-950 rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
+                {raisedHands.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Chat Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-full transition-all relative shrink-0",
+              showSidebar && activeTab === "chat"
+                ? "bg-zinc-800 text-white"
+                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            )}
+            onClick={() => toggleSidebarTab("chat")}
+            title="Chat"
+          >
+            <MessageSquare className="h-5 w-5" />
+            {chatMessages.length > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-650 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-zinc-955">
+                {chatMessages.length}
+              </span>
+            )}
+          </Button>
+
+          {/* Waiting Room Toggle (Teacher only) */}
+          {isTeacher && (
+            <Button
+              variant="ghost"
+              size="icon"
               className={cn(
-                "flex-1 py-3 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 transition-all",
-                activeTab === "chat" 
-                  ? "border-red-600 text-slate-950 bg-slate-100 dark:text-white dark:bg-zinc-900/10" 
-                  : "border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                "h-12 w-12 rounded-full transition-all relative shrink-0",
+                showSidebar && activeTab === "waiting"
+                  ? "bg-zinc-800 text-white"
+                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
               )}
+              onClick={() => toggleSidebarTab("waiting")}
+              title="Waiting Room"
             >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Chat
-              {chatMessages.length > 0 && (
-                <span className="bg-zinc-800 text-[10px] text-zinc-300 px-1.5 py-0.5 rounded-full ml-1 font-normal">
-                  {chatMessages.length}
+              <Clock className="h-5 w-5" />
+              {pendingApprovals.length > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-indigo-600 text-[9px] font-bold text-white rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
+                  {pendingApprovals.length}
                 </span>
               )}
-            </button>
-            <button
-              onClick={() => setActiveTab("interactions")}
+            </Button>
+          )}
+
+          {/* Host Device Settings (Teacher only) */}
+          {isCreator && (
+            <Button
+              variant="ghost"
+              size="icon"
               className={cn(
-                "flex-1 py-3 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 transition-all",
-                activeTab === "interactions" 
-                  ? "border-red-600 text-slate-950 bg-slate-100 dark:text-white dark:bg-zinc-900/10" 
-                  : "border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                "h-12 w-12 rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all shrink-0",
+                showSettings && "bg-zinc-800 text-white"
               )}
+              onClick={() => setShowSettings(!showSettings)}
+              title="Settings"
             >
-              <Users className="h-3.5 w-3.5" />
-              Interactions
-              {raisedHands.length > 0 && (
-                <span className="bg-amber-500/15 text-[10px] text-amber-500 px-1.5 py-0.5 rounded-full ml-1 font-semibold animate-pulse border border-amber-500/10">
-                  {raisedHands.length}
-                </span>
-              )}
-            </button>
-            {isTeacher && (
-              <button
-                className={cn(
-                  "flex-1 py-3 text-xs font-semibold tracking-wide transition-colors relative",
-                  activeTab === "waiting" 
-                    ? "text-indigo-600 dark:text-indigo-400" 
-                    : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                )}
-                onClick={() => setActiveTab("waiting")}
-              >
-                Waiting ({pendingApprovals.length})
-                {activeTab === "waiting" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400" />}
-              </button>
-            )}
-          </div>
+              <Settings className="h-5 w-5" />
+            </Button>
+          )}
 
-          {/* Tab Contents */}
-          <div className="flex-1 overflow-hidden relative flex flex-col">
-            
-            {/* 1. CHAT TAB */}
-            {activeTab === "chat" && (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-                  {chatMessages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 mt-10">
-                      <MessageSquare className="h-10 w-10 text-slate-300 mb-2 dark:text-zinc-800" />
-                      <p className="text-xs text-slate-500 dark:text-zinc-500">No messages yet.</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 dark:text-zinc-650">Start the conversation by typing below.</p>
-                    </div>
-                  ) : (
-                    chatMessages.map((msg: any) => {
-                      const isMe = msg.senderId === user?._id;
-                      const isTeacherRole = msg.senderRole === "teacher" || msg.senderRole === "admin";
-                      
-                      return (
-                        <div key={msg._id} className={cn("flex flex-col max-w-[85%]", isMe ? "ml-auto items-end" : "items-start")}>
-                          <div className="flex items-center gap-1.5 mb-1 px-1">
-                            <span className="text-[10px] text-slate-500 font-medium dark:text-zinc-400">{msg.senderName}</span>
-                            {isTeacherRole && (
-                              <Badge className="bg-red-600/10 border border-red-500/20 text-[8px] text-red-500 px-1 py-0 leading-none h-3 font-semibold uppercase tracking-wider rounded">
-                                Teacher
-                              </Badge>
-                            )}
-                          </div>
-                          <div
-                            className={cn(
-                              "px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words shadow-sm transition-transform duration-200 scale-95 origin-bottom",
-                              isMe
-                                ? "bg-red-600 text-white rounded-tr-none hover:bg-red-700"
-                                : isTeacherRole
-                                ? "bg-red-50 border border-red-100 text-slate-800 rounded-tl-none dark:bg-zinc-850 dark:border-red-950/30 dark:text-zinc-100"
-                                : "bg-slate-100 border border-slate-200 text-slate-800 rounded-tl-none dark:bg-zinc-900 dark:border-zinc-850 dark:text-zinc-300"
-                            )}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
+          {/* Invite dialog button (Teacher only) */}
+          {isTeacher && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-12 w-12 rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all shrink-0"
+              onClick={() => setShowInvite(true)}
+              title="Invite Students"
+            >
+              <Users className="h-5 w-5" />
+            </Button>
+          )}
 
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-white shrink-0 flex gap-2 dark:border-zinc-900 dark:bg-zinc-950">
-                  <Input
-                    placeholder="Ask a question..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    className="text-xs h-9 rounded-xl focus-visible:ring-1 focus-visible:ring-red-600 focus-visible:ring-offset-0 focus-visible:border-transparent"
-                  />
-                  <Button type="submit" size="icon" className="h-9 w-9 bg-red-600 hover:bg-red-700 text-white shrink-0 rounded-xl">
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </form>
-              </>
-            )}
+        </div>
 
-            {/* 2. INTERACTIONS TAB */}
-            {activeTab === "interactions" && (
-              <div className="flex-1 overflow-y-auto p-4 flex flex-col h-full">
-                
-                {/* Modern Student Hand Raising Card */}
-                {!isCreator && (
-                  <div className="mb-5 p-4 rounded-2xl border bg-gradient-to-br from-zinc-50 to-white dark:from-zinc-900/60 dark:to-zinc-950 border-zinc-200 dark:border-zinc-800/80 shadow-md">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-                          {myHandRaised ? "Hand Raised" : "Have a Question?"}
-                        </h4>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                          {myHandRaised 
-                            ? "The teacher has been notified. You are in the queue." 
-                            : "Raise your hand to let the teacher know you'd like to ask a question."}
-                        </p>
-                      </div>
-                      <Button
-                        onClick={handleRaiseHand}
-                        className={cn(
-                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shrink-0",
-                          myHandRaised
-                            ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 animate-bounce ring-4 ring-amber-500/30"
-                            : "bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105 active:scale-95"
-                        )}
-                        title={myHandRaised ? "Lower Hand" : "Raise Hand"}
-                      >
-                        <Hand className={cn("h-5 w-5", myHandRaised ? "animate-pulse" : "")} />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Raised hands queue */}
-                <div className="mb-6 flex-1">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 dark:text-zinc-400">
-                      <Hand className="h-3.5 w-3.5" />
-                      Raised Hands Queue
-                    </h3>
-                    {isCreator && raisedHands.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[10px] text-slate-500 hover:text-slate-950 px-2 py-1 h-auto dark:text-zinc-500 dark:hover:text-white"
-                        onClick={async () => {
-                          for (const h of raisedHands) {
-                            await lowerStudentHand({ liveClassId: id as any, studentId: h.studentId });
-                          }
-                          toast.info("Cleared raised hands queue.");
-                        }}
-                      >
-                        Clear All
-                      </Button>
-                    )}
-                  </div>
-
-                  {raisedHands.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-6 border border-dashed border-slate-200 rounded-xl text-center bg-slate-50 min-h-[140px] dark:border-zinc-900 dark:bg-zinc-900/10">
-                      <Hand className="mb-2 h-7 w-7 text-slate-300 dark:text-zinc-700" />
-                      <p className="text-xs text-slate-500 dark:text-zinc-500">No hands raised yet</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 dark:text-zinc-650">Students can raise hands to ask questions.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {raisedHands.map((hand: any) => (
-                        <div
-                          key={hand._id}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10 shadow-sm animate-pulse"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-500 shrink-0">
-                              {hand.studentName.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="text-xs text-slate-800 font-medium truncate dark:text-zinc-200">{hand.studentName}</span>
-                          </div>
-                          
-                          {isCreator && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-[10px] text-amber-500"
-                              onClick={() => lowerStudentHand({ liveClassId: id as any, studentId: hand.studentId })}
-                            >
-                              Lower
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Live Reactions Section */}
-                <div className="mb-6">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-3 dark:text-zinc-400">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                    Live Class Reactions
-                  </h3>
-                  
-                  {/* Click to React Grid */}
-                  <div className="grid grid-cols-5 gap-2 mb-4 bg-slate-50 dark:bg-zinc-900/20 border border-slate-100 dark:border-zinc-900/50 p-2 rounded-xl">
-                    {Object.entries(EMOJI_MAP).map(([type, emoji]) => (
-                      <Button
-                        key={type}
-                        variant="ghost"
-                        className="h-12 flex flex-col items-center justify-center p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all hover:scale-105 active:scale-95"
-                        onClick={() => handleSendReaction(type)}
-                        title={`Send ${type}`}
-                      >
-                        <span className="text-xl mb-0.5">{emoji}</span>
-                        <span className="text-[10px] font-bold text-slate-600 dark:text-zinc-400">
-                          {reactionStats[type] || 0}
-                        </span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Class Participants Section */}
-                <div className="mb-6">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-3 dark:text-zinc-400">
-                    <Users className="h-3.5 w-3.5" />
-                    Students in Class ({participants.length})
-                  </h3>
-                  {participants.length === 0 ? (
-                    <p className="text-xs text-slate-400 dark:text-zinc-550 italic">No students in class yet.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {participants.map((p: any) => (
-                        <div key={p.studentId} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80">
-                          <span className="text-xs font-medium text-slate-700 dark:text-zinc-300 truncate max-w-[110px]" title={p.name}>{p.name}</span>
-                          
-                          <div className="flex items-center gap-1 shrink-0">
-                            {isCreator ? (
-                              <>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className={cn("h-7 w-7 rounded-lg", p.isMuted ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800")}
-                                  onClick={async () => {
-                                    try {
-                                      const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: p.studentId });
-                                      toast.success(res.isMuted ? `${p.name} muted.` : `${p.name} unmuted.`);
-                                    } catch (err: any) {
-                                      toast.error(err.message || "Failed to toggle mute.");
-                                    }
-                                  }}
-                                  title={p.isMuted ? "Unmute Student" : "Mute Student"}
-                                >
-                                  {p.isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className={cn("h-7 w-7 rounded-lg", p.isCameraBlocked ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800")}
-                                  onClick={async () => {
-                                    try {
-                                      const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: p.studentId });
-                                      toast.success(res.isCameraBlocked ? `${p.name} camera blocked.` : `${p.name} camera unblocked.`);
-                                    } catch (err: any) {
-                                      toast.error(err.message || "Failed to toggle camera block.");
-                                    }
-                                  }}
-                                  title={p.isCameraBlocked ? "Unblock Camera" : "Block Camera"}
-                                >
-                                  {p.isCameraBlocked ? <VideoOff className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg"
-                                  onClick={async () => {
-                                    try {
-                                      await evictStudentMutation({ liveClassId: id as any, studentId: p.studentId });
-                                      toast.success(`${p.name} evicted from class.`);
-                                    } catch (err: any) {
-                                      toast.error(err.message || "Failed to evict student.");
-                                    }
-                                  }}
-                                  title="Evict Student"
-                                >
-                                  <PhoneOff className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            ) : (
-                              <div className="flex items-center gap-1.5 px-1">
-                                {p.isMuted && <MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Muted" />}
-                                {p.isCameraBlocked && <VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Camera Blocked" />}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Additional classroom metrics */}
-                <div className="mt-auto border-t border-slate-200 pt-4 shrink-0 dark:border-zinc-900">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 dark:bg-zinc-900/40 dark:border-zinc-900">
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-                      <span>Live Status</span>
-                      <Badge className={cn("text-[9px] py-0 font-semibold uppercase leading-none h-4", classItem.status === "live" ? "bg-red-500 text-white" : "bg-zinc-800 text-zinc-400")}>
-                        {classItem.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-                      <span>Students in Class</span>
-                      <span className="font-semibold text-slate-800 dark:text-zinc-200">{participants.length} students</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-                      <span>Active Interactions</span>
-                      <span className="font-semibold text-slate-800 dark:text-zinc-200">{raisedHands.length} hands</span>
-                    </div>
-                    {classItem.maxParticipants && (
-                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-                        <span>Max Capacity</span>
-                        <span className="font-semibold text-slate-800 dark:text-zinc-200">{classItem.maxParticipants} students</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WAITING ROOM TAB (Teacher Only) */}
-            {activeTab === "waiting" && isTeacher && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-zinc-950">
-                {pendingApprovals.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-zinc-600">
-                    <Clock className="h-10 w-10 mb-2 opacity-50" />
-                    <p className="text-sm font-medium">No pending requests</p>
-                  </div>
-                ) : (
-                  pendingApprovals.map((req: any) => (
-                    <div key={req._id} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-sm">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
-                          {req.studentName.charAt(0).toUpperCase()}
-                        </div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-zinc-200 truncate">
-                          {req.studentName}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 dark:border-green-900/30 dark:hover:bg-green-900/20"
-                          onClick={() => approveStudentMutation({ approvalId: req._id, status: "approved" })}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 dark:border-red-900/30 dark:hover:bg-red-900/20"
-                          onClick={() => approveStudentMutation({ approvalId: req._id, status: "denied" })}
-                        >
-                          <AlertCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
-      </main>
+      </footer>
 
       {isTeacher && <InviteDialog open={showInvite} onClose={() => setShowInvite(false)} liveClass={classItem} />}
     </div>

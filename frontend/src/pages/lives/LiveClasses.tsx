@@ -641,6 +641,8 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
         srtUrl: streamData.srtUrl,
         srtStreamId: streamData.srtStreamId,
         srtPassphrase: streamData.srtPassphrase,
+        whipUrl: streamData.whipUrl,
+        whepUrl: streamData.whepUrl,
         playbackUrl: streamData.playbackUrl,
         targetGrades: targetGrade === "all" ? [] : [Number(targetGrade)],
       } as any);

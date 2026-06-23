@@ -229,6 +229,8 @@ app.post("/api/live/create-input", async (c) => {
       uid: string;
       rtmps?: { url?: string; streamKey?: string };
       srt?: { url?: string; streamId?: string; passphrase?: string };
+      webRTC?: { url?: string };
+      webRTCPlayback?: { url?: string };
     }>;
 
     if (!response.ok || !data.success || !data.result) {
@@ -243,6 +245,8 @@ app.post("/api/live/create-input", async (c) => {
       srtUrl: data.result.srt?.url,
       srtStreamId: data.result.srt?.streamId,
       srtPassphrase: data.result.srt?.passphrase,
+      whipUrl: data.result.webRTC?.url,
+      whepUrl: data.result.webRTCPlayback?.url,
       playbackUrl: `https://videodelivery.net/${uid}/manifest/video.m3u8`,
       iframeUrl: `https://iframe.videodelivery.net/${uid}`,
     });
