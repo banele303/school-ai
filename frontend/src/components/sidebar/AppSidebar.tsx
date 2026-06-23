@@ -11,6 +11,7 @@ import {
   BookOpen,
   type LucideIcon,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 
 import { NavMain } from "@/components/sidebar/nav-main";
@@ -221,16 +222,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <div className="px-3 py-2">
         <Button
           className={cn(
-            "w-full gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-lg transition-all duration-300 rounded-full",
-            isCollapsed ? "h-10 w-10 p-0 justify-center rounded-full" : "h-11"
+            "w-full gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-medium shadow-md transition-all duration-300 rounded-lg text-xs",
+            isCollapsed ? "h-8 w-8 p-0 justify-center rounded-lg" : "h-9"
           )}
           onClick={() => navigate("/study-buddy")}
           title="AI Study Chat"
         >
           {!isCollapsed ? (
-            <span>AI Study Chat</span>
+            <span className="flex items-center gap-1.5 justify-center">
+              <Sparkles className="h-3.5 w-3.5 text-rose-100" />
+              AI Study Chat
+            </span>
           ) : (
-            <span className="text-[11px] font-bold tracking-tight">AI</span>
+            <Sparkles className="h-4 w-4 text-rose-100" />
           )}
         </Button>
       </div>

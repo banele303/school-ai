@@ -442,14 +442,17 @@ async function userPreferences_grade(
 }
 
 export const getLiveChatMessages = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const messages = await ctx.db
       .query("liveClassChatMessages")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     messages.sort((a, b) => a.createdAt - b.createdAt);
@@ -489,14 +492,17 @@ export const sendLiveChatMessage = mutation({
 });
 
 export const getRaisedHands = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const hands = await ctx.db
       .query("liveClassRaisedHands")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     hands.sort((a, b) => a.raisedAt - b.raisedAt);
@@ -520,8 +526,8 @@ export const toggleRaiseHand = mutation({
 
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
-    if (liveClass.status !== "live") {
-      throw new Error("Hands can only be raised while the class is live");
+    if (liveClass.status === "ended" || liveClass.status === "cancelled") {
+      throw new Error("Hands cannot be raised in ended or cancelled classes");
     }
 
     const existing = await ctx.db
@@ -680,15 +686,18 @@ export const sendReaction = mutation({
 });
 
 export const getRecentReactions = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const now = Date.now();
     const reactions = await ctx.db
       .query("liveClassReactions")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     // Only return reactions from the last 10 seconds
@@ -704,15 +713,18 @@ export const getRecentReactions = query({
 // ─── WAITING ROOM / APPROVALS ────────────────────────────────────────────────
 
 export const getApprovalStatus = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return null;
+
     const approval = await ctx.db
       .query("liveClassApprovals")
       .withIndex("by_student_class", (q) =>
-        q.eq("student", userId).eq("liveClass", args.liveClassId)
+        q.eq("student", userId).eq("liveClass", liveClassId)
       )
       .first();
 
@@ -721,13 +733,16 @@ export const getApprovalStatus = query({
 });
 
 export const getPendingApprovals = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const user = await ctx.db.get(userId);
-    const liveClass = await ctx.db.get(args.liveClassId);
+    const liveClass = await ctx.db.get(liveClassId);
     if (!liveClass) return [];
 
     // Only teachers/admins can see pending approvals
@@ -737,7 +752,7 @@ export const getPendingApprovals = query({
 
     const approvals = await ctx.db
       .query("liveClassApprovals")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .filter((q) => q.eq(q.field("status"), "pending"))
       .collect();
 
@@ -819,14 +834,17 @@ export const approveStudent = mutation({
 });
 
 export const getReactionStats = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+
     const reactions = await ctx.db
       .query("liveClassReactions")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     const counts: Record<string, number> = { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
@@ -836,5 +854,192 @@ export const getReactionStats = query({
       }
     }
     return counts;
+  },
+});
+
+export const getLiveClassParticipants = query({
+  args: { liveClassId: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
+      .collect();
+
+    const participants = [];
+    for (const record of attendance) {
+      if (record.leftAt !== undefined) {
+        continue;
+      }
+      const student = await ctx.db.get(record.student);
+      if (student) {
+        participants.push({
+          studentId: student._id,
+          name: student.name || student.email || "Student",
+          email: student.email || "",
+          isMuted: record.isMuted ?? false,
+          isCameraBlocked: record.isCameraBlocked ?? false,
+        });
+      }
+    }
+    return participants;
+  },
+});
+
+export const leaveLiveClass = mutation({
+  args: { liveClassId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return;
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), userId))
+      .first();
+
+    if (attendance && attendance.leftAt === undefined) {
+      await ctx.db.patch(attendance._id, {
+        leftAt: Date.now(),
+      });
+    }
+  },
+});
+
+export const evictStudent = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), args.studentId))
+      .first();
+
+    if (attendance) {
+      await ctx.db.patch(attendance._id, {
+        leftAt: Date.now(),
+      });
+    }
+
+    const approval = await ctx.db
+      .query("liveClassApprovals")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", args.studentId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    if (approval) {
+      await ctx.db.patch(approval._id, {
+        status: "denied",
+      });
+    } else {
+      await ctx.db.insert("liveClassApprovals", {
+        liveClass: args.liveClassId,
+        student: args.studentId,
+        studentName: "Evicted Learner",
+        status: "denied",
+        requestedAt: Date.now(),
+      });
+    }
+
+    const raisedHand = await ctx.db
+      .query("liveClassRaisedHands")
+      .withIndex("by_student_class", (q) =>
+        q.eq("student", args.studentId).eq("liveClass", args.liveClassId)
+      )
+      .first();
+
+    if (raisedHand) {
+      await ctx.db.delete(raisedHand._id);
+    }
+
+    return { success: true };
+  },
+});
+
+export const toggleMuteStudent = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), args.studentId))
+      .first();
+
+    if (attendance) {
+      const nextMuteState = !attendance.isMuted;
+      await ctx.db.patch(attendance._id, {
+        isMuted: nextMuteState,
+      });
+      return { isMuted: nextMuteState };
+    }
+    return { isMuted: false };
+  },
+});
+
+export const toggleBlockCameraStudent = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), args.studentId))
+      .first();
+
+    if (attendance) {
+      const nextBlockState = !attendance.isCameraBlocked;
+      await ctx.db.patch(attendance._id, {
+        isCameraBlocked: nextBlockState,
+      });
+      return { isCameraBlocked: nextBlockState };
+    }
+    return { isCameraBlocked: false };
   },
 });
