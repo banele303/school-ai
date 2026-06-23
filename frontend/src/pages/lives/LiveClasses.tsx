@@ -596,6 +596,8 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
         srtStreamId?: string;
         srtPassphrase?: string;
         playbackUrl?: string;
+        whipUrl?: string;
+        whepUrl?: string;
       } = {};
       let finalJoinUrl = trimmedJoinUrl;
 
@@ -614,6 +616,8 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
               srtStreamId: data.srtStreamId,
               srtPassphrase: data.srtPassphrase,
               playbackUrl: data.playbackUrl,
+              whipUrl: data.whipUrl,
+              whepUrl: data.whepUrl,
             };
             finalJoinUrl = "/lives/room/native";
           } catch (e: any) {

@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/hooks/AuthProvider";
 import Hls from "hls.js";
 import InviteDialog from "./InviteDialog";
+import { createStreamLiveInput } from "@/lib/cloudflareWorker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +93,7 @@ export default function LiveRoomPage() {
   const hlsPlayerRef = useRef<Hls | null>(null);
   const whipPcRef = useRef<RTCPeerConnection | null>(null);
   const studentPcRef = useRef<RTCPeerConnection | null>(null);
+  const whepTimeoutRef = useRef<any>(null);
 
   // Clock state updater
   useEffect(() => {
@@ -218,9 +220,40 @@ export default function LiveRoomPage() {
     pc.addTransceiver("video", { direction: "recvonly" });
     pc.addTransceiver("audio", { direction: "recvonly" });
 
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        console.warn("Student WHEP connection disconnected/failed, retrying in 2s...");
+        setTimeout(() => {
+          if (studentPcRef.current === pc && classItem && classItem.status === "live") {
+            setupStudentPlayer();
+          }
+        }, 2000);
+      }
+    };
+
     pc.ontrack = (event) => {
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+        let stream = event.streams[0];
+        if (!stream) {
+          let inboundStream = remoteVideoRef.current.srcObject;
+          if (!(inboundStream instanceof MediaStream)) {
+            inboundStream = new MediaStream();
+            remoteVideoRef.current.srcObject = inboundStream;
+          }
+          inboundStream.addTrack(event.track);
+        } else {
+          remoteVideoRef.current.srcObject = stream;
+        }
+
+        // Programmatically play and handle autoplay restrictions
+        remoteVideoRef.current.play().catch(err => {
+          console.warn("Autoplay prevented, muting video to play:", err);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.muted = true;
+            setIsAudioMuted(true);
+            remoteVideoRef.current.play().catch(e => console.error("Play failed even when muted:", e));
+          }
+        });
       }
     };
 
@@ -383,6 +416,10 @@ export default function LiveRoomPage() {
 
   // Teardown student player
   const teardownStudentPlayer = () => {
+    if (whepTimeoutRef.current) {
+      clearTimeout(whepTimeoutRef.current);
+      whepTimeoutRef.current = null;
+    }
     if (hlsPlayerRef.current) {
       hlsPlayerRef.current.destroy();
       hlsPlayerRef.current = null;
@@ -408,7 +445,20 @@ export default function LiveRoomPage() {
         toast.success("Connected to live classroom WebRTC stream.");
         return;
       } catch (err: any) {
-        console.error("WHEP playback failed, falling back to HLS:", err);
+        console.error("WHEP playback failed, scheduling retry:", err);
+        // Schedule retry if room is still live
+        if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
+        whepTimeoutRef.current = setTimeout(() => {
+          if (classItem && classItem.status === "live") {
+            setupStudentPlayer();
+          }
+        }, 3000);
+
+        // Try HLS fallback temporarily
+        if (classItem.playbackUrl) {
+          playHls(classItem.playbackUrl);
+        }
+        return;
       }
     }
 
@@ -428,6 +478,12 @@ export default function LiveRoomPage() {
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // Native support (Safari / iOS)
       video.src = url;
+      video.play().catch(err => {
+        console.warn("HLS autoplay failed, muting:", err);
+        video.muted = true;
+        setIsAudioMuted(true);
+        video.play().catch(e => console.error("Native play failed:", e));
+      });
     } else if (Hls.isSupported()) {
       const hls = new Hls({
         maxMaxBufferLength: 10,
@@ -436,6 +492,14 @@ export default function LiveRoomPage() {
       hlsPlayerRef.current = hls;
       hls.loadSource(url);
       hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(err => {
+          console.warn("HLS build play failed, muting:", err);
+          video.muted = true;
+          setIsAudioMuted(true);
+          video.play().catch(e => console.error("Hls play failed:", e));
+        });
+      });
     } else {
       toast.error("HLS Live streaming is not supported in this browser.");
     }
@@ -486,22 +550,49 @@ export default function LiveRoomPage() {
         await startPreview();
       }
 
+      let whipUrl = classItem.whipUrl;
+      let whepUrl = classItem.whepUrl;
+      let playbackUrl = classItem.playbackUrl;
+      let streamInputId = classItem.streamInputId;
+      let rtmpsUrl = classItem.rtmpsUrl;
+      let streamKey = classItem.streamKey;
+
+      if (!whipUrl) {
+        toast.info("Provisioning real-time WebRTC stream channels...");
+        try {
+          const data = await createStreamLiveInput({
+            title: classItem.title,
+            preferLowLatency: true,
+          });
+          whipUrl = data.whipUrl;
+          whepUrl = data.whepUrl;
+          playbackUrl = data.playbackUrl;
+          streamInputId = data.uid;
+          rtmpsUrl = data.rtmpsUrl;
+          streamKey = data.streamKey;
+        } catch (err) {
+          console.error("Failed to provision live input dynamically:", err);
+        }
+      }
+
       // Update Convex status
       await startNativeLiveClass({
         liveClassId: id as any,
-        rtmpsUrl: classItem.rtmpsUrl || "",
-        streamKey: classItem.streamKey || "",
+        rtmpsUrl: rtmpsUrl || "",
+        streamKey: streamKey || "",
         srtUrl: classItem.srtUrl || "",
         srtStreamId: classItem.srtStreamId || "",
         srtPassphrase: classItem.srtPassphrase || "",
-        playbackUrl: classItem.playbackUrl || "",
-        streamInputId: classItem.streamInputId || `mock_${id}`,
+        playbackUrl: playbackUrl || "",
+        streamInputId: streamInputId || `mock_${id}`,
+        whipUrl,
+        whepUrl,
       });
 
-      if (classItem.whipUrl && localStreamRef.current) {
-        await publishWhip(localStreamRef.current, classItem.whipUrl);
+      if (whipUrl && localStreamRef.current) {
+        await publishWhip(localStreamRef.current, whipUrl);
         toast.success("Stream published successfully to Cloudflare via WebRTC!");
-      } else if (classItem.rtmpsUrl && classItem.streamKey) {
+      } else if (rtmpsUrl && streamKey) {
         toast.success("Class is live. Start sending video from OBS to Cloudflare.");
       } else {
         toast.success("Class is live in classroom fallback mode.");
@@ -559,49 +650,106 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Share Screen (Teacher)
+  // Share Screen (Teacher only)
   const toggleScreenShare = async () => {
     try {
       if (isScreenSharing) {
         // Switch back to webcam
         setIsScreenSharing(false);
-        await startPreview();
-        if (isBroadcasting && classItem?.whipUrl && localStreamRef.current) {
-          await publishWhip(localStreamRef.current, classItem.whipUrl);
-          toast.info("Switched stream back to webcam feed.");
-        } else if (isBroadcasting) {
-          toast.info("Streaming switched to webcam feed. Restart broadcasting.");
-          handleEndStream();
+
+        // 1. Get new webcam video stream
+        const constraints = {
+          video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
+          audio: false, // We keep the existing audio track running on the PC!
+        };
+        const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const cameraVideoTrack = cameraStream.getVideoTracks()[0];
+
+        // 2. Replace track on video sender
+        if (whipPcRef.current) {
+          const videoSender = whipPcRef.current.getSenders().find(s => s.track?.kind === "video");
+          if (videoSender) {
+            await videoSender.replaceTrack(cameraVideoTrack);
+          }
         }
+
+        // 3. Update local stream ref video track
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(t => {
+            t.stop();
+            localStreamRef.current?.removeTrack(t);
+          });
+          localStreamRef.current.addTrack(cameraVideoTrack);
+        }
+
+        // 4. Update local video preview
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+
+        toast.info("Switched stream back to webcam feed.");
       } else {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        // Switch to screen share
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenVideoTrack = screenStream.getVideoTracks()[0];
         setIsScreenSharing(true);
 
+        // 1. Replace track on video sender
+        if (whipPcRef.current) {
+          const videoSender = whipPcRef.current.getSenders().find(s => s.track?.kind === "video");
+          if (videoSender) {
+            await videoSender.replaceTrack(screenVideoTrack);
+          }
+        }
+
+        // 2. Update local stream ref video track
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(t => {
+            t.stop();
+            localStreamRef.current?.removeTrack(t);
+          });
+          localStreamRef.current.addTrack(screenVideoTrack);
+        }
+
+        // 3. Update local video preview
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+          localVideoRef.current.srcObject = screenStream;
         }
 
         // Handle stop sharing clicked inside browser
-        stream.getVideoTracks()[0].onended = async () => {
+        screenVideoTrack.onended = async () => {
           setIsScreenSharing(false);
-          await startPreview();
-          if (isBroadcasting && classItem?.whipUrl && localStreamRef.current) {
-            await publishWhip(localStreamRef.current, classItem.whipUrl);
-            toast.info("Switched stream back to webcam feed.");
+
+          const constraints = {
+            video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
+            audio: false,
+          };
+          const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+          const cameraVideoTrack = cameraStream.getVideoTracks()[0];
+
+          if (whipPcRef.current) {
+            const videoSender = whipPcRef.current.getSenders().find(s => s.track?.kind === "video");
+            if (videoSender) {
+              await videoSender.replaceTrack(cameraVideoTrack);
+            }
           }
+
+          if (localStreamRef.current) {
+            localStreamRef.current.getVideoTracks().forEach(t => {
+              t.stop();
+              localStreamRef.current?.removeTrack(t);
+            });
+            localStreamRef.current.addTrack(cameraVideoTrack);
+          }
+
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+          }
+
+          toast.info("Switched stream back to webcam feed.");
         };
 
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((track) => track.stop());
-        }
-        localStreamRef.current = stream;
-        
-        if (isBroadcasting && classItem?.whipUrl) {
-          await publishWhip(stream, classItem.whipUrl);
-          toast.success("Screen sharing stream published.");
-        } else if (isBroadcasting) {
-          toast.success("Screen sharing stream ready.");
-        }
+        toast.success("Screen sharing stream published.");
       }
     } catch (err: any) {
       toast.error(`Screen share failed: ${err.message}`);
@@ -722,7 +870,7 @@ export default function LiveRoomPage() {
         <section className="flex-1 flex flex-col bg-zinc-950 p-4 md:p-6 overflow-hidden justify-center items-center relative">
           
           {/* Top-Left Floating Room Info Badge */}
-          <div className="absolute top-6 left-6 z-20 flex items-center gap-3">
+          <div className="absolute top-8 left-8 z-20 flex items-center gap-3">
             <div className="text-xs font-semibold text-white/90 tracking-wide px-3.5 py-2 rounded-full bg-zinc-900/80 backdrop-blur border border-zinc-800 flex items-center gap-2 shadow-lg">
               <span className="text-zinc-200">{timeStr}</span>
               <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
@@ -740,14 +888,10 @@ export default function LiveRoomPage() {
           </div>
 
           {/* Top-Right Floating Status Badges */}
-          <div className="absolute top-6 right-6 z-20 flex items-center gap-2.5">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/20 text-red-200 text-xs font-semibold shadow-lg backdrop-blur border border-red-500/35">
+          <div className="absolute top-8 right-8 z-20 flex items-center gap-2.5">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-red-500/20 text-red-200 text-xs font-semibold shadow-lg backdrop-blur border border-red-500/35">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               Transcribing
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/20 text-sky-200 text-xs font-semibold shadow-lg backdrop-blur border border-sky-500/35">
-              <Sparkles className="w-3.5 h-3.5 text-sky-450" />
-              Gemini is taking notes
             </div>
           </div>
 
