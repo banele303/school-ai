@@ -16,6 +16,24 @@ export const getVideos = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const user = await ctx.db.get(userId);
+    if (!user) return [];
+
+    let allowedSubjectIds: Set<string> | null = null;
+    if (user.role === "student") {
+      if (!user.studentClass) return [];
+      const studentClass = await ctx.db.get(user.studentClass);
+      if (!studentClass) return [];
+      allowedSubjectIds = new Set(studentClass.subjects);
+    } else if (user.role === "parent") {
+      if (!user.linkedStudent) return [];
+      const student = await ctx.db.get(user.linkedStudent);
+      if (!student || !student.studentClass) return [];
+      const studentClass = await ctx.db.get(student.studentClass);
+      if (!studentClass) return [];
+      allowedSubjectIds = new Set(studentClass.subjects);
+    }
+
     let videos;
 
     if (args.playlist) {
@@ -39,6 +57,11 @@ export const getVideos = query({
         .query("videoLibrary")
         .withIndex("by_published", (q) => q.eq("isPublished", true))
         .collect();
+    }
+
+    // Apply class subjects restriction for students/parents
+    if (allowedSubjectIds !== null) {
+      videos = videos.filter((v) => allowedSubjectIds!.has(v.subject));
     }
 
     // Apply additional filters
@@ -272,6 +295,11 @@ export const getMyProgress = query({
     const user = await ctx.db.get(userId);
     if (user?.role !== "student") return [];
 
+    if (!user.studentClass) return [];
+    const studentClass = await ctx.db.get(user.studentClass);
+    if (!studentClass) return [];
+    const allowedSubjectIds = new Set(studentClass.subjects);
+
     const progressRecords = await ctx.db
       .query("videoProgress")
       .withIndex("by_student", (q) => q.eq("student", userId))
@@ -291,7 +319,8 @@ export const getMyProgress = query({
       })
     );
 
-    return enriched;
+    // Filter out videos not for their class
+    return enriched.filter((item) => item.subject && allowedSubjectIds.has(item.subject));
   },
 });
 
@@ -303,10 +332,33 @@ export const getPlaylist = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const videos = await ctx.db
+    const user = await ctx.db.get(userId);
+    if (!user) return [];
+
+    let allowedSubjectIds: Set<string> | null = null;
+    if (user.role === "student") {
+      if (!user.studentClass) return [];
+      const studentClass = await ctx.db.get(user.studentClass);
+      if (!studentClass) return [];
+      allowedSubjectIds = new Set(studentClass.subjects);
+    } else if (user.role === "parent") {
+      if (!user.linkedStudent) return [];
+      const student = await ctx.db.get(user.linkedStudent);
+      if (!student || !student.studentClass) return [];
+      const studentClass = await ctx.db.get(student.studentClass);
+      if (!studentClass) return [];
+      allowedSubjectIds = new Set(studentClass.subjects);
+    }
+
+    let videos = await ctx.db
       .query("videoLibrary")
       .withIndex("by_playlist", (q) => q.eq("playlist", args.playlistName))
       .collect();
+
+    // Apply class subjects restriction for students/parents
+    if (allowedSubjectIds !== null) {
+      videos = videos.filter((v) => allowedSubjectIds!.has(v.subject));
+    }
 
     videos.sort((a, b) => (a.playlistOrder ?? 0) - (b.playlistOrder ?? 0));
     return videos;

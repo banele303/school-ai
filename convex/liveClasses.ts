@@ -442,14 +442,17 @@ async function userPreferences_grade(
 }
 
 export const getLiveChatMessages = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const messages = await ctx.db
       .query("liveClassChatMessages")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     messages.sort((a, b) => a.createdAt - b.createdAt);
@@ -489,14 +492,17 @@ export const sendLiveChatMessage = mutation({
 });
 
 export const getRaisedHands = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const hands = await ctx.db
       .query("liveClassRaisedHands")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     hands.sort((a, b) => a.raisedAt - b.raisedAt);
@@ -680,15 +686,18 @@ export const sendReaction = mutation({
 });
 
 export const getRecentReactions = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const now = Date.now();
     const reactions = await ctx.db
       .query("liveClassReactions")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     // Only return reactions from the last 10 seconds
@@ -704,15 +713,18 @@ export const getRecentReactions = query({
 // ─── WAITING ROOM / APPROVALS ────────────────────────────────────────────────
 
 export const getApprovalStatus = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return null;
+
     const approval = await ctx.db
       .query("liveClassApprovals")
       .withIndex("by_student_class", (q) =>
-        q.eq("student", userId).eq("liveClass", args.liveClassId)
+        q.eq("student", userId).eq("liveClass", liveClassId)
       )
       .first();
 
@@ -721,13 +733,16 @@ export const getApprovalStatus = query({
 });
 
 export const getPendingApprovals = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const user = await ctx.db.get(userId);
-    const liveClass = await ctx.db.get(args.liveClassId);
+    const liveClass = await ctx.db.get(liveClassId);
     if (!liveClass) return [];
 
     // Only teachers/admins can see pending approvals
@@ -737,7 +752,7 @@ export const getPendingApprovals = query({
 
     const approvals = await ctx.db
       .query("liveClassApprovals")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .filter((q) => q.eq(q.field("status"), "pending"))
       .collect();
 
@@ -819,14 +834,17 @@ export const approveStudent = mutation({
 });
 
 export const getReactionStats = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+
     const reactions = await ctx.db
       .query("liveClassReactions")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     const counts: Record<string, number> = { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
@@ -840,14 +858,17 @@ export const getReactionStats = query({
 });
 
 export const getLiveClassParticipants = query({
-  args: { liveClassId: v.id("liveClasses") },
+  args: { liveClassId: v.string() },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) return [];
+
     const attendance = await ctx.db
       .query("liveClassAttendance")
-      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .withIndex("by_class", (q) => q.eq("liveClass", liveClassId))
       .collect();
 
     const participants = [];

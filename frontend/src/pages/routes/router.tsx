@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router";
+import RouteErrorBoundary from "@/components/RouteErrorBoundary";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import About from "@/pages/About";
@@ -52,14 +53,15 @@ import WhiteboardList from "@/pages/whiteboard/WhiteboardList";
 import WhiteboardPage from "@/pages/whiteboard/WhiteboardPage";
 
 export const router = createBrowserRouter([
-  { path: "/", element: <Home /> },
-  { path: "login", element: <Login /> },
-  { path: "about", element: <About /> },
-  { path: "contact", element: <Contact /> },
-  { path: "pricing", element: <Pricing /> },
-  { path: "faq", element: <FAQ /> },
+  { path: "/", element: <Home />, errorElement: <RouteErrorBoundary /> },
+  { path: "login", element: <Login />, errorElement: <RouteErrorBoundary /> },
+  { path: "about", element: <About />, errorElement: <RouteErrorBoundary /> },
+  { path: "contact", element: <Contact />, errorElement: <RouteErrorBoundary /> },
+  { path: "pricing", element: <Pricing />, errorElement: <RouteErrorBoundary /> },
+  { path: "faq", element: <FAQ />, errorElement: <RouteErrorBoundary /> },
   {
     element: <PrivateRoutes />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "dashboard", element: <Dashboard /> },
       { path: "activities-log", element: <Dashboard /> },
