@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/hooks/AuthProvider";
 
 import { Button } from "@/components/ui/button";
 import Search from "@/components/global/Search";
@@ -12,7 +13,9 @@ import { SubjectTable } from "@/components/subjects/SubjectTable";
 import { SubjectForm } from "@/components/subjects/SubjectForm";
 
 export const Subjects = () => {
-  const convexSubjects = useQuery(api.subjects.getSubjects);
+  const { user } = useAuth();
+  const isAuthorized = user?.role === "admin" || user?.role === "teacher";
+  const convexSubjects = useQuery(api.subjects.getSubjects, isAuthorized ? {} : "skip");
   
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -71,6 +74,15 @@ export const Subjects = () => {
       setDeleteId(null);
     }
   };
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950">
+        <p className="text-muted-foreground text-lg font-medium">Access Denied: You do not have permission to view this page.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">

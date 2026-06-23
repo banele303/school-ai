@@ -50,6 +50,18 @@ export default function LiveRoomPage() {
   const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, id ? { liveClassId: id as any } : "skip") || [];
   const requestJoin = useMutation(api.liveClasses.requestJoinClass);
   const approveStudentMutation = useMutation(api.liveClasses.approveStudent);
+  
+  const joinLiveClassMutation = useMutation(api.liveClasses.joinLiveClass);
+  const leaveLiveClassMutation = useMutation(api.liveClasses.leaveLiveClass);
+  const evictStudentMutation = useMutation(api.liveClasses.evictStudent);
+  const toggleMuteStudentMutation = useMutation(api.liveClasses.toggleMuteStudent);
+  const toggleBlockCameraStudentMutation = useMutation(api.liveClasses.toggleBlockCameraStudent);
+  // @ts-ignore
+  const participants = useQuery(api.liveClasses.getLiveClassParticipants, id ? { liveClassId: id as any } : "skip") || [];
+
+  const myParticipantRecord = participants.find((p: any) => p.studentId === user?._id);
+  const myMuteStatus = myParticipantRecord?.isMuted ?? false;
+  const myBlockCameraStatus = myParticipantRecord?.isCameraBlocked ?? false;
 
   // States
   const [activeTab, setActiveTab] = useState<"chat" | "interactions" | "waiting">("chat");
@@ -101,6 +113,23 @@ export default function LiveRoomPage() {
       console.warn("AudioContext failed to load", e);
     }
   };
+
+  // Mark student attendance when in live room and clean up on exit/unload
+  useEffect(() => {
+    if (user?.role === "student" && classItem?.status && classItem?.status !== "ended" && classItem?.status !== "cancelled" && approvalStatus?.status === "approved") {
+      joinLiveClassMutation({ liveClassId: id as any }).catch(console.error);
+
+      const handleUnload = () => {
+        leaveLiveClassMutation({ liveClassId: id as any }).catch(console.error);
+      };
+      window.addEventListener("beforeunload", handleUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", handleUnload);
+        leaveLiveClassMutation({ liveClassId: id as any }).catch(console.error);
+      };
+    }
+  }, [user?.role, classItem?.status, approvalStatus?.status, id]);
 
   // Detect new raised hands (for creator teacher)
   useEffect(() => {
@@ -550,6 +579,24 @@ export default function LiveRoomPage() {
           
           <div className="w-full max-w-4xl aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-900 relative shadow-2xl group">
             
+            {/* Muted or Camera Blocked Alert overlay */}
+            {(myMuteStatus || myBlockCameraStatus) && (
+              <div className="absolute top-4 left-4 flex flex-col gap-2 z-35 pointer-events-none max-w-xs md:max-w-sm">
+                {myMuteStatus && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-650/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
+                    <MicOff className="h-3.5 w-3.5" />
+                    <span>Microphone muted by teacher</span>
+                  </div>
+                )}
+                {myBlockCameraStatus && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-650/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
+                    <VideoOff className="h-3.5 w-3.5" />
+                    <span>Camera blocked by teacher</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Emojis Floating Overlay */}
             <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
               {floatingEmojis.map((emoji) => (
@@ -794,21 +841,6 @@ export default function LiveRoomPage() {
                   <Users className="h-3.5 w-3.5" />
                   {raisedHands.length} raised hands
                 </span>
-                
-                {!isCreator && (
-                  <Button
-                    onClick={handleRaiseHand}
-                    className={cn(
-                      "gap-2 font-semibold transition-all duration-300 shadow-md px-6 rounded-full hover:scale-105 active:scale-95 text-xs h-9",
-                      myHandRaised
-                        ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 animate-pulse ring-4 ring-amber-500/20"
-                        : "bg-slate-800 hover:bg-slate-700 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700"
-                    )}
-                  >
-                    <Hand className="h-4 w-4" />
-                    {myHandRaised ? "Lower Hand" : "Raise Hand"}
-                  </Button>
-                )}
               </div>
             </div>
           )}
@@ -934,6 +966,36 @@ export default function LiveRoomPage() {
             {activeTab === "interactions" && (
               <div className="flex-1 overflow-y-auto p-4 flex flex-col h-full">
                 
+                {/* Modern Student Hand Raising Card */}
+                {!isCreator && (
+                  <div className="mb-5 p-4 rounded-2xl border bg-gradient-to-br from-zinc-50 to-white dark:from-zinc-900/60 dark:to-zinc-950 border-zinc-200 dark:border-zinc-800/80 shadow-md">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                          {myHandRaised ? "Hand Raised" : "Have a Question?"}
+                        </h4>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                          {myHandRaised 
+                            ? "The teacher has been notified. You are in the queue." 
+                            : "Raise your hand to let the teacher know you'd like to ask a question."}
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleRaiseHand}
+                        className={cn(
+                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg shrink-0",
+                          myHandRaised
+                            ? "bg-amber-500 hover:bg-amber-600 text-zinc-950 animate-bounce ring-4 ring-amber-500/30"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105 active:scale-95"
+                        )}
+                        title={myHandRaised ? "Lower Hand" : "Raise Hand"}
+                      >
+                        <Hand className={cn("h-5 w-5", myHandRaised ? "animate-pulse" : "")} />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Raised hands queue */}
                 <div className="mb-6 flex-1">
                   <div className="flex items-center justify-between mb-3">
@@ -1020,6 +1082,85 @@ export default function LiveRoomPage() {
                   </div>
                 </div>
 
+                {/* Class Participants Section */}
+                <div className="mb-6">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-3 dark:text-zinc-400">
+                    <Users className="h-3.5 w-3.5" />
+                    Students in Class ({participants.length})
+                  </h3>
+                  {participants.length === 0 ? (
+                    <p className="text-xs text-slate-400 dark:text-zinc-550 italic">No students in class yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {participants.map((p: any) => (
+                        <div key={p.studentId} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800/80">
+                          <span className="text-xs font-medium text-slate-700 dark:text-zinc-300 truncate max-w-[110px]" title={p.name}>{p.name}</span>
+                          
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isCreator ? (
+                              <>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className={cn("h-7 w-7 rounded-lg", p.isMuted ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800")}
+                                  onClick={async () => {
+                                    try {
+                                      const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                      toast.success(res.isMuted ? `${p.name} muted.` : `${p.name} unmuted.`);
+                                    } catch (err: any) {
+                                      toast.error(err.message || "Failed to toggle mute.");
+                                    }
+                                  }}
+                                  title={p.isMuted ? "Unmute Student" : "Mute Student"}
+                                >
+                                  {p.isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className={cn("h-7 w-7 rounded-lg", p.isCameraBlocked ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800")}
+                                  onClick={async () => {
+                                    try {
+                                      const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                      toast.success(res.isCameraBlocked ? `${p.name} camera blocked.` : `${p.name} camera unblocked.`);
+                                    } catch (err: any) {
+                                      toast.error(err.message || "Failed to toggle camera block.");
+                                    }
+                                  }}
+                                  title={p.isCameraBlocked ? "Unblock Camera" : "Block Camera"}
+                                >
+                                  {p.isCameraBlocked ? <VideoOff className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg"
+                                  onClick={async () => {
+                                    try {
+                                      await evictStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                      toast.success(`${p.name} evicted from class.`);
+                                    } catch (err: any) {
+                                      toast.error(err.message || "Failed to evict student.");
+                                    }
+                                  }}
+                                  title="Evict Student"
+                                >
+                                  <PhoneOff className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-1.5 px-1">
+                                {p.isMuted && <MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Muted" />}
+                                {p.isCameraBlocked && <VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Camera Blocked" />}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Additional classroom metrics */}
                 <div className="mt-auto border-t border-slate-200 pt-4 shrink-0 dark:border-zinc-900">
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 dark:bg-zinc-900/40 dark:border-zinc-900">
@@ -1028,6 +1169,10 @@ export default function LiveRoomPage() {
                       <Badge className={cn("text-[9px] py-0 font-semibold uppercase leading-none h-4", classItem.status === "live" ? "bg-red-500 text-white" : "bg-zinc-800 text-zinc-400")}>
                         {classItem.status}
                       </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
+                      <span>Students in Class</span>
+                      <span className="font-semibold text-slate-800 dark:text-zinc-200">{participants.length} students</span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                       <span>Active Interactions</span>
@@ -1090,7 +1235,7 @@ export default function LiveRoomPage() {
         </aside>
       </main>
 
-      <InviteDialog open={showInvite} onClose={() => setShowInvite(false)} liveClass={classItem} />
+      {isTeacher && <InviteDialog open={showInvite} onClose={() => setShowInvite(false)} liveClass={classItem} />}
     </div>
   );
 }

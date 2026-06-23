@@ -9,7 +9,6 @@ import {
   Banknote,
   Megaphone,
   BookOpen,
-  MessageCircle,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -153,11 +152,11 @@ export const sidebardata = {
       title: "System",
       url: "#",
       icon: Settings2,
-      roles: ["admin"],
+      roles: ["admin", "teacher", "student", "parent"],
       items: [
-        { title: "School Settings", url: "/settings/general" },
-        { title: "Academic Years", url: "/settings/academic-years" },
-        { title: "Roles & Permissions", url: "/settings/roles" },
+        { title: "School Settings", url: "/settings/general", roles: ["admin"] },
+        { title: "Academic Years", url: "/settings/academic-years", roles: ["admin"] },
+        { title: "Roles & Permissions", url: "/settings/roles", roles: ["admin"] },
         { title: "Manage Resources", url: "/admin/resources", roles: ["admin"] },
         { title: "My Profile", url: "/profile", roles: ["admin", "teacher", "student", "parent"] },
       ],
@@ -222,14 +221,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <div className="px-3 py-2">
         <Button
           className={cn(
-            "w-full gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-lg transition-all duration-300",
-            isCollapsed ? "h-10 w-10 p-0 justify-center" : "h-11"
+            "w-full gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-lg transition-all duration-300 rounded-full",
+            isCollapsed ? "h-10 w-10 p-0 justify-center rounded-full" : "h-11"
           )}
           onClick={() => navigate("/study-buddy")}
           title="AI Study Chat"
         >
-          <MessageCircle className={cn("h-5 w-5", isCollapsed ? "" : "shrink-0")} />
-          {!isCollapsed && <span>AI Study Chat</span>}
+          {!isCollapsed ? (
+            <span>AI Study Chat</span>
+          ) : (
+            <span className="text-[11px] font-bold tracking-tight">AI</span>
+          )}
         </Button>
       </div>
       <SidebarContent>

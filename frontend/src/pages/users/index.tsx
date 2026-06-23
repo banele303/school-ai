@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/hooks/AuthProvider";
 import UserTable from "@/components/users/UserTable";
 import UserDialog from "@/components/users/UserDialog";
 
@@ -22,7 +23,9 @@ export default function UserManagementPage({
   title,
   description,
 }: Props) {
-  const convexUsers = useQuery(api.users.getUsers, { role });
+  const { user } = useAuth();
+  const isAuthorized = user?.role === "admin" || user?.role === "teacher";
+  const convexUsers = useQuery(api.users.getUsers, isAuthorized ? { role } : "skip");
   const deleteConvexUser = useMutation(api.users.deleteUser);
   
   const [search, setSearch] = useState("");
@@ -74,6 +77,13 @@ export default function UserManagementPage({
       setDeleteId(null);
     }
   };
+  if (!isAuthorized) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950">
+        <p className="text-muted-foreground text-lg font-medium">Access Denied: You do not have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

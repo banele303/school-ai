@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { useAuth } from "@/hooks/AuthProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,12 +29,20 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function BadgesPage() {
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher" || user?.role === "admin";
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [isAwarding, setIsAwarding] = useState(false);
 
-  const students = useQuery(api.users.getUsers, { role: "student" });
+  useEffect(() => {
+    if (user && user.role !== "teacher" && user.role !== "admin") {
+      setSelectedStudentId(user._id);
+    }
+  }, [user]);
+
+  const students = useQuery(api.users.getUsers, isTeacher ? { role: "student" } : "skip");
   const badges = useQuery(api.badges.getMyBadges,
     selectedStudentId && selectedStudentId !== "all" ? { studentId: selectedStudentId as any } : {}
   );
@@ -62,66 +71,72 @@ export default function BadgesPage() {
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Achievement Badges</h1>
-          <p className="text-muted-foreground">Recognise and reward outstanding students.</p>
+          <p className="text-muted-foreground">
+            {isTeacher ? "Recognise and reward outstanding students." : "View your achievement badges and progress."}
+          </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Award className="mr-2 h-4 w-4" /> Award Badge</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> Award a Badge</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Select Student</Label>
-                <Select value={selectedStudentId === "all" ? "" : selectedStudentId} onValueChange={setSelectedStudentId}>
-                  <SelectTrigger><SelectValue placeholder="Choose a student..." /></SelectTrigger>
-                  <SelectContent>
-                    {students?.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Select Badge</Label>
-                <div className="grid grid-cols-1 gap-2">
-                  {BADGE_PRESETS.map((p, i) => (
-                    <button
-                      key={i}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
-                        selectedPreset === i ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/60"
-                      )}
-                      onClick={() => setSelectedPreset(i)}
-                    >
-                      <span className="text-2xl">{p.icon}</span>
-                      <div>
-                        <p className="text-sm font-medium">{p.title}</p>
-                        <p className="text-xs text-muted-foreground">{p.description}</p>
-                      </div>
-                    </button>
-                  ))}
+        {isTeacher && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Award className="mr-2 h-4 w-4" /> Award Badge</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> Award a Badge</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Select Student</Label>
+                  <Select value={selectedStudentId === "all" ? "" : selectedStudentId} onValueChange={setSelectedStudentId}>
+                    <SelectTrigger><SelectValue placeholder="Choose a student..." /></SelectTrigger>
+                    <SelectContent>
+                      {students?.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Select Badge</Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {BADGE_PRESETS.map((p, i) => (
+                      <button
+                        key={i}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
+                          selectedPreset === i ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/60"
+                        )}
+                        onClick={() => setSelectedPreset(i)}
+                      >
+                        <span className="text-2xl">{p.icon}</span>
+                        <div>
+                          <p className="text-sm font-medium">{p.title}</p>
+                          <p className="text-xs text-muted-foreground">{p.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button className="w-full" onClick={handleAward} disabled={isAwarding || !selectedStudentId || selectedStudentId === "all" || selectedPreset === null}>
+                  {isAwarding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Award Badge
+                </Button>
               </div>
-              <Button className="w-full" onClick={handleAward} disabled={isAwarding || !selectedStudentId || selectedStudentId === "all" || selectedPreset === null}>
-                {isAwarding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Award Badge
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Student filter */}
-      <div className="flex items-center gap-3">
-        <Select value={selectedStudentId || "all"} onValueChange={setSelectedStudentId}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Filter by student..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Badges</SelectItem>
-            {students?.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {selectedStudentName && <span className="text-sm text-muted-foreground">Showing badges for <strong>{selectedStudentName}</strong></span>}
-      </div>
+      {isTeacher && (
+        <div className="flex items-center gap-3">
+          <Select value={selectedStudentId || "all"} onValueChange={setSelectedStudentId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Filter by student..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Badges</SelectItem>
+              {students?.map((s) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {selectedStudentName && <span className="text-sm text-muted-foreground">Showing badges for <strong>{selectedStudentName}</strong></span>}
+        </div>
+      )}
 
       {/* Badge grid */}
       {badges === undefined ? (
@@ -130,7 +145,11 @@ export default function BadgesPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
             <Award className="h-10 w-10 opacity-30" />
-            <p>No badges awarded yet. Recognise a student's achievement!</p>
+            <p>
+              {isTeacher
+                ? "No badges awarded yet. Recognise a student's achievement!"
+                : "No badges earned yet. Keep learning to earn badges!"}
+            </p>
           </CardContent>
         </Card>
       ) : (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/hooks/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2, Printer, FileText, Sparkles } from "lucide-react";
@@ -8,13 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 
 export default function ReportCardGenerator() {
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher" || user?.role === "admin";
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportReady, setReportReady] = useState(false);
 
   // In a full implementation, we'd fetch actual students for the teacher/admin
   // For demo purposes, we fetch all students
-  const students = useQuery(api.users.getUsers, { role: "student" });
+  const students = useQuery(api.users.getUsers, isTeacher ? { role: "student" } : "skip");
   
   const handleGenerate = async () => {
     if (!selectedStudent) {
@@ -38,6 +41,14 @@ export default function ReportCardGenerator() {
   const handlePrint = () => {
     window.print();
   };
+
+  if (!isTeacher) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950">
+        <p className="text-muted-foreground text-lg font-medium">Access Denied: You do not have permission to view this page.</p>
+      </div>
+    );
+  }
 
   if (students === undefined) {
     return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;

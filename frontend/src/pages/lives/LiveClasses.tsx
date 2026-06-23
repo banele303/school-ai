@@ -277,7 +277,7 @@ export default function LiveClassesPage() {
         </section>
 
         <aside className="space-y-4">
-          <TeacherToolbox isTeacher={isTeacher} onCreate={() => setShowCreateDialog(true)} onMarker={() => navigate("/ai/marking")} />
+          {isTeacher && <TeacherToolbox isTeacher={isTeacher} onCreate={() => setShowCreateDialog(true)} onMarker={() => navigate("/ai/marking")} />}
           <SelfLearningPanel />
         </aside>
       </main>
@@ -295,7 +295,7 @@ export default function LiveClassesPage() {
         onClose={() => setShowStudio(false)}
         onStatus={changeStatus}
       />
-      <InviteDialog open={!!inviteClass} onClose={() => setInviteClass(null)} liveClass={inviteClass} />
+      {isTeacher && <InviteDialog open={!!inviteClass} onClose={() => setInviteClass(null)} liveClass={inviteClass} />}
     </div>
   );
 }
