@@ -1068,7 +1068,7 @@ export default function LiveRoomPage() {
                        ? classItem.recordingUrl 
                        : classItem.recordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
                      className="w-full h-full aspect-video border-0"
-                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; unload;"
                      allowFullScreen
                    />
                 ) : (

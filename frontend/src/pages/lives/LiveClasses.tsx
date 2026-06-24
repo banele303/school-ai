@@ -794,7 +794,7 @@ function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
           <div className="overflow-hidden rounded-xl bg-black aspect-video w-full flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
             {playbackUrl ? (
               playbackUrl.includes("iframe.videodelivery.net") ? (
-                <iframe title={lesson.title} src={playbackUrl} className="w-full h-full aspect-video" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen />
+                <iframe title={lesson.title} src={playbackUrl} className="w-full h-full aspect-video" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; unload;" allowFullScreen />
               ) : (
                 <video src={playbackUrl} controls className="w-full h-full object-contain" />
               )
