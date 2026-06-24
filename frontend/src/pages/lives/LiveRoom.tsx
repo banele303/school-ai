@@ -282,8 +282,15 @@ export default function LiveRoomPage() {
             inboundStream = new MediaStream();
           }
           inboundStream.addTrack(event.track);
-          remoteVideoRef.current.srcObject = inboundStream;
+          stream = inboundStream;
+        }
+
+        // Force browser rendering pipeline refresh to register newly added tracks
+        const currentSrcObject = remoteVideoRef.current.srcObject;
+        if (currentSrcObject !== stream) {
+          remoteVideoRef.current.srcObject = stream;
         } else {
+          remoteVideoRef.current.srcObject = null;
           remoteVideoRef.current.srcObject = stream;
         }
 
@@ -1038,7 +1045,10 @@ export default function LiveRoomPage() {
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover transform scale-x-[-1]"
+                  className={cn(
+                    "w-full h-full object-cover transform",
+                    !isScreenSharing && "scale-x-[-1]"
+                  )}
                 />
                 
                 {/* Local status labels */}
