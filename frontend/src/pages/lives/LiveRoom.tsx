@@ -194,6 +194,20 @@ export default function LiveRoomPage() {
       pc.addTrack(track, stream);
     });
 
+    // Prefer H.264 codec for video publishing
+    const videoTransceiver = pc.getTransceivers().find(t => t.sender.track?.kind === 'video');
+    if (videoTransceiver && typeof RTCRtpSender.getCapabilities === 'function') {
+      const capabilities = RTCRtpSender.getCapabilities('video');
+      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
+      if (h264Codecs && h264Codecs.length > 0) {
+        try {
+          videoTransceiver.setCodecPreferences(h264Codecs);
+        } catch (e) {
+          console.warn("Failed to set publish H.264 preferences:", e);
+        }
+      }
+    }
+
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
@@ -209,7 +223,7 @@ export default function LiveRoomPage() {
           }
         };
         pc.addEventListener("icegatheringstatechange", check);
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 2000);
       }
     });
 
@@ -261,6 +275,20 @@ export default function LiveRoomPage() {
 
     pc.addTransceiver("video", { direction: "recvonly" });
     pc.addTransceiver("audio", { direction: "recvonly" });
+
+    // Prefer H.264 codec for video subscribing
+    const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
+    if (videoTransceiver && typeof RTCRtpReceiver.getCapabilities === 'function') {
+      const capabilities = RTCRtpReceiver.getCapabilities('video');
+      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
+      if (h264Codecs && h264Codecs.length > 0) {
+        try {
+          videoTransceiver.setCodecPreferences(h264Codecs);
+        } catch (e) {
+          console.warn("Failed to set WHEP H.264 preferences:", e);
+        }
+      }
+    }
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
@@ -320,7 +348,7 @@ export default function LiveRoomPage() {
           }
         };
         pc.addEventListener("icegatheringstatechange", check);
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 2000);
       }
     });
 
