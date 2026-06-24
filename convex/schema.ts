@@ -552,6 +552,7 @@ export default defineSchema({
     streamVideoUid: v.optional(v.string()),
     playbackUrl: v.optional(v.string()),
     roomId: v.optional(v.string()),
+    lastStreamUpdate: v.optional(v.number()),
     accessMode: v.optional(v.union(
       v.literal("school-only"),
       v.literal("school-and-public"),
