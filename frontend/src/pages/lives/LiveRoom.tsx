@@ -290,8 +290,7 @@ export default function LiveRoomPage() {
         if (currentSrcObject !== stream) {
           remoteVideoRef.current.srcObject = stream;
         } else {
-          remoteVideoRef.current.srcObject = null;
-          remoteVideoRef.current.srcObject = stream;
+          remoteVideoRef.current.load();
         }
 
         // Programmatically play and handle autoplay restrictions
@@ -758,8 +757,15 @@ export default function LiveRoomPage() {
 
         toast.info("Switched stream back to webcam feed.");
       } else {
-        // Switch to screen share
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        // Switch to screen share with compatible resolution and frame rate constraints
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            frameRate: { ideal: 15, max: 30 }
+          },
+          audio: true
+        });
         const screenVideoTrack = screenStream.getVideoTracks()[0];
         const screenAudioTrack = screenStream.getAudioTracks()[0];
         setIsScreenSharing(true);
