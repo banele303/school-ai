@@ -303,6 +303,9 @@ export default function LiveRoomPage() {
 
     pc.ontrack = (event) => {
       if (remoteVideoRef.current) {
+        const isVideoTrack = event.track.kind === "video";
+        const hasExistingSrc = !!remoteVideoRef.current.srcObject;
+
         let stream = event.streams[0];
         if (!stream) {
           let inboundStream = remoteVideoRef.current.srcObject;
@@ -318,8 +321,10 @@ export default function LiveRoomPage() {
         if (currentSrcObject !== stream) {
           remoteVideoRef.current.srcObject = stream;
         } else {
-          // Only load if paused/not playing to prevent interrupting active play requests
-          if (remoteVideoRef.current.paused) {
+          // If a video track is added to an existing stream, force load() to refresh the video element
+          if (isVideoTrack && hasExistingSrc) {
+            remoteVideoRef.current.load();
+          } else if (remoteVideoRef.current.paused) {
             remoteVideoRef.current.load();
           }
         }
@@ -327,11 +332,18 @@ export default function LiveRoomPage() {
         // Programmatically play if not already playing and handle autoplay restrictions
         if (remoteVideoRef.current.paused) {
           remoteVideoRef.current.play().catch(err => {
+            if (err && err.name === "AbortError") {
+              // Silence harmless AbortError caused by load() interrupting active play requests
+              return;
+            }
             console.warn("Autoplay prevented, muting video to play:", err);
             if (remoteVideoRef.current) {
               remoteVideoRef.current.muted = true;
               setIsAudioMuted(true);
-              remoteVideoRef.current.play().catch(e => console.error("Play failed even when muted:", e));
+              remoteVideoRef.current.play().catch(e => {
+                if (e && e.name === "AbortError") return;
+                console.error("Play failed even when muted:", e);
+              });
             }
           });
         }
