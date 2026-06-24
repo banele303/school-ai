@@ -498,7 +498,7 @@ export default function LiveRoomPage() {
       setStreamActive(true);
       const timer = setTimeout(() => {
         setupStudentPlayer();
-      }, 500);
+      }, 1200);
       return () => {
         clearTimeout(timer);
         teardownStudentPlayer();
@@ -763,38 +763,31 @@ export default function LiveRoomPage() {
         const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
         const cameraVideoTrack = cameraStream.getVideoTracks()[0];
 
-        // 2. Replace track on existing session if active, otherwise update stream refs
-        if (isBroadcasting && whipPcRef.current) {
-          const videoSender = whipPcRef.current.getSenders().find(s => s.track?.kind === "video");
-          if (videoSender) {
-            await videoSender.replaceTrack(cameraVideoTrack);
-          } else {
-            await terminateWhipSession();
-            whipPcRef.current.close();
-            whipPcRef.current = null;
-            if (localStreamRef.current) {
-              localStreamRef.current.getVideoTracks().forEach(t => {
-                t.stop();
-                localStreamRef.current?.removeTrack(t);
-              });
-              localStreamRef.current.addTrack(cameraVideoTrack);
-            }
-            await publishWhip(localStreamRef.current, classItem.whipUrl);
-            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
-          }
-        } else {
-          if (localStreamRef.current) {
-            localStreamRef.current.getVideoTracks().forEach(t => {
-              t.stop();
-              localStreamRef.current?.removeTrack(t);
-            });
-            localStreamRef.current.addTrack(cameraVideoTrack);
-          }
+        // 2. Stop old WHIP session (required by Cloudflare Stream to reset SSRC)
+        if (whipPcRef.current) {
+          await terminateWhipSession();
+          whipPcRef.current.close();
+          whipPcRef.current = null;
         }
 
-        // 3. Update local video preview
+        // 3. Update local stream ref video track
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(t => {
+            t.stop();
+            localStreamRef.current?.removeTrack(t);
+          });
+          localStreamRef.current.addTrack(cameraVideoTrack);
+        }
+
+        // 4. Update local video preview
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStreamRef.current;
+        }
+
+        // 5. Publish new stream and update database timestamp (triggers clean student re-subscription)
+        if (isBroadcasting && classItem.whipUrl && localStreamRef.current) {
+          await publishWhip(localStreamRef.current, classItem.whipUrl);
+          await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
         }
 
         toast.info("Switched stream back to webcam feed.");
@@ -812,43 +805,43 @@ export default function LiveRoomPage() {
         const screenAudioTrack = screenStream.getAudioTracks()[0];
         setIsScreenSharing(true);
 
-        // 1. Get existing mic track
+        // 1. Stop old WHIP session (required by Cloudflare Stream to reset SSRC)
+        if (whipPcRef.current) {
+          await terminateWhipSession();
+          whipPcRef.current.close();
+          whipPcRef.current = null;
+        }
+
+        // 2. Get existing mic track
         const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
 
-        // 2. Create a combined stream for fallback publishing
+        // 3. Create a combined stream for publishing
         const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
         if (micAudioTrack) combinedTracks.push(micAudioTrack);
         if (screenAudioTrack) combinedTracks.push(screenAudioTrack);
         const combinedStream = new MediaStream(combinedTracks);
 
-        // 3. Replace track on existing session if active
-        if (isBroadcasting && whipPcRef.current) {
-          const videoSender = whipPcRef.current.getSenders().find(s => s.track?.kind === "video");
-          if (videoSender) {
-            await videoSender.replaceTrack(screenVideoTrack);
-          } else {
-            await terminateWhipSession();
-            whipPcRef.current.close();
-            whipPcRef.current = null;
-            await publishWhip(combinedStream, classItem.whipUrl);
-            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
-          }
-        } else {
-          if (localStreamRef.current) {
-            localStreamRef.current.getVideoTracks().forEach(t => {
-              t.stop();
-              localStreamRef.current?.removeTrack(t);
-            });
-            localStreamRef.current.addTrack(screenVideoTrack);
-          }
+        // 4. Update local stream ref video track
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(t => {
+            t.stop();
+            localStreamRef.current?.removeTrack(t);
+          });
+          localStreamRef.current.addTrack(screenVideoTrack);
         }
 
-        // 4. Update local video preview
+        // 5. Update local video preview
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = screenStream;
         }
 
-        // 5. Handle stop sharing clicked inside browser window share bar
+        // 6. Publish new stream and update database timestamp (triggers clean student re-subscription)
+        if (isBroadcasting && classItem.whipUrl) {
+          await publishWhip(combinedStream, classItem.whipUrl);
+          await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+        }
+
+        // Handle stop sharing clicked inside browser window share bar
         screenVideoTrack.onended = async () => {
           setIsScreenSharing(false);
 
@@ -859,38 +852,27 @@ export default function LiveRoomPage() {
           const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
           const cameraVideoTrack = cameraStream.getVideoTracks()[0];
 
-          if (isBroadcasting && whipPcRef.current) {
-            const videoSender = whipPcRef.current.getSenders().find(s => s.track?.kind === "video");
-            if (videoSender) {
-              await videoSender.replaceTrack(cameraVideoTrack);
-            } else {
-              if (whipPcRef.current) {
-                await terminateWhipSession();
-                whipPcRef.current.close();
-                whipPcRef.current = null;
-              }
-              if (localStreamRef.current) {
-                localStreamRef.current.getVideoTracks().forEach(t => {
-                  t.stop();
-                  localStreamRef.current?.removeTrack(t);
-                });
-                localStreamRef.current.addTrack(cameraVideoTrack);
-              }
-              await publishWhip(localStreamRef.current, classItem.whipUrl);
-              await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
-            }
-          } else {
-            if (localStreamRef.current) {
-              localStreamRef.current.getVideoTracks().forEach(t => {
-                t.stop();
-                localStreamRef.current?.removeTrack(t);
-              });
-              localStreamRef.current.addTrack(cameraVideoTrack);
-            }
+          if (whipPcRef.current) {
+            await terminateWhipSession();
+            whipPcRef.current.close();
+            whipPcRef.current = null;
+          }
+
+          if (localStreamRef.current) {
+            localStreamRef.current.getVideoTracks().forEach(t => {
+              t.stop();
+              localStreamRef.current?.removeTrack(t);
+            });
+            localStreamRef.current.addTrack(cameraVideoTrack);
           }
 
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = localStreamRef.current;
+          }
+
+          if (isBroadcasting && classItem.whipUrl && localStreamRef.current) {
+            await publishWhip(localStreamRef.current, classItem.whipUrl);
+            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
           }
 
           toast.info("Switched stream back to webcam feed.");
