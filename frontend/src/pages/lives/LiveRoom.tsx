@@ -227,7 +227,14 @@ export default function LiveRoomPage() {
 
     const locationHeader = response.headers.get("Location");
     if (locationHeader) {
-      whipResourceUrlRef.current = new URL(locationHeader, whipUrl).href;
+      try {
+        whipResourceUrlRef.current = new URL(locationHeader, whipUrl).href;
+      } catch (e) {
+        console.warn("Failed to parse WHIP Location:", e);
+        if (locationHeader.startsWith("http://") || locationHeader.startsWith("https://")) {
+          whipResourceUrlRef.current = locationHeader;
+        }
+      }
     }
 
     const answerSdp = await response.text();
@@ -273,9 +280,9 @@ export default function LiveRoomPage() {
           let inboundStream = remoteVideoRef.current.srcObject;
           if (!(inboundStream instanceof MediaStream)) {
             inboundStream = new MediaStream();
-            remoteVideoRef.current.srcObject = inboundStream;
           }
           inboundStream.addTrack(event.track);
+          remoteVideoRef.current.srcObject = inboundStream;
         } else {
           remoteVideoRef.current.srcObject = stream;
         }
@@ -325,7 +332,14 @@ export default function LiveRoomPage() {
 
     const locationHeader = response.headers.get("Location");
     if (locationHeader) {
-      whepResourceUrlRef.current = new URL(locationHeader, whepUrl).href;
+      try {
+        whepResourceUrlRef.current = new URL(locationHeader, whepUrl).href;
+      } catch (e) {
+        console.warn("Failed to parse WHEP Location:", e);
+        if (locationHeader.startsWith("http://") || locationHeader.startsWith("https://")) {
+          whepResourceUrlRef.current = locationHeader;
+        }
+      }
     }
 
     const answerSdp = await response.text();
