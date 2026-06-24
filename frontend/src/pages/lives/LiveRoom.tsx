@@ -96,6 +96,8 @@ export default function LiveRoomPage() {
   const whipPcRef = useRef<RTCPeerConnection | null>(null);
   const studentPcRef = useRef<RTCPeerConnection | null>(null);
   const whepTimeoutRef = useRef<any>(null);
+  const whipResourceUrlRef = useRef<string | null>(null);
+  const whepResourceUrlRef = useRef<string | null>(null);
 
   // Clock state updater
   useEffect(() => {
@@ -147,6 +149,32 @@ export default function LiveRoomPage() {
     }
   };
 
+  const terminateWhipSession = async () => {
+    if (whipResourceUrlRef.current) {
+      const url = whipResourceUrlRef.current;
+      whipResourceUrlRef.current = null;
+      try {
+        await fetch(url, { method: "DELETE" }).catch(() => {});
+        console.log("WHIP session terminated cleanly.");
+      } catch (e) {
+        console.warn("Failed to delete WHIP session:", e);
+      }
+    }
+  };
+
+  const terminateWhepSession = async () => {
+    if (whepResourceUrlRef.current) {
+      const url = whepResourceUrlRef.current;
+      whepResourceUrlRef.current = null;
+      try {
+        await fetch(url, { method: "DELETE" }).catch(() => {});
+        console.log("WHEP session terminated cleanly.");
+      } catch (e) {
+        console.warn("Failed to delete WHEP session:", e);
+      }
+    }
+  };
+
   // WebRTC WHIP publisher (Teacher)
   const publishWhip = async (stream: MediaStream, whipUrl: string) => {
     if (whipPcRef.current) {
@@ -195,6 +223,11 @@ export default function LiveRoomPage() {
 
     if (!response.ok) {
       throw new Error(`WHIP publish failed: ${response.statusText}`);
+    }
+
+    const locationHeader = response.headers.get("Location");
+    if (locationHeader) {
+      whipResourceUrlRef.current = new URL(locationHeader, whipUrl).href;
     }
 
     const answerSdp = await response.text();
@@ -288,6 +321,11 @@ export default function LiveRoomPage() {
 
     if (!response.ok) {
       throw new Error(`WHEP playback failed: ${response.statusText}`);
+    }
+
+    const locationHeader = response.headers.get("Location");
+    if (locationHeader) {
+      whepResourceUrlRef.current = new URL(locationHeader, whepUrl).href;
     }
 
     const answerSdp = await response.text();
@@ -418,6 +456,7 @@ export default function LiveRoomPage() {
 
   // Teardown student player
   const teardownStudentPlayer = () => {
+    terminateWhepSession();
     if (whepTimeoutRef.current) {
       clearTimeout(whepTimeoutRef.current);
       whepTimeoutRef.current = null;
@@ -608,6 +647,7 @@ export default function LiveRoomPage() {
   // End Stream (Teacher)
   const handleEndStream = async () => {
     setIsBroadcasting(false);
+    await terminateWhipSession();
     try {
       if (whipPcRef.current) {
         whipPcRef.current.close();
@@ -670,6 +710,7 @@ export default function LiveRoomPage() {
 
         // 2. Stop old WHIP session
         if (whipPcRef.current) {
+          await terminateWhipSession();
           whipPcRef.current.close();
           whipPcRef.current = null;
         }
@@ -704,6 +745,7 @@ export default function LiveRoomPage() {
 
         // 1. Stop old WHIP session
         if (whipPcRef.current) {
+          await terminateWhipSession();
           whipPcRef.current.close();
           whipPcRef.current = null;
         }
@@ -749,6 +791,7 @@ export default function LiveRoomPage() {
           const cameraVideoTrack = cameraStream.getVideoTracks()[0];
 
           if (whipPcRef.current) {
+            await terminateWhipSession();
             whipPcRef.current.close();
             whipPcRef.current = null;
           }
