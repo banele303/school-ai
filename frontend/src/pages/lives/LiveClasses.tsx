@@ -489,6 +489,9 @@ function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
       <DialogContent className="max-w-6xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
         <DialogHeader className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
           <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">Teacher Live Studio</DialogTitle>
+          <DialogDescription className="text-xs text-zinc-550 dark:text-zinc-400 mt-1">
+            Configure your preview camera, test screen sharing, and manage your broadcast stream.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr] pt-4">
           <div className="space-y-4">
@@ -674,6 +677,9 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
       <DialogContent className="max-w-5xl w-full p-6 sm:p-8 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
         <DialogHeader className="pb-4 border-b border-zinc-150 dark:border-zinc-800">
           <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">Create Live Learning Session</DialogTitle>
+          <DialogDescription className="text-xs text-zinc-550 dark:text-zinc-400 mt-1">
+            Fill in the details below to schedule a new live lesson and optionally provision streaming channels.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-5 md:grid-cols-2 pt-4">
           <div className="md:col-span-2">

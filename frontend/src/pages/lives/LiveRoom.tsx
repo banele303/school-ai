@@ -74,7 +74,7 @@ export default function LiveRoomPage() {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(true);
   const [playerVolume, setPlayerVolume] = useState(0.8);
   const [streamActive, setStreamActive] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -361,7 +361,9 @@ export default function LiveRoomPage() {
     });
 
     if (!response.ok) {
-      throw new Error(`WHEP playback failed: ${response.statusText}`);
+      const errText = await response.text().catch(() => "");
+      console.error(`WHEP server error (status ${response.status}):`, errText);
+      throw new Error(`WHEP playback failed: ${response.status} ${response.statusText} - ${errText}`);
     }
 
     const locationHeader = response.headers.get("Location");
@@ -556,8 +558,8 @@ export default function LiveRoomPage() {
       return;
     }
 
-    const fallbackHlsUrl = "https://videodelivery.net/6b56be0b0a668d6a0a09f3e3e07080f5/manifest/video.m3u8";
-    playHls(fallbackHlsUrl);
+    // No mock fallback. If both whepUrl and playbackUrl are falsy, the UI will display a friendly placeholder.
+    console.warn("No whepUrl or playbackUrl available for this live class.");
   };
 
   const playHls = (url: string) => {
@@ -1121,7 +1123,7 @@ export default function LiveRoomPage() {
               </>
             ) : (
               <>
-                {streamActive ? (
+                {streamActive && (classItem.whepUrl || classItem.playbackUrl) ? (
                   <div className="w-full h-full relative bg-black">
                     <video
                       ref={remoteVideoRef}
@@ -1171,6 +1173,21 @@ export default function LiveRoomPage() {
                         </Badge>
                       </div>
                     </div>
+                  </div>
+                ) : streamActive ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#201d16] via-[#16140f] to-[#0c0a07] p-6 text-center select-none">
+                    <div className="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-550 mb-6 animate-pulse">
+                      <AlertCircle className="h-10 w-10 text-amber-400" />
+                    </div>
+                    <h4 className="text-lg font-bold text-zinc-300">Live Stream Not Configured</h4>
+                    <p className="text-sm text-zinc-500 max-w-sm mt-1">
+                      The class is live, but the video broadcast feed is not configured.
+                    </p>
+                    {isTeacher && (
+                      <p className="text-xs text-amber-500/80 max-w-xs mt-4 bg-amber-500/5 border border-amber-500/10 px-4 py-2.5 rounded-xl">
+                        Tip: Ensure <strong>CLOUDFLARE_API_TOKEN</strong> is set in your Cloudflare Worker secrets.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#201d16] via-[#16140f] to-[#0c0a07] p-6 text-center select-none">
