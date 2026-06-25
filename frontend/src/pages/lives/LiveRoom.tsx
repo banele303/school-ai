@@ -15,8 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, PhoneOff, 
   Send, Users, MessageSquare, Settings, Volume2, VolumeX, 
-  Clock, ArrowLeft, AlertCircle, Wifi, Play, CheckCircle, Hand, Sparkles,
-  Presentation, Smile, Subtitles, MoreVertical
+  Clock, ArrowLeft, AlertCircle, Play, CheckCircle, Hand,
+  Presentation, Smile, Subtitles
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ export default function LiveRoomPage() {
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
   const sendReaction = useMutation(api.liveClasses.sendReaction);
   const recentReactions = useQuery(api.liveClasses.getRecentReactions, id ? { liveClassId: id as any } : "skip") || [];
-  const reactionStats = useQuery(api.liveClasses.getReactionStats, id ? { liveClassId: id as any } : "skip") || { like: 0, love: 0, applause: 0, laugh: 0, surprised: 0 };
+  // getReactionStats query is currently unused in the UI
 
   const approvalStatus = useQuery(api.liveClasses.getApprovalStatus, id ? { liveClassId: id as any } : "skip");
   const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, id ? { liveClassId: id as any } : "skip") || [];
@@ -303,9 +303,6 @@ export default function LiveRoomPage() {
 
     pc.ontrack = (event) => {
       if (remoteVideoRef.current) {
-        const isVideoTrack = event.track.kind === "video";
-        const hasExistingSrc = !!remoteVideoRef.current.srcObject;
-
         let stream = event.streams[0];
         if (!stream) {
           let inboundStream = remoteVideoRef.current.srcObject;
@@ -320,13 +317,6 @@ export default function LiveRoomPage() {
         const currentSrcObject = remoteVideoRef.current.srcObject;
         if (currentSrcObject !== stream) {
           remoteVideoRef.current.srcObject = stream;
-        } else {
-          // If a video track is added to an existing stream, force load() to refresh the video element
-          if (isVideoTrack && hasExistingSrc) {
-            remoteVideoRef.current.load();
-          } else if (remoteVideoRef.current.paused) {
-            remoteVideoRef.current.load();
-          }
         }
 
         // Programmatically play if not already playing and handle autoplay restrictions
@@ -519,7 +509,7 @@ export default function LiveRoomPage() {
       setStreamActive(false);
       teardownStudentPlayer();
     }
-  }, [isCreator, classItem?.status, classItem?.playbackUrl, classItem?.whepUrl, classItem?.lastStreamUpdate]);
+  }, [isCreator, classItem?.status, classItem?.playbackUrl, classItem?.whepUrl, (classItem as any)?.lastStreamUpdate]);
 
   // Teardown student player
   const teardownStudentPlayer = () => {
@@ -827,10 +817,13 @@ export default function LiveRoomPage() {
         // 2. Get existing mic track
         const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
 
-        // 3. Create a combined stream for publishing
+        // 3. Create a combined stream for publishing (at most one video track and one audio track for Cloudflare WHIP compatibility)
         const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
-        if (micAudioTrack) combinedTracks.push(micAudioTrack);
-        if (screenAudioTrack) combinedTracks.push(screenAudioTrack);
+        if (micAudioTrack) {
+          combinedTracks.push(micAudioTrack);
+        } else if (screenAudioTrack) {
+          combinedTracks.push(screenAudioTrack);
+        }
         const combinedStream = new MediaStream(combinedTracks);
 
         // 4. Update local stream ref video track
@@ -1571,8 +1564,8 @@ export default function LiveRoomPage() {
                                     </>
                                   ) : (
                                     <div className="flex items-center gap-1.5 px-1">
-                                      {p.isMuted && <MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Muted" />}
-                                      {p.isCameraBlocked && <VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" title="Camera Blocked" />}
+                                      {p.isMuted && <span title="Muted"><MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" /></span>}
+                                      {p.isCameraBlocked && <span title="Camera Blocked"><VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" /></span>}
                                     </div>
                                   )}
                                 </div>
