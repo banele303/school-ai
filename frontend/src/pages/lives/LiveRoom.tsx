@@ -998,13 +998,13 @@ export default function LiveRoomPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
       
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
         {/* Left Side: Video Viewport */}
         <section className="flex-1 flex flex-col bg-zinc-950 p-4 md:p-6 overflow-hidden justify-center items-center relative">
           
           {/* Top-Left Floating Room Info Badge */}
-          <div className="absolute top-8 left-8 z-20 flex items-center gap-3">
+          <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 flex items-center gap-2 md:gap-3">
             <div className="text-xs font-semibold text-white/90 tracking-wide px-3.5 py-2 rounded-full bg-zinc-900/80 backdrop-blur border border-zinc-800 flex items-center gap-2 shadow-lg">
               <span className="text-zinc-200">{timeStr}</span>
               <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
@@ -1022,7 +1022,7 @@ export default function LiveRoomPage() {
           </div>
 
           {/* Top-Right Floating Status Badges */}
-          <div className="absolute top-8 right-8 z-20 flex items-center gap-2.5">
+          <div className="absolute top-4 right-4 md:top-8 md:right-8 z-20 flex items-center gap-2.5">
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-red-500/20 text-red-200 text-xs font-semibold shadow-lg backdrop-blur border border-red-500/35">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               Transcribing
@@ -1034,7 +1034,7 @@ export default function LiveRoomPage() {
             
             {/* Muted or Camera Blocked Alert overlay */}
             {(myMuteStatus || myBlockCameraStatus) && (
-              <div className="absolute top-20 left-6 flex flex-col gap-2 z-35 pointer-events-none max-w-xs md:max-w-sm">
+              <div className="absolute top-16 left-4 md:top-20 md:left-6 flex flex-col gap-1.5 z-35 pointer-events-none max-w-[calc(100%-2rem)] md:max-w-sm">
                 {myMuteStatus && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-550/90 text-white text-xs font-semibold shadow-lg backdrop-blur border border-red-500/20 animate-pulse">
                     <MicOff className="h-3.5 w-3.5" />
@@ -1073,7 +1073,7 @@ export default function LiveRoomPage() {
                        ? classItem.recordingUrl 
                        : classItem.recordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
                      className="w-full h-full aspect-video border-0"
-                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; unload;"
+                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                      allowFullScreen
                    />
                 ) : (
@@ -1144,7 +1144,7 @@ export default function LiveRoomPage() {
                     />
 
                     {/* Custom student overlays */}
-                    <div className="absolute bottom-6 left-6 flex gap-2">
+                    <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 flex gap-2">
                       <Badge className="bg-zinc-950/85 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
                         Stream: Cloudflare Live (Sub-second WebRTC)
                       </Badge>
@@ -1272,9 +1272,9 @@ export default function LiveRoomPage() {
 
         </section>
 
-        {/* Right Side: Interactive Side Panel         {/* Right Side: Collapsible Sidebar */}
+        {/* Right Side: Collapsible Sidebar */}
         {showSidebar && (
-          <aside className="w-full md:w-80 border-l border-zinc-900 bg-zinc-950 flex flex-col overflow-hidden shrink-0 z-20">
+          <aside className="w-full md:w-80 h-72 md:h-full border-t md:border-t-0 md:border-l border-zinc-900 bg-zinc-950 flex flex-col overflow-hidden shrink-0 z-20">
             
             {/* Tab selectors */}
             <div className="flex border-b border-zinc-900 bg-zinc-950 shrink-0">
@@ -1653,24 +1653,24 @@ export default function LiveRoomPage() {
       </div>
 
       {/* ── BOTTOM CONTROL BAR (GOOGLE MEET/TEAMS STYLE) ── */}
-      <footer className="h-20 bg-zinc-955 flex items-center justify-between px-6 border-t border-zinc-900 z-30 shrink-0 select-none">
+      <footer className="h-16 md:h-20 bg-zinc-955 flex items-center justify-between px-3 md:px-6 border-t border-zinc-900 z-30 shrink-0 select-none">
         
         {/* Left Column: Room clock and code */}
-        <div className="flex items-center gap-4 text-sm font-medium text-zinc-400 min-w-[200px]">
+        <div className="hidden lg:flex items-center gap-4 text-sm font-medium text-zinc-400 min-w-[180px]">
           <span className="text-white font-medium">{timeStr}</span>
           <span className="w-1.5 h-1.5 rounded-full bg-zinc-800"></span>
           <span className="font-mono tracking-wider text-zinc-300 font-semibold">{getRoomCode()}</span>
         </div>
 
         {/* Center Column: Control Circle Buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-center">
           
           {/* Mute Mic */}
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "h-12 w-12 rounded-full border transition-all relative shrink-0",
+              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
               isMuted 
                 ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
                 : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
@@ -1678,8 +1678,8 @@ export default function LiveRoomPage() {
             onClick={toggleMute}
             title={isMuted ? "Unmute Mic" : "Mute Mic"}
           >
-            {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            {isMuted && <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-yellow-500 border-2 border-zinc-950" />}
+            {isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+            {isMuted && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
           </Button>
 
           {/* Video Camera */}
@@ -1687,7 +1687,7 @@ export default function LiveRoomPage() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-12 w-12 rounded-full border transition-all relative shrink-0",
+              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
               isVideoOff 
                 ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
                 : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
@@ -1695,8 +1695,8 @@ export default function LiveRoomPage() {
             onClick={toggleVideo}
             title={isVideoOff ? "Turn On Camera" : "Turn Off Camera"}
           >
-            {isVideoOff ? <VideoOff className="h-5 w-5" /> : <VideoIcon className="h-5 w-5" />}
-            {isVideoOff && <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-yellow-500 border-2 border-zinc-950" />}
+            {isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+            {isVideoOff && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
           </Button>
 
           {/* Screen Share (Teacher only) */}
@@ -1705,15 +1705,15 @@ export default function LiveRoomPage() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-12 w-12 rounded-full border transition-all shrink-0",
+                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0",
                 isScreenSharing 
-                  ? "bg-emerald-500/20 border-emerald-500 text-emerald-500 hover:bg-emerald-500/30" 
+                  ? "bg-emerald-550/20 border-emerald-500 text-emerald-500 hover:bg-emerald-500/30" 
                   : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
               )}
               onClick={toggleScreenShare}
               title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
             >
-              <Monitor className="h-5 w-5" />
+              <Monitor className="h-4.5 w-4.5 md:h-5 md:w-5" />
             </Button>
           )}
 
@@ -1721,11 +1721,11 @@ export default function LiveRoomPage() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-12 w-12 rounded-full border bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shrink-0"
+            className="h-10 w-10 md:h-12 md:w-12 rounded-full border bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700 transition-all shrink-0"
             onClick={() => window.open("/whiteboard", "_blank")}
             title="Open Whiteboard Canvas"
           >
-            <Presentation className="h-5 w-5" />
+            <Presentation className="h-4.5 w-4.5 md:h-5 md:w-5" />
           </Button>
 
           {/* Closed Captions toggle */}
@@ -1733,7 +1733,7 @@ export default function LiveRoomPage() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-12 w-12 rounded-full border transition-all shrink-0",
+              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0",
               isCcEnabled 
                 ? "bg-sky-500/20 border-sky-500 text-sky-400 hover:bg-sky-500/30" 
                 : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
@@ -1741,7 +1741,7 @@ export default function LiveRoomPage() {
             onClick={() => setIsCcEnabled(!isCcEnabled)}
             title={isCcEnabled ? "Disable Captions" : "Enable Captions"}
           >
-            <Subtitles className="h-5 w-5" />
+            <Subtitles className="h-4.5 w-4.5 md:h-5 md:w-5" />
           </Button>
 
           {/* Raise Hand (Student only) */}
@@ -1750,7 +1750,7 @@ export default function LiveRoomPage() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-12 w-12 rounded-full border transition-all shrink-0",
+                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0",
                 myHandRaised 
                   ? "bg-amber-500 border-amber-505 text-zinc-950 hover:bg-amber-600 hover:border-amber-605" 
                   : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
@@ -1758,7 +1758,7 @@ export default function LiveRoomPage() {
               onClick={handleRaiseHand}
               title={myHandRaised ? "Lower Hand" : "Raise Hand"}
             >
-              <Hand className="h-5 w-5" />
+              <Hand className="h-4.5 w-4.5 md:h-5 md:w-5" />
             </Button>
           )}
 
@@ -1768,7 +1768,7 @@ export default function LiveRoomPage() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-12 w-12 rounded-full border transition-all shrink-0",
+                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0",
                 showReactionsMenu
                   ? "bg-zinc-800 border-zinc-700 text-white"
                   : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
@@ -1776,12 +1776,12 @@ export default function LiveRoomPage() {
               onClick={() => setShowReactionsMenu(!showReactionsMenu)}
               title="Reactions"
             >
-              <Smile className="h-5 w-5" />
+              <Smile className="h-4.5 w-4.5 md:h-5 md:w-5" />
             </Button>
 
             {/* Floating Reactions Toolbar */}
             {showReactionsMenu && (
-              <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 p-1.5 rounded-full shadow-2xl z-40 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="absolute bottom-14 md:bottom-16 left-1/2 transform -translate-x-1/2 flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1.5 rounded-full shadow-2xl z-40 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 {Object.entries(EMOJI_MAP).map(([type, emoji]) => (
                   <Button
                     key={type}
@@ -1804,33 +1804,33 @@ export default function LiveRoomPage() {
           {/* Red Hang Up / End Class Button */}
           {isCreator ? (
             <Button
-              className="bg-red-600 hover:bg-red-750 text-white rounded-full px-5 py-2 h-12 gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
+              className="bg-red-600 hover:bg-red-750 text-white rounded-full px-3 md:px-5 py-2 h-10 md:h-12 gap-1.5 md:gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
               onClick={handleEndStream}
             >
-              <PhoneOff className="h-5 w-5" />
-              <span className="hidden md:inline">End Class</span>
+              <PhoneOff className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden sm:inline">End Class</span>
             </Button>
           ) : (
             <Button
-              className="bg-red-650 hover:bg-red-750 text-white rounded-full px-5 py-2 h-12 gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
+              className="bg-red-650 hover:bg-red-750 text-white rounded-full px-3 md:px-5 py-2 h-10 md:h-12 gap-1.5 md:gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
               onClick={() => navigate("/lives")}
             >
-              <PhoneOff className="h-5 w-5" />
-              <span className="hidden md:inline">Leave</span>
+              <PhoneOff className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden sm:inline">Leave</span>
             </Button>
           )}
 
         </div>
 
         {/* Right Column: Toggle Sidebar and Settings Buttons */}
-        <div className="flex items-center gap-2 min-w-[200px] justify-end">
+        <div className="flex items-center gap-1 md:gap-2 min-w-0 md:min-w-[180px] justify-end">
           
           {/* People Toggle */}
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "h-12 w-12 rounded-full transition-all relative shrink-0",
+              "h-10 w-10 md:h-12 md:w-12 rounded-full transition-all relative shrink-0",
               showSidebar && activeTab === "interactions"
                 ? "bg-zinc-800 text-white"
                 : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
@@ -1838,9 +1838,9 @@ export default function LiveRoomPage() {
             onClick={() => toggleSidebarTab("interactions")}
             title="People & Roster"
           >
-            <Users className="h-5 w-5" />
+            <Users className="h-4.5 w-4.5 md:h-5 md:w-5" />
             {raisedHands.length > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-amber-500 text-[9px] font-bold text-zinc-950 rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
+              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-amber-500 text-[8px] font-bold text-zinc-955 rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
                 {raisedHands.length}
               </span>
             )}
@@ -1851,7 +1851,7 @@ export default function LiveRoomPage() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-12 w-12 rounded-full transition-all relative shrink-0",
+              "h-10 w-10 md:h-12 md:w-12 rounded-full transition-all relative shrink-0",
               showSidebar && activeTab === "chat"
                 ? "bg-zinc-800 text-white"
                 : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
@@ -1859,9 +1859,9 @@ export default function LiveRoomPage() {
             onClick={() => toggleSidebarTab("chat")}
             title="Chat"
           >
-            <MessageSquare className="h-5 w-5" />
+            <MessageSquare className="h-4.5 w-4.5 md:h-5 md:w-5" />
             {chatMessages.length > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-650 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-zinc-955">
+              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-650 text-[8px] font-bold text-white rounded-full flex items-center justify-center border border-zinc-955">
                 {chatMessages.length}
               </span>
             )}
@@ -1873,7 +1873,7 @@ export default function LiveRoomPage() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-12 w-12 rounded-full transition-all relative shrink-0",
+                "h-10 w-10 md:h-12 md:w-12 rounded-full transition-all relative shrink-0",
                 showSidebar && activeTab === "waiting"
                   ? "bg-zinc-800 text-white"
                   : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
@@ -1881,9 +1881,9 @@ export default function LiveRoomPage() {
               onClick={() => toggleSidebarTab("waiting")}
               title="Waiting Room"
             >
-              <Clock className="h-5 w-5" />
+              <Clock className="h-4.5 w-4.5 md:h-5 md:w-5" />
               {pendingApprovals.length > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-indigo-600 text-[9px] font-bold text-white rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-indigo-600 text-[8px] font-bold text-white rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
                   {pendingApprovals.length}
                 </span>
               )}
@@ -1896,13 +1896,13 @@ export default function LiveRoomPage() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-12 w-12 rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all shrink-0",
+                "h-10 w-10 md:h-12 md:w-12 rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all shrink-0",
                 showSettings && "bg-zinc-800 text-white"
               )}
               onClick={() => setShowSettings(!showSettings)}
               title="Settings"
             >
-              <Settings className="h-5 w-5" />
+              <Settings className="h-4.5 w-4.5 md:h-5 md:w-5" />
             </Button>
           )}
 
@@ -1911,11 +1911,11 @@ export default function LiveRoomPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-12 w-12 rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all shrink-0"
+              className="h-10 w-10 md:h-12 md:w-12 rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all shrink-0"
               onClick={() => setShowInvite(true)}
               title="Invite Students"
             >
-              <Users className="h-5 w-5" />
+              <Users className="h-4.5 w-4.5 md:h-5 md:w-5" />
             </Button>
           )}
 
