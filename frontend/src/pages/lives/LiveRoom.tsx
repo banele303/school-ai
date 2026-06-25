@@ -194,14 +194,15 @@ export default function LiveRoomPage() {
       pc.addTrack(track, stream);
     });
 
-    // Prefer H.264 codec for video publishing
+    // Prefer H.264 codec for video publishing but keep VP8/VP9 as fallback for screen sharing
     const videoTransceiver = pc.getTransceivers().find(t => t.sender.track?.kind === 'video');
     if (videoTransceiver && typeof RTCRtpSender.getCapabilities === 'function') {
       const capabilities = RTCRtpSender.getCapabilities('video');
-      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
-      if (h264Codecs && h264Codecs.length > 0) {
+      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264') || [];
+      const otherCodecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/h264') || [];
+      if (h264Codecs.length > 0) {
         try {
-          videoTransceiver.setCodecPreferences(h264Codecs);
+          videoTransceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
         } catch (e) {
           console.warn("Failed to set publish H.264 preferences:", e);
         }
@@ -276,14 +277,15 @@ export default function LiveRoomPage() {
     pc.addTransceiver("video", { direction: "recvonly" });
     pc.addTransceiver("audio", { direction: "recvonly" });
 
-    // Prefer H.264 codec for video subscribing
+    // Prefer H.264 codec for video subscribing but keep VP8/VP9 as fallback for screen sharing
     const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
     if (videoTransceiver && typeof RTCRtpReceiver.getCapabilities === 'function') {
       const capabilities = RTCRtpReceiver.getCapabilities('video');
-      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
-      if (h264Codecs && h264Codecs.length > 0) {
+      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264') || [];
+      const otherCodecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/h264') || [];
+      if (h264Codecs.length > 0) {
         try {
-          videoTransceiver.setCodecPreferences(h264Codecs);
+          videoTransceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
         } catch (e) {
           console.warn("Failed to set WHEP H.264 preferences:", e);
         }
@@ -314,10 +316,7 @@ export default function LiveRoomPage() {
         }
 
         // Force browser rendering pipeline refresh to register newly added tracks
-        const currentSrcObject = remoteVideoRef.current.srcObject;
-        if (currentSrcObject !== stream) {
-          remoteVideoRef.current.srcObject = stream;
-        }
+        remoteVideoRef.current.srcObject = stream;
 
         // Programmatically play if not already playing and handle autoplay restrictions
         if (remoteVideoRef.current.paused) {
