@@ -27,12 +27,12 @@ export default function LiveRoomPage() {
   const { user } = useAuth();
   const [showInvite, setShowInvite] = useState(false);
 
-  const liveClasses = useQuery(api.liveClasses.getLiveClasses, {}) || [];
+  const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
 // @ts-ignore generated Convex types update after codegen
   const chatMessages = useQuery(api.liveClasses.getLiveChatMessages, id ? { liveClassId: id as any } : "skip") || [];
 // @ts-ignore generated Convex types update after codegen
   const raisedHands = useQuery(api.liveClasses.getRaisedHands, id ? { liveClassId: id as any } : "skip") || [];
-  const classItem = liveClasses.find((c: any) => c._id === id);
+  const classItem = liveClasses?.find((c: any) => c._id === id);
 
   // Mutations
 // @ts-ignore
@@ -121,6 +121,13 @@ export default function LiveRoomPage() {
       if (studentPcRef.current) studentPcRef.current.close();
     };
   }, []);
+
+  // Synchronize remote video element mute property with isAudioMuted state
+  useEffect(() => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = isAudioMuted;
+    }
+  }, [isAudioMuted]);
 
   const getRoomCode = () => {
     if (!id) return "";
@@ -277,21 +284,6 @@ export default function LiveRoomPage() {
     pc.addTransceiver("video", { direction: "recvonly" });
     pc.addTransceiver("audio", { direction: "recvonly" });
 
-    // Prefer H.264 codec for video subscribing but keep VP8/VP9 as fallback for screen sharing
-    const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video');
-    if (videoTransceiver && typeof RTCRtpReceiver.getCapabilities === 'function') {
-      const capabilities = RTCRtpReceiver.getCapabilities('video');
-      const h264Codecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264') || [];
-      const otherCodecs = capabilities?.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/h264') || [];
-      if (h264Codecs.length > 0) {
-        try {
-          videoTransceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
-        } catch (e) {
-          console.warn("Failed to set WHEP H.264 preferences:", e);
-        }
-      }
-    }
-
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
         console.warn("Student WHEP connection disconnected/failed, retrying in 2s...");
@@ -304,25 +296,25 @@ export default function LiveRoomPage() {
     };
 
     pc.ontrack = (event) => {
+      console.log("Student WHEP pc.ontrack fired:", event.track.kind, event.track.id);
       if (remoteVideoRef.current) {
-        let stream = event.streams[0];
-        if (!stream) {
-          let inboundStream = remoteVideoRef.current.srcObject;
-          if (!(inboundStream instanceof MediaStream)) {
-            inboundStream = new MediaStream();
-          }
-          inboundStream.addTrack(event.track);
-          stream = inboundStream;
+        let stream = remoteVideoRef.current.srcObject;
+        if (!(stream instanceof MediaStream)) {
+          stream = new MediaStream();
+          remoteVideoRef.current.srcObject = stream;
         }
 
-        // Force browser rendering pipeline refresh to register newly added tracks
-        remoteVideoRef.current.srcObject = stream;
+        // Avoid adding duplicate tracks
+        if (!stream.getTracks().find(t => t.id === event.track.id)) {
+          stream.addTrack(event.track);
+          console.log("Added track to remote video stream:", event.track.kind);
+        }
 
-        // Programmatically play if not already playing and handle autoplay restrictions
+        // Programmatically and unconditionally play if paused
         if (remoteVideoRef.current.paused) {
           remoteVideoRef.current.play().catch(err => {
             if (err && err.name === "AbortError") {
-              // Silence harmless AbortError caused by load() interrupting active play requests
+              // Silence harmless AbortError caused by play request interruptions
               return;
             }
             console.warn("Autoplay prevented, muting video to play:", err);
@@ -342,19 +334,26 @@ export default function LiveRoomPage() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    // Wait for ICE candidates
+    // Wait for ICE candidates fully or timeout after 2s
     await new Promise((resolve) => {
       if (pc.iceGatheringState === "complete") {
         resolve(null);
       } else {
-        const check = () => {
-          if (pc.iceGatheringState === "complete") {
-            pc.removeEventListener("icegatheringstatechange", check);
+        let resolved = false;
+        const complete = () => {
+          if (!resolved) {
+            resolved = true;
+            pc.removeEventListener("icegatheringstatechange", complete);
             resolve(null);
           }
         };
-        pc.addEventListener("icegatheringstatechange", check);
-        setTimeout(resolve, 2000);
+        pc.addEventListener("icegatheringstatechange", complete);
+        pc.onicecandidate = (e) => {
+          if (!e.candidate) {
+            complete();
+          }
+        };
+        setTimeout(complete, 2000);
       }
     });
 
@@ -542,18 +541,18 @@ export default function LiveRoomPage() {
         toast.success("Connected to live classroom WebRTC stream.");
         return;
       } catch (err: any) {
-        console.error("WHEP playback failed, scheduling retry:", err);
-        // Schedule retry if room is still live
-        if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
-        whepTimeoutRef.current = setTimeout(() => {
-          if (classItem && classItem.status === "live") {
-            setupStudentPlayer();
-          }
-        }, 3000);
-
+        console.error("WHEP playback failed, trying HLS fallback:", err);
         // Try HLS fallback temporarily
         if (classItem.playbackUrl) {
           playHls(classItem.playbackUrl);
+        } else {
+          // No HLS fallback, schedule WHEP retry if room is still live
+          if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
+          whepTimeoutRef.current = setTimeout(() => {
+            if (classItem && classItem.status === "live") {
+              setupStudentPlayer();
+            }
+          }, 3000);
         }
         return;
       }
@@ -929,6 +928,16 @@ export default function LiveRoomPage() {
       toast.error(err.message || "Failed to send reaction");
     }
   };
+
+  if (liveClasses === undefined) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center h-screen bg-zinc-950 text-white font-sans">
+        <Clock className="h-10 w-10 text-indigo-500 mb-4 animate-spin" />
+        <h3 className="text-lg font-semibold">Loading classroom...</h3>
+        <p className="text-xs text-zinc-505 mt-1">Connecting to database</p>
+      </div>
+    );
+  }
 
   if (!classItem) {
     return (
