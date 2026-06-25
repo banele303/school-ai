@@ -1077,3 +1077,25 @@ export const toggleBlockCameraStudent = mutation({
     return { isCameraBlocked: false };
   },
 });
+
+export const updateStreamTimestamp = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "teacher" && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    await ctx.db.patch(args.liveClassId, {
+      lastStreamUpdate: Date.now(),
+    });
+  },
+});
