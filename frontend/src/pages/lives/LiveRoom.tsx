@@ -310,24 +310,22 @@ export default function LiveRoomPage() {
           console.log("Added track to remote video stream:", event.track.kind);
         }
 
-        // Programmatically and unconditionally play if paused
-        if (remoteVideoRef.current.paused) {
-          remoteVideoRef.current.play().catch(err => {
-            if (err && err.name === "AbortError") {
-              // Silence harmless AbortError caused by play request interruptions
-              return;
-            }
-            console.warn("Autoplay prevented, muting video to play:", err);
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.muted = true;
-              setIsAudioMuted(true);
-              remoteVideoRef.current.play().catch(e => {
-                if (e && e.name === "AbortError") return;
-                console.error("Play failed even when muted:", e);
-              });
-            }
-          });
-        }
+        // Programmatically and unconditionally play
+        remoteVideoRef.current.play().catch(err => {
+          if (err && err.name === "AbortError") {
+            // Silence harmless AbortError caused by play request interruptions
+            return;
+          }
+          console.warn("Autoplay prevented, muting video to play:", err);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.muted = true;
+            setIsAudioMuted(true);
+            remoteVideoRef.current.play().catch(e => {
+              if (e && e.name === "AbortError") return;
+              console.error("Play failed even when muted:", e);
+            });
+          }
+        });
       }
     };
 
