@@ -390,8 +390,9 @@ export default function LiveRoomPage() {
 
 
   const isTeacher = user?.role === "teacher" || user?.role === "admin";
-  const isCreator = classItem?.teacher === user?._id || user?.role === "admin";
-  const myHandRaised = !isCreator && raisedHands.some((h: any) => h.studentId === user?._id);
+  const isCreator = classItem?.teacher === user?._id;
+  const isModerator = classItem?.teacher === user?._id || user?.role === "admin";
+  const myHandRaised = !isModerator && raisedHands.some((h: any) => h.studentId === user?._id);
 
   const EMOJI_MAP: Record<string, string> = { like: "👍", love: "❤️", applause: "👏", laugh: "😂", surprised: "😮" };
   const [floatingEmojis, setFloatingEmojis] = useState<{ id: string; type: string; x: number }[]>([]);
@@ -434,15 +435,15 @@ export default function LiveRoomPage() {
     }
   }, [user?.role, classItem?.status, approvalStatus?.status, id]);
 
-  // Detect new raised hands (for creator teacher)
+  // Detect new raised hands (for creator/moderator)
   useEffect(() => {
-    if (isCreator && raisedHands.length > prevRaisedCountRef.current) {
+    if (isModerator && raisedHands.length > prevRaisedCountRef.current) {
       const newestHand = raisedHands[raisedHands.length - 1];
       toast.success(`${newestHand.studentName} raised their hand`);
       playHandRaiseChime();
     }
     prevRaisedCountRef.current = raisedHands.length;
-  }, [raisedHands, isCreator]);
+  }, [raisedHands, isModerator]);
 
   // Listen for recent reactions and trigger floating animation
   useEffect(() => {
@@ -543,15 +544,12 @@ export default function LiveRoomPage() {
         // Try HLS fallback temporarily
         if (classItem.playbackUrl) {
           playHls(classItem.playbackUrl);
-        } else {
-          // No HLS fallback, schedule WHEP retry if room is still live
-          if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
-          whepTimeoutRef.current = setTimeout(() => {
-            if (classItem && classItem.status === "live") {
-              setupStudentPlayer();
-            }
-          }, 3000);
         }
+        // Always schedule background WebRTC reconnect when WHEP fails
+        if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
+        whepTimeoutRef.current = setTimeout(() => {
+          retryWhepInBackground(classItem.whepUrl!);
+        }, 3000);
         return;
       }
     }
@@ -563,6 +561,124 @@ export default function LiveRoomPage() {
 
     // No mock fallback. If both whepUrl and playbackUrl are falsy, the UI will display a friendly placeholder.
     console.warn("No whepUrl or playbackUrl available for this live class.");
+  };
+
+  // Reconnect WHEP client in the background without interrupting HLS playback
+  const retryWhepInBackground = async (whepUrl: string) => {
+    if (!classItem || classItem.status !== "live") return;
+
+    console.log("Attempting background WHEP reconnection...");
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302"
+        }
+      ]
+    });
+
+    let isConnected = false;
+
+    pc.addTransceiver("video", { direction: "recvonly" });
+    pc.addTransceiver("audio", { direction: "recvonly" });
+
+    pc.ontrack = (event) => {
+      console.log("Background WHEP pc.ontrack fired:", event.track.kind, event.track.id);
+      if (remoteVideoRef.current) {
+        if (!isConnected) {
+          isConnected = true;
+          toast.success("Low-latency live stream reconnected!");
+
+          // 1. Destroy HLS player if it exists
+          if (hlsPlayerRef.current) {
+            hlsPlayerRef.current.destroy();
+            hlsPlayerRef.current = null;
+          }
+
+          // 2. Close previous student peer connection
+          if (studentPcRef.current && studentPcRef.current !== pc) {
+            studentPcRef.current.close();
+          }
+          studentPcRef.current = pc;
+
+          // 3. Clear video src and set fresh MediaStream
+          remoteVideoRef.current.src = "";
+          const stream = new MediaStream();
+          remoteVideoRef.current.srcObject = stream;
+          stream.addTrack(event.track);
+
+          // 4. Play
+          remoteVideoRef.current.play().catch(console.warn);
+        } else {
+          // Add subsequent tracks (e.g., audio)
+          const stream = remoteVideoRef.current.srcObject;
+          if (stream instanceof MediaStream && !stream.getTracks().find(t => t.id === event.track.id)) {
+            stream.addTrack(event.track);
+          }
+        }
+      }
+    };
+
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Wait for ICE candidates fully or timeout after 1.5s
+      await new Promise((resolve) => {
+        if (pc.iceGatheringState === "complete") {
+          resolve(null);
+        } else {
+          let resolved = false;
+          const complete = () => {
+            if (!resolved) {
+              resolved = true;
+              pc.removeEventListener("icegatheringstatechange", complete);
+              resolve(null);
+            }
+          };
+          pc.addEventListener("icegatheringstatechange", complete);
+          pc.onicecandidate = (e) => {
+            if (!e.candidate) complete();
+          };
+          setTimeout(complete, 1500);
+        }
+      });
+
+      const response = await fetch(whepUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/sdp",
+        },
+        body: pc.localDescription?.sdp
+      });
+
+      if (!response.ok) {
+        throw new Error(`WHEP reconnect response not ok: ${response.status}`);
+      }
+
+      const locationHeader = response.headers.get("Location");
+      if (locationHeader) {
+        try {
+          whepResourceUrlRef.current = new URL(locationHeader, whepUrl).href;
+        } catch (e) {
+          if (locationHeader.startsWith("http://") || locationHeader.startsWith("https://")) {
+            whepResourceUrlRef.current = locationHeader;
+          }
+        }
+      }
+
+      const answerSdp = await response.text();
+      await pc.setRemoteDescription(new RTCSessionDescription({
+        type: "answer",
+        sdp: answerSdp
+      }));
+    } catch (err) {
+      console.warn("Background WHEP reconnect failed, scheduling retry:", err);
+      pc.close();
+      if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
+      whepTimeoutRef.current = setTimeout(() => {
+        retryWhepInBackground(whepUrl);
+      }, 4000);
+    }
   };
 
   const playHls = (url: string) => {
@@ -790,16 +906,19 @@ export default function LiveRoomPage() {
 
         toast.info("Switched stream back to webcam feed.");
       } else {
-        // Switch to screen share with compatible resolution and frame rate constraints
+        // Switch to screen share with optimized quality constraints
         const screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: {
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 },
-            frameRate: { ideal: 15, max: 30 }
+            width: { ideal: 1920, max: 3840 },
+            height: { ideal: 1080, max: 2160 },
+            frameRate: { ideal: 30, max: 30 }
           },
           audio: true
         });
         const screenVideoTrack = screenStream.getVideoTracks()[0];
+        if (screenVideoTrack && "contentHint" in screenVideoTrack) {
+          screenVideoTrack.contentHint = "text";
+        }
         const screenAudioTrack = screenStream.getAudioTracks()[0];
         setIsScreenSharing(true);
 
@@ -1400,7 +1519,7 @@ export default function LiveRoomPage() {
                 <div className="flex-1 overflow-y-auto p-4 flex flex-col h-full space-y-5">
                   
                   {/* Student Hand Raising Card */}
-                  {!isCreator && (
+                  {!isModerator && (
                     <div className="p-4 rounded-2xl border bg-gradient-to-br from-zinc-900 to-zinc-955 border-zinc-800 shadow-md shrink-0">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1">
@@ -1436,7 +1555,7 @@ export default function LiveRoomPage() {
                         <Hand className="h-3.5 w-3.5" />
                         Raised Hands Queue
                       </h3>
-                      {isCreator && raisedHands.length > 0 && (
+                      {isModerator && raisedHands.length > 0 && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1472,7 +1591,7 @@ export default function LiveRoomPage() {
                               <span className="text-xs text-zinc-200 font-medium truncate">{hand.studentName}</span>
                             </div>
                             
-                            {isCreator && (
+                            {isModerator && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1517,7 +1636,7 @@ export default function LiveRoomPage() {
                                 </div>
                                 
                                 <div className="flex items-center gap-1 shrink-0">
-                                  {isCreator ? (
+                                  {isModerator ? (
                                     <>
                                       <Button 
                                         variant="ghost" 
@@ -1671,41 +1790,45 @@ export default function LiveRoomPage() {
         {/* Center Column: Control Circle Buttons */}
         <div className="flex items-center gap-1.5 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-center">
           
-          {/* Mute Mic */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
-              isMuted 
-                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
-                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
-            )}
-            onClick={toggleMute}
-            title={isMuted ? "Unmute Mic" : "Mute Mic"}
-          >
-            {isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
-            {isMuted && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
-          </Button>
+          {/* Mute Mic (Broadcaster only) */}
+          {isCreator && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
+                isMuted 
+                  ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
+                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              )}
+              onClick={toggleMute}
+              title={isMuted ? "Unmute Mic" : "Mute Mic"}
+            >
+              {isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+              {isMuted && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
+            </Button>
+          )}
 
-          {/* Video Camera */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
-              isVideoOff 
-                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
-                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
-            )}
-            onClick={toggleVideo}
-            title={isVideoOff ? "Turn On Camera" : "Turn Off Camera"}
-          >
-            {isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
-            {isVideoOff && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
-          </Button>
+          {/* Video Camera (Broadcaster only) */}
+          {isCreator && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
+                isVideoOff 
+                  ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
+                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              )}
+              onClick={toggleVideo}
+              title={isVideoOff ? "Turn On Camera" : "Turn Off Camera"}
+            >
+              {isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+              {isVideoOff && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
+            </Button>
+          )}
 
-          {/* Screen Share (Teacher only) */}
+          {/* Screen Share (Broadcaster only) */}
           {isCreator && (
             <Button
               variant="ghost"
@@ -1751,7 +1874,7 @@ export default function LiveRoomPage() {
           </Button>
 
           {/* Raise Hand (Student only) */}
-          {!isCreator && (
+          {!isModerator && (
             <Button
               variant="ghost"
               size="icon"
@@ -1808,7 +1931,7 @@ export default function LiveRoomPage() {
           </div>
 
           {/* Red Hang Up / End Class Button */}
-          {isCreator ? (
+          {isModerator ? (
             <Button
               className="bg-red-600 hover:bg-red-750 text-white rounded-full px-3 md:px-5 py-2 h-10 md:h-12 gap-1.5 md:gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
               onClick={handleEndStream}

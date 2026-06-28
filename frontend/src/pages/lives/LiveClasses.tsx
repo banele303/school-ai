@@ -234,7 +234,7 @@ export default function LiveClassesPage() {
                         classItem={classItem}
                         subjectName={subject?.name}
                         isTeacher={isTeacher}
-                        isOwner={isTeacher}
+                        isOwner={classItem.teacher === user?._id || user?.role === "admin"}
                         onOpen={() => openLesson(classItem)}
                         onStudio={() => {
                           setSelectedClass(classItem);
