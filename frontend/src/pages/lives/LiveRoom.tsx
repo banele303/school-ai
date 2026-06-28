@@ -61,11 +61,17 @@ export default function LiveRoomPage() {
   // @ts-ignore
   const updateStreamTimestamp = useMutation(api.liveClasses.updateStreamTimestamp);
   // @ts-ignore
+  const requestScreenShareMutation = useMutation(api.liveClasses.requestScreenShare);
+  // @ts-ignore
+  const toggleScreenSharePermissionMutation = useMutation(api.liveClasses.toggleScreenSharePermission);
+  // @ts-ignore
   const participants = useQuery(api.liveClasses.getLiveClassParticipants, id ? { liveClassId: id as any } : "skip") || [];
 
   const myParticipantRecord = participants.find((p: any) => p.studentId === user?._id);
-  const myMuteStatus = myParticipantRecord?.isMuted ?? false;
-  const myBlockCameraStatus = myParticipantRecord?.isCameraBlocked ?? false;
+  const myMuteStatus = (myParticipantRecord as any)?.isMuted ?? false;
+  const myBlockCameraStatus = (myParticipantRecord as any)?.isCameraBlocked ?? false;
+  const myCanShareScreen = (myParticipantRecord as any)?.canShareScreen ?? false;
+  const myRequestedScreenShare = (myParticipantRecord as any)?.requestedScreenShare ?? false;
 
   // States
   const [activeTab, setActiveTab] = useState<"chat" | "interactions" | "waiting">("chat");
@@ -493,7 +499,7 @@ export default function LiveRoomPage() {
 
   // Handle student playback connection
   useEffect(() => {
-    if (!isCreator && classItem && classItem.status === "live") {
+    if (!isCreator && !isScreenSharing && classItem && classItem.status === "live") {
       setStreamActive(true);
       const timer = setTimeout(() => {
         setupStudentPlayer();
@@ -506,7 +512,7 @@ export default function LiveRoomPage() {
       setStreamActive(false);
       teardownStudentPlayer();
     }
-  }, [isCreator, classItem?.status, classItem?.playbackUrl, classItem?.whepUrl, (classItem as any)?.lastStreamUpdate]);
+  }, [isCreator, isScreenSharing, classItem?.status, classItem?.playbackUrl, classItem?.whepUrl, (classItem as any)?.lastStreamUpdate]);
 
   // Teardown student player
   const teardownStudentPlayer = () => {
@@ -861,52 +867,56 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Share Screen (Teacher only)
+  // Share Screen (Teacher or Permitted Student)
   const toggleScreenShare = async () => {
     if (!classItem) return;
     try {
       if (isScreenSharing) {
-        // Switch back to webcam
         setIsScreenSharing(false);
 
-        // 1. Get new webcam video stream
-        const constraints = {
-          video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
-          audio: false,
-        };
-        const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-        const cameraVideoTrack = cameraStream.getVideoTracks()[0];
+        // 1. Stop screen tracks
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(t => t.stop());
+          localStreamRef.current = null;
+        }
 
-        // 2. Stop old WHIP session (required by Cloudflare Stream to reset SSRC)
+        // 2. Terminate the publishing session
         if (whipPcRef.current) {
           await terminateWhipSession();
           whipPcRef.current.close();
           whipPcRef.current = null;
         }
 
-        // 3. Update local stream ref video track
-        if (localStreamRef.current) {
-          localStreamRef.current.getVideoTracks().forEach(t => {
-            t.stop();
-            localStreamRef.current?.removeTrack(t);
-          });
-          localStreamRef.current.addTrack(cameraVideoTrack);
-        }
+        if (isCreator) {
+          // Switch back to webcam for teacher
+          const constraints = {
+            video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
+            audio: false,
+          };
+          const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+          const cameraVideoTrack = cameraStream.getVideoTracks()[0];
 
-        // 4. Update local video preview
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStreamRef.current;
-        }
+          localStreamRef.current = new MediaStream([cameraVideoTrack]);
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+          }
 
-        // 5. Publish new stream and update database timestamp (triggers clean student re-subscription)
-        if (isBroadcasting && classItem.whipUrl && localStreamRef.current) {
-          await publishWhip(localStreamRef.current, classItem.whipUrl);
-          await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+          if (isBroadcasting && classItem.whipUrl) {
+            await publishWhip(localStreamRef.current, classItem.whipUrl);
+            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+          }
+          toast.info("Switched stream back to webcam feed.");
+        } else {
+          // For student, just switch back to viewing mode
+          toast.info("Stopped screen sharing.");
         }
-
-        toast.info("Switched stream back to webcam feed.");
       } else {
-        // Switch to screen share with optimized quality constraints
+        // Stop student WHEP player if active so we can publish our own screen
+        if (!isCreator) {
+          teardownStudentPlayer();
+        }
+
+        // Capture screen share with optimized quality constraints
         const screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: {
             width: { ideal: 1920, max: 3840 },
@@ -922,55 +932,36 @@ export default function LiveRoomPage() {
         const screenAudioTrack = screenStream.getAudioTracks()[0];
         setIsScreenSharing(true);
 
-        // 1. Stop old WHIP session (required by Cloudflare Stream to reset SSRC)
         if (whipPcRef.current) {
           await terminateWhipSession();
           whipPcRef.current.close();
           whipPcRef.current = null;
         }
 
-        // 2. Get existing mic track
-        const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
-
-        // 3. Create a combined stream for publishing (at most one video track and one audio track for Cloudflare WHIP compatibility)
+        // Combine screen video track and audio track
         const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
-        if (micAudioTrack) {
-          combinedTracks.push(micAudioTrack);
-        } else if (screenAudioTrack) {
+        if (screenAudioTrack) {
           combinedTracks.push(screenAudioTrack);
         }
         const combinedStream = new MediaStream(combinedTracks);
+        localStreamRef.current = combinedStream;
 
-        // 4. Update local stream ref video track
-        if (localStreamRef.current) {
-          localStreamRef.current.getVideoTracks().forEach(t => {
-            t.stop();
-            localStreamRef.current?.removeTrack(t);
-          });
-          localStreamRef.current.addTrack(screenVideoTrack);
-        }
-
-        // 5. Update local video preview
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = screenStream;
         }
 
-        // 6. Publish new stream and update database timestamp (triggers clean student re-subscription)
-        if (isBroadcasting && classItem.whipUrl) {
+        // Publish stream
+        if (classItem.whipUrl) {
           await publishWhip(combinedStream, classItem.whipUrl);
           await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
         }
 
-        // Handle stop sharing clicked inside browser window share bar
         screenVideoTrack.onended = async () => {
           setIsScreenSharing(false);
-
-          const constraints = {
-            video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
-            audio: false,
-          };
-          const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-          const cameraVideoTrack = cameraStream.getVideoTracks()[0];
+          if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(t => t.stop());
+            localStreamRef.current = null;
+          }
 
           if (whipPcRef.current) {
             await terminateWhipSession();
@@ -978,24 +969,28 @@ export default function LiveRoomPage() {
             whipPcRef.current = null;
           }
 
-          if (localStreamRef.current) {
-            localStreamRef.current.getVideoTracks().forEach(t => {
-              t.stop();
-              localStreamRef.current?.removeTrack(t);
-            });
-            localStreamRef.current.addTrack(cameraVideoTrack);
-          }
+          if (isCreator) {
+            // Switch back to webcam
+            const constraints = {
+              video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
+              audio: false,
+            };
+            const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const cameraVideoTrack = cameraStream.getVideoTracks()[0];
 
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
-          }
+            localStreamRef.current = new MediaStream([cameraVideoTrack]);
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = localStreamRef.current;
+            }
 
-          if (isBroadcasting && classItem.whipUrl && localStreamRef.current) {
-            await publishWhip(localStreamRef.current, classItem.whipUrl);
-            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+            if (isBroadcasting && classItem.whipUrl) {
+              await publishWhip(localStreamRef.current, classItem.whipUrl);
+              await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+            }
+            toast.info("Switched stream back to webcam feed.");
+          } else {
+            toast.info("Stopped screen sharing.");
           }
-
-          toast.info("Switched stream back to webcam feed.");
         };
 
         toast.success("Screen sharing stream published.");
@@ -1209,7 +1204,7 @@ export default function LiveRoomPage() {
                   />
                 )}
               </div>
-            ) : isCreator ? (
+            ) : (isCreator || isScreenSharing) ? (
               <>
                 <video
                   ref={localVideoRef}
@@ -1235,9 +1230,9 @@ export default function LiveRoomPage() {
                 </div>
 
                 {/* If not broadcasting yet, show a big "Start Live Class" overlay in the middle */}
-                {!isBroadcasting && (
+                {isCreator && !isBroadcasting && (
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 z-10 transition-all">
-                    <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-2">
+                    <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-505 mb-2">
                       <VideoIcon className="h-8 w-8 animate-pulse" />
                     </div>
                     <div className="text-center">
@@ -1673,6 +1668,44 @@ export default function LiveRoomPage() {
                                       <Button 
                                         variant="ghost" 
                                         size="icon" 
+                                        className={cn(
+                                          "h-7 w-7 rounded-lg", 
+                                          p.canShareScreen 
+                                            ? "text-emerald-500 hover:bg-emerald-950/20" 
+                                            : p.requestedScreenShare 
+                                              ? "text-amber-500 hover:bg-amber-955/20 animate-pulse" 
+                                              : "text-zinc-400 hover:bg-zinc-800"
+                                        )}
+                                        onClick={async () => {
+                                          try {
+                                            const nextState = !p.canShareScreen;
+                                            await toggleScreenSharePermissionMutation({ 
+                                              liveClassId: id as any, 
+                                              studentId: p.studentId, 
+                                              granted: nextState 
+                                            });
+                                            toast.success(
+                                              nextState 
+                                                ? `Granted screen share permission to ${p.name}.` 
+                                                : `Revoked screen share permission for ${p.name}.`
+                                            );
+                                          } catch (err: any) {
+                                            toast.error(err.message || "Failed to update permission.");
+                                          }
+                                        }}
+                                        title={
+                                          p.canShareScreen 
+                                            ? "Revoke Screen Share" 
+                                            : p.requestedScreenShare 
+                                              ? "Grant Screen Share Request" 
+                                              : "Grant Screen Share"
+                                        }
+                                      >
+                                        <Monitor className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
                                         className="h-7 w-7 text-red-550 hover:text-red-400 hover:bg-red-955/20 rounded-lg"
                                         onClick={async () => {
                                           try {
@@ -1828,21 +1861,50 @@ export default function LiveRoomPage() {
             </Button>
           )}
 
-          {/* Screen Share (Broadcaster only) */}
-          {isCreator && (
+          {/* Screen Share (Broadcaster or permitted student) */}
+          {(isCreator || myCanShareScreen) && (
             <Button
               variant="ghost"
               size="icon"
               className={cn(
                 "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0",
                 isScreenSharing 
-                  ? "bg-emerald-550/20 border-emerald-500 text-emerald-500 hover:bg-emerald-500/30" 
+                  ? "bg-emerald-550/20 border-emerald-500 text-emerald-505 hover:bg-emerald-500/30" 
                   : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
               )}
               onClick={toggleScreenShare}
               title={isScreenSharing ? "Stop Sharing Screen" : "Share Screen"}
             >
               <Monitor className="h-4.5 w-4.5 md:h-5 md:w-5" />
+            </Button>
+          )}
+
+          {/* Request Screen Share Button (Student who does not have permission yet) */}
+          {!isModerator && !myCanShareScreen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0 relative",
+                myRequestedScreenShare
+                  ? "bg-amber-500/20 border-amber-500 text-amber-500 animate-pulse" 
+                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 hover:border-zinc-700"
+              )}
+              onClick={async () => {
+                if (myRequestedScreenShare) return;
+                try {
+                  await requestScreenShareMutation({ liveClassId: id as any });
+                  toast.success("Screen share permission requested!");
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to request screen share.");
+                }
+              }}
+              title={myRequestedScreenShare ? "Screen Share Requested (Awaiting Teacher Approval)" : "Request to Share Screen"}
+            >
+              <Monitor className="h-4.5 w-4.5 md:h-5 md:w-5" />
+              {myRequestedScreenShare && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500" />
+              )}
             </Button>
           )}
 

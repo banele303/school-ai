@@ -585,6 +585,8 @@ export default defineSchema({
     watchPercentage: v.optional(v.number()),
     isMuted: v.optional(v.boolean()),
     isCameraBlocked: v.optional(v.boolean()),
+    canShareScreen: v.optional(v.boolean()),
+    requestedScreenShare: v.optional(v.boolean()),
   }).index("by_class", ["liveClass"])
     .index("by_student", ["student"]),
 

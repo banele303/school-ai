@@ -892,13 +892,15 @@ export const getLiveClassParticipants = query({
           const student = await ctx.db.get(studentId);
           if (student) {
             const record = activeMap.get(studentId);
-            participants.push({
+             participants.push({
               studentId: student._id,
               name: student.name || student.email || "Student",
               email: student.email || "",
               isOnline: record !== undefined,
               isMuted: record?.isMuted ?? false,
               isCameraBlocked: record?.isCameraBlocked ?? false,
+              canShareScreen: record?.canShareScreen ?? false,
+              requestedScreenShare: record?.requestedScreenShare ?? false,
             });
           }
         }
@@ -918,6 +920,8 @@ export const getLiveClassParticipants = query({
           isOnline: true,
           isMuted: record.isMuted ?? false,
           isCameraBlocked: record.isCameraBlocked ?? false,
+          canShareScreen: record.canShareScreen ?? false,
+          requestedScreenShare: record.requestedScreenShare ?? false,
         });
       }
     }
@@ -1087,17 +1091,87 @@ export const updateStreamTimestamp = mutation({
     if (!userId) throw new Error("Unauthorized");
 
     const user = await ctx.db.get(userId);
-    if (user?.role !== "teacher" && user?.role !== "admin") {
-      throw new Error("Unauthorized");
-    }
-
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), userId))
+      .first();
+
+    const isTeacher = user?.role === "teacher" || user?.role === "admin" || liveClass.teacher === userId;
+    const canShare = attendance?.canShareScreen ?? false;
+
+    if (!isTeacher && !canShare) {
+      throw new Error("Unauthorized");
+    }
 
     await ctx.db.patch(args.liveClassId, {
       lastStreamUpdate: Date.now(),
     });
 
     return { success: true };
+  },
+});
+
+export const requestScreenShare = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), userId))
+      .first();
+
+    if (!attendance) {
+      throw new Error("Student not joined to class");
+    }
+
+    await ctx.db.patch(attendance._id, {
+      requestedScreenShare: true,
+    });
+
+    return { success: true };
+  },
+});
+
+export const toggleScreenSharePermission = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    studentId: v.id("users"),
+    granted: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const liveClass = await ctx.db.get(args.liveClassId);
+    if (!liveClass) throw new Error("Live class not found");
+
+    if (liveClass.teacher !== userId && user?.role !== "admin") {
+      throw new Error("Unauthorized");
+    }
+
+    const attendance = await ctx.db
+      .query("liveClassAttendance")
+      .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
+      .filter((q) => q.eq(q.field("student"), args.studentId))
+      .first();
+
+    if (attendance) {
+      await ctx.db.patch(attendance._id, {
+        canShareScreen: args.granted,
+        requestedScreenShare: false,
+      });
+      return { success: true, canShareScreen: args.granted };
+    }
+    return { success: false };
   },
 });
