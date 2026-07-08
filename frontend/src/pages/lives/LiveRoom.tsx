@@ -888,15 +888,20 @@ export default function LiveRoomPage() {
         }
 
         if (isCreator) {
-          // Switch back to webcam for teacher
+          // Switch back to webcam and mic for teacher
           const constraints = {
             video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
-            audio: false,
+            audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
           };
           const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
           const cameraVideoTrack = cameraStream.getVideoTracks()[0];
+          const cameraAudioTrack = cameraStream.getAudioTracks()[0];
 
-          localStreamRef.current = new MediaStream([cameraVideoTrack]);
+          const tracks: MediaStreamTrack[] = [];
+          if (cameraVideoTrack) tracks.push(cameraVideoTrack);
+          if (cameraAudioTrack) tracks.push(cameraAudioTrack);
+          localStreamRef.current = new MediaStream(tracks);
+
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = localStreamRef.current;
           }
@@ -938,13 +943,35 @@ export default function LiveRoomPage() {
           whipPcRef.current = null;
         }
 
-        // Combine screen video track and audio track
-        const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
-        if (screenAudioTrack) {
-          combinedTracks.push(screenAudioTrack);
+        let combinedStream: MediaStream;
+        if (isCreator) {
+          // Preserve the teacher's mic track
+          const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
+          const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
+          if (micAudioTrack) {
+            combinedTracks.push(micAudioTrack);
+          } else if (screenAudioTrack) {
+            combinedTracks.push(screenAudioTrack);
+          }
+          combinedStream = new MediaStream(combinedTracks);
+
+          // Update local stream ref with screen video while keeping mic active
+          if (localStreamRef.current) {
+            localStreamRef.current.getVideoTracks().forEach(t => {
+              t.stop();
+              localStreamRef.current?.removeTrack(t);
+            });
+            localStreamRef.current.addTrack(screenVideoTrack);
+          }
+        } else {
+          // For student screen sharing, just use screen video and screen audio
+          const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
+          if (screenAudioTrack) {
+            combinedTracks.push(screenAudioTrack);
+          }
+          combinedStream = new MediaStream(combinedTracks);
+          localStreamRef.current = combinedStream;
         }
-        const combinedStream = new MediaStream(combinedTracks);
-        localStreamRef.current = combinedStream;
 
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = screenStream;
@@ -970,15 +997,20 @@ export default function LiveRoomPage() {
           }
 
           if (isCreator) {
-            // Switch back to webcam
+            // Switch back to webcam and mic
             const constraints = {
               video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
-              audio: false,
+              audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
             };
             const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
             const cameraVideoTrack = cameraStream.getVideoTracks()[0];
+            const cameraAudioTrack = cameraStream.getAudioTracks()[0];
 
-            localStreamRef.current = new MediaStream([cameraVideoTrack]);
+            const tracks: MediaStreamTrack[] = [];
+            if (cameraVideoTrack) tracks.push(cameraVideoTrack);
+            if (cameraAudioTrack) tracks.push(cameraAudioTrack);
+            localStreamRef.current = new MediaStream(tracks);
+
             if (localVideoRef.current) {
               localVideoRef.current.srcObject = localStreamRef.current;
             }
