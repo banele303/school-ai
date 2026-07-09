@@ -95,3 +95,23 @@ export const deleteSubject = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+export const ensureMathsLiteracyExists = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query("subjects")
+      .filter((q) => q.eq(q.field("name"), "Maths Literacy"))
+      .first();
+
+    if (!existing) {
+      const subjectId = await ctx.db.insert("subjects", {
+        name: "Maths Literacy",
+        code: "MATHLIT101",
+        isActive: true,
+      });
+      return { status: "created", id: subjectId };
+    }
+    return { status: "already_exists", id: existing._id };
+  },
+});

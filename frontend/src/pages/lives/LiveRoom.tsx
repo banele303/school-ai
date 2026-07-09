@@ -97,6 +97,8 @@ export default function LiveRoomPage() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const studentStreamRef = useRef<MediaStream | null>(null);
+  const studentLocalVideoRef = useRef<HTMLVideoElement>(null);
   const prevRaisedCountRef = useRef(0);
   const hlsPlayerRef = useRef<Hls | null>(null);
   const whipPcRef = useRef<RTCPeerConnection | null>(null);
@@ -721,6 +723,127 @@ export default function LiveRoomPage() {
     }
   };
 
+  // Safe helper to request user media based on device presence
+  const getUserMediaSafe = async (customConstraints: MediaStreamConstraints) => {
+    try {
+      const deviceList = await navigator.mediaDevices.enumerateDevices();
+      const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
+      const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
+
+      const constraints: MediaStreamConstraints = {};
+      if (hasVideoInput && customConstraints.video) {
+        constraints.video = customConstraints.video;
+      }
+      if (hasAudioInput && customConstraints.audio) {
+        constraints.audio = customConstraints.audio;
+      }
+
+      if (!constraints.video && !constraints.audio) {
+        throw new Error("No camera or microphone devices available.");
+      }
+
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err: any) {
+      if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        try {
+          if (customConstraints.video && customConstraints.audio) {
+            return await navigator.mediaDevices.getUserMedia({ audio: true });
+          }
+        } catch {
+          return await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      }
+      throw err;
+    }
+  };
+
+  // Student specific media track setup
+  const startStudentMedia = async (needAudio: boolean, needVideo: boolean) => {
+    try {
+      const deviceList = await navigator.mediaDevices.enumerateDevices();
+      const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
+      const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
+
+      const constraints: MediaStreamConstraints = {
+        audio: needAudio && hasAudioInput,
+        video: needVideo && hasVideoInput,
+      };
+
+      if (!constraints.audio && !constraints.video) {
+        if (studentStreamRef.current) {
+          studentStreamRef.current.getTracks().forEach(t => t.stop());
+          studentStreamRef.current = null;
+        }
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      studentStreamRef.current = stream;
+
+      if (studentLocalVideoRef.current) {
+        studentLocalVideoRef.current.srcObject = stream;
+      }
+    } catch (err: any) {
+      console.error("Student media capture failed:", err);
+      toast.error(`Media capture failed: ${err.message}`);
+    }
+  };
+
+  const stopStudentAudio = () => {
+    if (studentStreamRef.current) {
+      studentStreamRef.current.getAudioTracks().forEach(t => t.stop());
+    }
+  };
+
+  const stopStudentVideoOnly = () => {
+    if (studentStreamRef.current) {
+      studentStreamRef.current.getVideoTracks().forEach(t => t.stop());
+    }
+    if (studentLocalVideoRef.current) {
+      studentLocalVideoRef.current.srcObject = null;
+    }
+  };
+
+  const toggleStudentMic = async () => {
+    if (!id || !user?._id) return;
+    try {
+      const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: user._id as any });
+      if (!res.isMuted) {
+        await startStudentMedia(true, !myBlockCameraStatus);
+      } else {
+        stopStudentAudio();
+      }
+      toast.success(res.isMuted ? "Microphone muted" : "Microphone unmuted");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to toggle microphone.");
+    }
+  };
+
+  const toggleStudentVideo = async () => {
+    if (!id || !user?._id) return;
+    try {
+      const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: user._id as any });
+      if (!res.isCameraBlocked) {
+        await startStudentMedia(!myMuteStatus, true);
+      } else {
+        stopStudentVideoOnly();
+      }
+      toast.success(res.isCameraBlocked ? "Camera turned off" : "Camera turned on");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to toggle camera.");
+    }
+  };
+
+  // Clean up student local stream on unmount
+  useEffect(() => {
+    return () => {
+      if (studentStreamRef.current) {
+        studentStreamRef.current.getTracks().forEach(t => t.stop());
+        studentStreamRef.current = null;
+      }
+    };
+  }, []);
+
   // Start preview (Teacher only)
   const startPreview = async () => {
     try {
@@ -733,7 +856,7 @@ export default function LiveRoomPage() {
         audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await getUserMediaSafe(constraints);
       localStreamRef.current = stream;
 
       if (localVideoRef.current) {
@@ -893,7 +1016,7 @@ export default function LiveRoomPage() {
             video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
             audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
           };
-          const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+          const cameraStream = await getUserMediaSafe(constraints);
           const cameraVideoTrack = cameraStream.getVideoTracks()[0];
           const cameraAudioTrack = cameraStream.getAudioTracks()[0];
 
@@ -1002,7 +1125,7 @@ export default function LiveRoomPage() {
               video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
               audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
             };
-            const cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const cameraStream = await getUserMediaSafe(constraints);
             const cameraVideoTrack = cameraStream.getVideoTracks()[0];
             const cameraAudioTrack = cameraStream.getAudioTracks()[0];
 
@@ -1383,6 +1506,19 @@ export default function LiveRoomPage() {
               <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-xl border border-zinc-800 text-center max-w-xl text-sm font-light tracking-wide backdrop-blur z-20">
                 <span className="text-zinc-400 font-semibold uppercase text-[10px] block mb-1">Live Transcription</span>
                 "Welcome class! Today we're going to dive into advanced coding techniques and look at the structure of our application..."
+              </div>
+            )}
+
+            {/* Small floating video for student's local webcam feed if camera is on */}
+            {!isCreator && !myBlockCameraStatus && (
+              <div className="absolute bottom-4 right-4 w-28 h-20 md:w-36 md:h-24 rounded-xl border border-zinc-800 overflow-hidden shadow-xl z-30 bg-zinc-950">
+                <video
+                  ref={studentLocalVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
               </div>
             )}
 
@@ -1855,43 +1991,39 @@ export default function LiveRoomPage() {
         {/* Center Column: Control Circle Buttons */}
         <div className="flex items-center gap-1.5 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-center">
           
-          {/* Mute Mic (Broadcaster only) */}
-          {isCreator && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
-                isMuted 
-                  ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
-                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
-              )}
-              onClick={toggleMute}
-              title={isMuted ? "Unmute Mic" : "Mute Mic"}
-            >
-              {isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
-              {isMuted && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
-            </Button>
-          )}
+          {/* Mute Mic (Broadcaster or Student) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
+              (isCreator ? isMuted : myMuteStatus)
+                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
+                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+            )}
+            onClick={isCreator ? toggleMute : toggleStudentMic}
+            title={(isCreator ? isMuted : myMuteStatus) ? "Unmute Mic" : "Mute Mic"}
+          >
+            {(isCreator ? isMuted : myMuteStatus) ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+            {(isCreator ? isMuted : myMuteStatus) && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
+          </Button>
 
-          {/* Video Camera (Broadcaster only) */}
-          {isCreator && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
-                isVideoOff 
-                  ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
-                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
-              )}
-              onClick={toggleVideo}
-              title={isVideoOff ? "Turn On Camera" : "Turn Off Camera"}
-            >
-              {isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
-              {isVideoOff && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
-            </Button>
-          )}
+          {/* Video Camera (Broadcaster or Student) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
+              (isCreator ? isVideoOff : myBlockCameraStatus)
+                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
+                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+            )}
+            onClick={isCreator ? toggleVideo : toggleStudentVideo}
+            title={(isCreator ? isVideoOff : myBlockCameraStatus) ? "Turn On Camera" : "Turn Off Camera"}
+          >
+            {(isCreator ? isVideoOff : myBlockCameraStatus) ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+            {(isCreator ? isVideoOff : myBlockCameraStatus) && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
+          </Button>
 
           {/* Screen Share (Broadcaster or permitted student) */}
           {(isCreator || myCanShareScreen) && (

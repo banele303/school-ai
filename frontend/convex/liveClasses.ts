@@ -1023,7 +1023,7 @@ export const toggleMuteStudent = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
+    if (liveClass.teacher !== userId && user?.role !== "admin" && args.studentId !== userId) {
       throw new Error("Unauthorized");
     }
 
@@ -1057,7 +1057,7 @@ export const toggleBlockCameraStudent = mutation({
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
-    if (liveClass.teacher !== userId && user?.role !== "admin") {
+    if (liveClass.teacher !== userId && user?.role !== "admin" && args.studentId !== userId) {
       throw new Error("Unauthorized");
     }
 

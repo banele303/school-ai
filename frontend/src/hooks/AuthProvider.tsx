@@ -1,5 +1,5 @@
-import React, { createContext, useContext } from "react";
-import { useQuery } from "convex/react";
+import React, { createContext, useContext, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 
@@ -20,9 +20,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { signOut } = useAuthActions();
   const convexUser = useQuery(api.users.getMe);
   const currentYear = useQuery(api.academicYears.getCurrentAcademicYear);
+  const ensureMathsLiteracy = useMutation(api.subjects.ensureMathsLiteracyExists);
 
   // We consider loading to be true if the queries are still undefined
   const loading = convexUser === undefined || currentYear === undefined;
+
+  useEffect(() => {
+    ensureMathsLiteracy().catch((err) => {
+      console.error("Failed to ensure Maths Literacy subject exists:", err);
+    });
+  }, [ensureMathsLiteracy]);
 
   return (
     <AuthContext.Provider

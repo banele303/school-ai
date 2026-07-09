@@ -455,11 +455,32 @@ function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
 
   const startPreview = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const deviceList = await navigator.mediaDevices.enumerateDevices();
+      const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
+      const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
+
+      if (!hasVideoInput && !hasAudioInput) {
+        toast.error("No camera or microphone devices found.");
+        return;
+      }
+
+      const constraints: MediaStreamConstraints = {
+        video: hasVideoInput,
+        audio: hasAudioInput,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraOn(true);
-    } catch {
-      toast.error("Camera or microphone permission was blocked.");
+
+      if (hasVideoInput && !hasAudioInput) {
+        toast.warning("No microphone detected. Captured video only.");
+      } else if (!hasVideoInput && hasAudioInput) {
+        toast.warning("No camera detected. Captured audio only.");
+      }
+    } catch (err: any) {
+      toast.error("Camera or microphone permission was blocked or device failed.");
+      console.error("TeacherStudioDialog preview failed:", err);
     }
   };
 

@@ -50,6 +50,7 @@ export const seedAll = mutation({
     // 2. Subjects (CAPS-aligned)
     const subjects = [
       { name: "Mathematics", code: "MATH101" },
+      { name: "Maths Literacy", code: "MATHLIT101" },
       { name: "Physical Sciences", code: "SCI101" },
       { name: "English Home Language", code: "ENG101" },
       { name: "Afrikaans First Additional Language", code: "AFR101" },
