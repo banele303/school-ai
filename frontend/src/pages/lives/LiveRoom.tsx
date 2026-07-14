@@ -91,6 +91,7 @@ export default function LiveRoomPage() {
   const [showReactionsMenu, setShowReactionsMenu] = useState(false);
   const [timeStr, setTimeStr] = useState("");
   const [isCcEnabled, setIsCcEnabled] = useState(false);
+  const [showRosterForStudent, setShowRosterForStudent] = useState(false);
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -1782,165 +1783,189 @@ export default function LiveRoomPage() {
                         ))}
                       </div>
                     )}
-                  </div>
-
-                  {/* Student Roster Section (Online vs Offline) */}
+                            {/* Student Roster Section (Online vs Offline) */}
                   <div className="flex-1 overflow-hidden flex flex-col">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 mb-3 shrink-0">
-                      <Users className="h-3.5 w-3.5" />
-                      Student Roster
-                    </h3>
-
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                      
-                      {/* Online list */}
-                      <div className="space-y-2">
-                        <div className="text-[10px] font-bold text-emerald-500 flex items-center gap-1.5 px-1 uppercase tracking-wider">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          Online ({participants.filter((p: any) => p.isOnline).length})
-                        </div>
-                        {participants.filter((p: any) => p.isOnline).length === 0 ? (
-                          <p className="text-[11px] text-zinc-600 italic pl-1">No students online.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {participants.filter((p: any) => p.isOnline).map((p: any) => (
-                              <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-850">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-6 h-6 rounded-full bg-emerald-950 border border-emerald-800 flex items-center justify-center text-[10px] font-bold text-emerald-450 shrink-0">
-                                    {p.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-xs font-medium text-zinc-200 truncate" title={p.name}>{p.name}</span>
-                                </div>
-                                
-                                <div className="flex items-center gap-1 shrink-0">
-                                  {isModerator ? (
-                                    <>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className={cn("h-7 w-7 rounded-lg", p.isMuted ? "text-red-500 hover:bg-red-950/20" : "text-zinc-400 hover:bg-zinc-800")}
-                                        onClick={async () => {
-                                          try {
-                                            const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: p.studentId });
-                                            toast.success(res.isMuted ? `${p.name} muted.` : `${p.name} unmuted.`);
-                                          } catch (err: any) {
-                                            toast.error(err.message || "Failed to toggle mute.");
-                                          }
-                                        }}
-                                        title={p.isMuted ? "Unmute Student" : "Mute Student"}
-                                      >
-                                        {p.isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className={cn("h-7 w-7 rounded-lg", p.isCameraBlocked ? "text-red-500 hover:bg-red-955/20" : "text-zinc-400 hover:bg-zinc-800")}
-                                        onClick={async () => {
-                                          try {
-                                            const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: p.studentId });
-                                            toast.success(res.isCameraBlocked ? `${p.name} camera blocked.` : `${p.name} camera unblocked.`);
-                                          } catch (err: any) {
-                                            toast.error(err.message || "Failed to toggle camera block.");
-                                          }
-                                        }}
-                                        title={p.isCameraBlocked ? "Unblock Camera" : "Block Camera"}
-                                      >
-                                        {p.isCameraBlocked ? <VideoOff className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className={cn(
-                                          "h-7 w-7 rounded-lg", 
-                                          p.canShareScreen 
-                                            ? "text-emerald-500 hover:bg-emerald-950/20" 
-                                            : p.requestedScreenShare 
-                                              ? "text-amber-500 hover:bg-amber-955/20 animate-pulse" 
-                                              : "text-zinc-400 hover:bg-zinc-800"
-                                        )}
-                                        onClick={async () => {
-                                          try {
-                                            const nextState = !p.canShareScreen;
-                                            await toggleScreenSharePermissionMutation({ 
-                                              liveClassId: id as any, 
-                                              studentId: p.studentId, 
-                                              granted: nextState 
-                                            });
-                                            toast.success(
-                                              nextState 
-                                                ? `Granted screen share permission to ${p.name}.` 
-                                                : `Revoked screen share permission for ${p.name}.`
-                                            );
-                                          } catch (err: any) {
-                                            toast.error(err.message || "Failed to update permission.");
-                                          }
-                                        }}
-                                        title={
-                                          p.canShareScreen 
-                                            ? "Revoke Screen Share" 
-                                            : p.requestedScreenShare 
-                                              ? "Grant Screen Share Request" 
-                                              : "Grant Screen Share"
-                                        }
-                                      >
-                                        <Monitor className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-7 w-7 text-red-550 hover:text-red-400 hover:bg-red-955/20 rounded-lg"
-                                        onClick={async () => {
-                                          try {
-                                            await evictStudentMutation({ liveClassId: id as any, studentId: p.studentId });
-                                            toast.success(`${p.name} evicted from class.`);
-                                          } catch (err: any) {
-                                            toast.error(err.message || "Failed to evict student.");
-                                          }
-                                        }}
-                                        title="Evict Student"
-                                      >
-                                        <PhoneOff className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <div className="flex items-center gap-1.5 px-1">
-                                      {p.isMuted && <span title="Muted"><MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" /></span>}
-                                      {p.isCameraBlocked && <span title="Camera Blocked"><VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" /></span>}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Offline list */}
-                      <div className="space-y-2">
-                        <div className="text-[10px] font-bold text-zinc-500 flex items-center gap-1.5 px-1 uppercase tracking-wider">
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-700"></span>
-                          Offline ({participants.filter((p: any) => !p.isOnline).length})
-                        </div>
-                        {participants.filter((p: any) => !p.isOnline).length === 0 ? (
-                          <p className="text-[11px] text-zinc-650 italic pl-1">All students are online.</p>
-                        ) : (
-                          <div className="space-y-1.5 opacity-60">
-                            {participants.filter((p: any) => !p.isOnline).map((p: any) => (
-                              <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-900">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">
-                                    {p.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <span className="text-xs font-medium text-zinc-400 truncate" title={p.name}>{p.name}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
+                    <div className="flex items-center justify-between mb-3 shrink-0">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        Student Roster
+                      </h3>
+                      {!isModerator && (
+                        <Button 
+                          variant="ghost" 
+                          className="h-6 px-2 text-[10px] font-semibold text-red-500 hover:text-red-400 hover:bg-zinc-800 rounded-md"
+                          onClick={() => setShowRosterForStudent(!showRosterForStudent)}
+                        >
+                          {showRosterForStudent ? "Hide" : "View"}
+                        </Button>
+                      )}
                     </div>
-                  </div>
+
+                    {isModerator || showRosterForStudent ? (
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        
+                        {/* Online list */}
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-bold text-emerald-500 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Online ({participants.filter((p: any) => p.isOnline).length})
+                          </div>
+                          {participants.filter((p: any) => p.isOnline).length === 0 ? (
+                            <p className="text-[11px] text-zinc-650 italic pl-1">No students online.</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {participants.filter((p: any) => p.isOnline).map((p: any) => (
+                                <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-850">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-950 border border-emerald-800 flex items-center justify-center text-[10px] font-bold text-emerald-450 shrink-0">
+                                      {p.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-medium text-zinc-200 truncate" title={p.name}>{p.name}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {isModerator ? (
+                                      <>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className={cn("h-7 w-7 rounded-lg", p.isMuted ? "text-red-500 hover:bg-red-955/20" : "text-zinc-400 hover:bg-zinc-800")}
+                                          onClick={async () => {
+                                            try {
+                                              const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                              toast.success(res.isMuted ? `${p.name} muted.` : `${p.name} unmuted.`);
+                                            } catch (err: any) {
+                                              toast.error(err.message || "Failed to toggle mute.");
+                                            }
+                                          }}
+                                          title={p.isMuted ? "Unmute Student" : "Mute Student"}
+                                        >
+                                          {p.isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className={cn("h-7 w-7 rounded-lg", p.isCameraBlocked ? "text-red-500 hover:bg-red-955/20" : "text-zinc-400 hover:bg-zinc-800")}
+                                          onClick={async () => {
+                                            try {
+                                              const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                              toast.success(res.isCameraBlocked ? `${p.name} camera blocked.` : `${p.name} camera unblocked.`);
+                                            } catch (err: any) {
+                                              toast.error(err.message || "Failed to toggle camera block.");
+                                            }
+                                          }}
+                                          title={p.isCameraBlocked ? "Unblock Camera" : "Block Camera"}
+                                        >
+                                          {p.isCameraBlocked ? <VideoOff className="h-3.5 w-3.5" /> : <VideoIcon className="h-3.5 w-3.5" />}
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className={cn(
+                                            "h-7 w-7 rounded-lg", 
+                                            p.canShareScreen 
+                                              ? "text-emerald-500 hover:bg-emerald-950/20" 
+                                              : p.requestedScreenShare 
+                                                ? "text-amber-500 hover:bg-amber-955/20 animate-pulse" 
+                                                : "text-zinc-400 hover:bg-zinc-800"
+                                          )}
+                                          onClick={async () => {
+                                            try {
+                                              const nextState = !p.canShareScreen;
+                                              await toggleScreenSharePermissionMutation({ 
+                                                liveClassId: id as any, 
+                                                studentId: p.studentId, 
+                                                granted: nextState 
+                                              });
+                                              toast.success(
+                                                nextState 
+                                                  ? `Granted screen share permission to ${p.name}.` 
+                                                  : `Revoked screen share permission for ${p.name}.`
+                                              );
+                                            } catch (err: any) {
+                                              toast.error(err.message || "Failed to update permission.");
+                                            }
+                                          }}
+                                          title={
+                                            p.canShareScreen 
+                                              ? "Revoke Screen Share" 
+                                              : p.requestedScreenShare 
+                                                ? "Grant Screen Share Request" 
+                                                : "Grant Screen Share"
+                                          }
+                                        >
+                                          <Monitor className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-7 w-7 text-red-550 hover:text-red-400 hover:bg-red-955/20 rounded-lg"
+                                          onClick={async () => {
+                                            try {
+                                              await evictStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                              toast.success(`${p.name} evicted from class.`);
+                                            } catch (err: any) {
+                                              toast.error(err.message || "Failed to evict student.");
+                                            }
+                                          }}
+                                          title="Evict Student"
+                                        >
+                                          <PhoneOff className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5 px-1">
+                                        {p.isMuted && <span title="Muted"><MicOff className="h-3.5 w-3.5 text-red-500 opacity-80" /></span>}
+                                        {p.isCameraBlocked && <span title="Camera Blocked"><VideoOff className="h-3.5 w-3.5 text-red-500 opacity-80" /></span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Offline list */}
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-bold text-zinc-500 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                            <span className="h-1.5 w-1.5 rounded-full bg-zinc-700"></span>
+                            Offline ({participants.filter((p: any) => !p.isOnline).length})
+                          </div>
+                          {participants.filter((p: any) => !p.isOnline).length === 0 ? (
+                            <p className="text-[11px] text-zinc-650 italic pl-1">All students are online.</p>
+                          ) : (
+                            <div className="space-y-1.5 opacity-60">
+                              {participants.filter((p: any) => !p.isOnline).map((p: any) => (
+                                <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-900">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">
+                                      {p.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-medium text-zinc-400 truncate" title={p.name}>{p.name}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center p-4 text-center rounded-xl bg-zinc-900/30 border border-dashed border-zinc-800">
+                        <Users className="h-6 w-6 text-zinc-600 mb-2" />
+                        <p className="text-xs text-zinc-400">Student list is hidden by default.</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 text-xs border-zinc-800 hover:bg-zinc-800 hover:text-white rounded-xl"
+                          onClick={() => setShowRosterForStudent(true)}
+                        >
+                          View Online Students
+                        </Button>
+                      </div>
+                    )}
+                  </div>          </div>
 
                 </div>
               )}
