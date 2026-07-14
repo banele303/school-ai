@@ -157,7 +157,7 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
             <CustomSelect
               control={form.control}
               name="classTeacher"
-              label="Year"
+              label="Teacher"
               placeholder="Select Teacher"
               options={teachersOptions}
               disabled={pending}

@@ -317,6 +317,7 @@ export default function LiveRoomPage() {
         if (!stream.getTracks().find(t => t.id === event.track.id)) {
           stream.addTrack(event.track);
           console.log("Added track to remote video stream:", event.track.kind);
+          remoteVideoRef.current.srcObject = stream;
         }
 
         // Programmatically and unconditionally play
@@ -622,6 +623,7 @@ export default function LiveRoomPage() {
           const stream = remoteVideoRef.current.srcObject;
           if (stream instanceof MediaStream && !stream.getTracks().find(t => t.id === event.track.id)) {
             stream.addTrack(event.track);
+            remoteVideoRef.current.srcObject = stream;
           }
         }
       }

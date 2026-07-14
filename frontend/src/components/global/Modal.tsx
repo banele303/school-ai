@@ -24,13 +24,15 @@ const Modal = ({
 }) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-2">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        {children}
-        <DialogFooter>
+        <div className="flex-1 overflow-y-auto px-6 py-2 min-h-0">
+          {children}
+        </div>
+        <DialogFooter className="p-6 pt-2">
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
