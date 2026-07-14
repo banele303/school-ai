@@ -20,6 +20,7 @@ import {
   Play,
   Plus,
   Search,
+  Trash2,
   UploadCloud,
   Video,
   X,
@@ -44,6 +45,7 @@ export default function VideoLibraryPage() {
   const myProgress = user?.role === "student" ? useQuery(api.videoLibrary.getMyProgress, {}) : null;
   const createVideo = useMutation(api.videoLibrary.createVideo);
   const incrementView = useMutation(api.videoLibrary.incrementViewCount);
+  const deleteVideoMutation = useMutation(api.videoLibrary.deleteVideo);
 
   const playlists = useMemo(
     () => [...new Set(videos.filter((v: any) => v.playlist).map((v: any) => v.playlist))],
@@ -76,6 +78,19 @@ export default function VideoLibraryPage() {
   const handlePlayVideo = (video: any) => {
     setNowPlaying(video);
     void incrementView({ videoId: video._id });
+  };
+
+  const handleDeleteVideo = async (videoId: any) => {
+    if (!confirm("Are you sure you want to delete this video?")) return;
+    try {
+      await deleteVideoMutation({ videoId });
+      toast.success("Video deleted successfully.");
+      if (nowPlaying?._id === videoId) {
+        setNowPlaying(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete video.");
+    }
   };
 
   const getYoutubeEmbedUrl = (url: string) => {
@@ -188,13 +203,30 @@ export default function VideoLibraryPage() {
                           <h2 className="line-clamp-2 text-sm font-semibold leading-5">{video.title}</h2>
                           {video.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">{video.description}</p>}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {subject && <Badge variant="secondary">{subject.name}</Badge>}
-                          {video.grade && <Badge variant="outline">Grade {video.grade}</Badge>}
-                          <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-zinc-400">
-                            <Eye className="h-3.5 w-3.5" />
-                            {video.viewCount || 0}
-                          </span>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {subject && <Badge variant="secondary">{subject.name}</Badge>}
+                            {video.grade && <Badge variant="outline">Grade {video.grade}</Badge>}
+                            <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-zinc-400">
+                              <Eye className="h-3.5 w-3.5" />
+                              {video.viewCount || 0}
+                            </span>
+                          </div>
+                          {(video.teacher === user?._id || user?.role === "admin") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleDeleteVideo(video._id);
+                              }}
+                              title="Delete Video"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                         {progress && !progress.completed && (
                           <div className="space-y-1">
