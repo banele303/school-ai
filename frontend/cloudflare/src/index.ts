@@ -256,6 +256,51 @@ app.post("/api/live/create-input", async (c) => {
   }
 });
 
+app.get("/api/live/input/:uid/recordings", async (c) => {
+  try {
+    const uid = c.req.param("uid");
+    if (!c.env.CLOUDFLARE_ACCOUNT_ID || !c.env.CLOUDFLARE_API_TOKEN) {
+      return c.json({ error: "Cloudflare Stream Live is not configured." }, 400);
+    }
+
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/stream/live_inputs/${uid}/videos`,
+      {
+        headers: {
+          Authorization: `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
+        },
+      }
+    );
+
+    const data = await response.json() as CloudflareApiResponse<Array<{
+      uid: string;
+      thumbnail?: string;
+      duration?: number;
+      created?: string;
+      status?: { state?: string };
+    }>>;
+
+    if (!response.ok || !data.success || !data.result) {
+      return c.json({ error: data.errors?.[0]?.message || "Failed to fetch recordings." }, 500);
+    }
+
+    const recordings = data.result.map(video => ({
+      uid: video.uid,
+      playbackUrl: `https://videodelivery.net/${video.uid}/manifest/video.m3u8`,
+      iframeUrl: `https://iframe.videodelivery.net/${video.uid}`,
+      thumbnailUrl: video.thumbnail || `https://videodelivery.net/${video.uid}/thumbnails/thumbnail.jpg`,
+      duration: video.duration,
+      created: video.created,
+      status: video.status?.state,
+    }));
+
+    return c.json(recordings);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to fetch recordings.";
+    return c.json({ error: message }, 500);
+  }
+});
+
 app.get("/api/stream/video/:uid", async (c) => {
   try {
     const uid = c.req.param("uid");

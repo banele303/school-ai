@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +45,7 @@ import InviteDialog from "./InviteDialog";
 import {
   createStreamLiveInput,
   createStreamDirectUpload,
+  getLiveInputRecordings,
   markScannedWork,
   uploadFileToR2,
   uploadVideoToStream,
@@ -801,11 +802,37 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
 
 function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
   if (!lesson) return null;
-  const playbackUrl = lesson.recordingUrl?.includes("videodelivery.net")
-    ? lesson.recordingUrl
-    : lesson.recordingUrl
-      ? lesson.recordingUrl
-      : "";
+
+  const [resolvedPlaybackUrl, setResolvedPlaybackUrl] = useState("");
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    const originalUrl = lesson.recordingUrl || "";
+    const isLiveInputUrl = originalUrl.includes("/manifest/video.m3u8") || originalUrl.includes("mock_");
+
+    if (isLiveInputUrl && lesson.streamInputId && !lesson.streamInputId.startsWith("mock_")) {
+      setResolving(true);
+      getLiveInputRecordings(lesson.streamInputId)
+        .then((recordings) => {
+          if (recordings && recordings.length > 0) {
+            setResolvedPlaybackUrl(recordings[0].iframeUrl);
+          } else {
+            setResolvedPlaybackUrl(originalUrl);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to resolve live recording:", err);
+          setResolvedPlaybackUrl(originalUrl);
+        })
+        .finally(() => {
+          setResolving(false);
+        });
+    } else {
+      setResolvedPlaybackUrl(originalUrl);
+    }
+  }, [lesson]);
+
+  const playbackUrl = resolvedPlaybackUrl;
 
   return (
     <Dialog open={!!lesson} onOpenChange={onClose}>
@@ -816,9 +843,22 @@ function LessonRoomDialog({ lesson, onClose, isTeacher }: any) {
         <div className="flex-1 overflow-y-auto p-6 sm:p-8 pt-4 min-h-0">
           <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
             <div className="overflow-hidden rounded-xl bg-black aspect-video w-full flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
-              {playbackUrl ? (
-                playbackUrl.includes("iframe.videodelivery.net") ? (
-                  <iframe title={lesson.title} src={playbackUrl} className="w-full h-full aspect-video" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen />
+              {resolving ? (
+                <div className="text-center text-zinc-300 p-6">
+                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Loading replay recording...</p>
+                </div>
+              ) : playbackUrl ? (
+                playbackUrl.includes("iframe.videodelivery.net") || playbackUrl.includes("videodelivery.net") ? (
+                  <iframe 
+                    title={lesson.title} 
+                    src={playbackUrl.includes("iframe.videodelivery.net") 
+                      ? playbackUrl 
+                      : playbackUrl.replace("videodelivery.net", "iframe.videodelivery.net")} 
+                    className="w-full h-full aspect-video border-0" 
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" 
+                    allowFullScreen 
+                  />
                 ) : (
                   <video src={playbackUrl} controls className="w-full h-full object-contain" />
                 )

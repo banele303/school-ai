@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/hooks/AuthProvider";
 import Hls from "hls.js";
 import InviteDialog from "./InviteDialog";
-import { createStreamLiveInput } from "@/lib/cloudflareWorker";
+import { createStreamLiveInput, getLiveInputRecordings } from "@/lib/cloudflareWorker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,8 @@ export default function LiveRoomPage() {
   const [timeStr, setTimeStr] = useState("");
   const [isCcEnabled, setIsCcEnabled] = useState(false);
   const [showRosterForStudent, setShowRosterForStudent] = useState(false);
+  const [resolvedRecordingUrl, setResolvedRecordingUrl] = useState<string | null>(null);
+  const [resolvingRecording, setResolvingRecording] = useState(false);
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -883,6 +885,35 @@ export default function LiveRoomPage() {
     };
   }, [isCreator, selectedVideoDevice, selectedAudioDevice, isBroadcasting]);
 
+  // Resolve recording URL dynamically if it points to live input manifest
+  useEffect(() => {
+    if (classItem?.status === "ended" && classItem?.recordingUrl) {
+      const isLiveInputUrl = classItem.recordingUrl.includes("/manifest/video.m3u8") || 
+                             classItem.recordingUrl.includes("mock_");
+      
+      if (isLiveInputUrl && classItem.streamInputId && !classItem.streamInputId.startsWith("mock_")) {
+        setResolvingRecording(true);
+        getLiveInputRecordings(classItem.streamInputId)
+          .then((recordings) => {
+            if (recordings && recordings.length > 0) {
+              setResolvedRecordingUrl(recordings[0].iframeUrl);
+            } else {
+              setResolvedRecordingUrl(classItem.recordingUrl);
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to resolve live recording:", err);
+            setResolvedRecordingUrl(classItem.recordingUrl);
+          })
+          .finally(() => {
+            setResolvingRecording(false);
+          });
+      } else {
+        setResolvedRecordingUrl(classItem.recordingUrl);
+      }
+    }
+  }, [classItem?.status, classItem?.recordingUrl, classItem?.streamInputId]);
+
   // Go Live (Teacher)
   const handleGoLive = async () => {
     if (!classItem) return;
@@ -1345,22 +1376,33 @@ export default function LiveRoomPage() {
             {/* 1. REPLAY OR LIVE/PREVIEW VIEW */}
             {classItem.status === "ended" && classItem.recordingUrl ? (
               <div className="w-full h-full relative bg-black flex items-center justify-center">
-                {classItem.recordingUrl.includes("videodelivery.net") || classItem.recordingUrl.includes("iframe.videodelivery.net") ? (
-                  <iframe
-                     title={classItem.title}
-                     src={classItem.recordingUrl.includes("iframe.videodelivery.net") 
-                       ? classItem.recordingUrl 
-                       : classItem.recordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
-                     className="w-full h-full aspect-video border-0"
-                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                     allowFullScreen
-                   />
+                {resolvingRecording ? (
+                  <div className="text-center text-zinc-300 p-6">
+                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Loading replay recording...</p>
+                  </div>
+                ) : resolvedRecordingUrl ? (
+                  resolvedRecordingUrl.includes("iframe.videodelivery.net") || resolvedRecordingUrl.includes("videodelivery.net") ? (
+                    <iframe
+                       title={classItem.title}
+                       src={resolvedRecordingUrl.includes("iframe.videodelivery.net") 
+                         ? resolvedRecordingUrl 
+                         : resolvedRecordingUrl.replace("videodelivery.net", "iframe.videodelivery.net")}
+                       className="w-full h-full aspect-video border-0"
+                       allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                       allowFullScreen
+                     />
+                  ) : (
+                    <video
+                      src={resolvedRecordingUrl}
+                      controls
+                      className="w-full h-full object-contain"
+                    />
+                  )
                 ) : (
-                  <video
-                    src={classItem.recordingUrl}
-                    controls
-                    className="w-full h-full object-contain"
-                  />
+                  <div className="text-center text-zinc-300 p-6 font-medium">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-450">Recording is being processed. Please check back shortly.</p>
+                  </div>
                 )}
               </div>
             ) : (isCreator || isScreenSharing) ? (

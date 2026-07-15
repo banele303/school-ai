@@ -69,3 +69,9 @@ cloudflare/*.key
 
 # Convex
 frontend/convex/_generated/
+
+# Python and outreach secrets
+outreach-email/.token
+outreach-email/__pycache__/
+outreach-email/leads/
+outreach-email/output/

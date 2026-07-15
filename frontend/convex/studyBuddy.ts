@@ -40,7 +40,7 @@ export const askStudyBuddy = action({
     }))),
   },
   handler: async (ctx, args): Promise<{ answer: string }> => {
-    const apiKey = process.env.DEEPSEEK_API_KEY || "sk-6a52b4fc3de54d72a255435f93b843fa";
+    const apiKey = process.env.DEEPSEEK_API_KEY || "sk-6f00b232f9f0492fa87aa1e12920f50a";
     if (!apiKey) return { answer: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
 
     const userId = await getAuthUserId(ctx);

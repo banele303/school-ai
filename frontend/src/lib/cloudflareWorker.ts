@@ -144,6 +144,16 @@ export async function uploadVideoToStream(uploadURL: string, file: File): Promis
   }
 }
 
+export async function getLiveInputRecordings(whipUrlOrUid: string): Promise<any[]> {
+  const uid = whipUrlOrUid.includes("/") ? whipUrlOrUid.split("/").filter(Boolean).pop() : whipUrlOrUid;
+  const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/live/input/${uid}/recordings`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to fetch recordings.");
+  }
+  return res.json();
+}
+
 export async function markScannedWork(payload: {
   title: string;
   subjectName?: string;
