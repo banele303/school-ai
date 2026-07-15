@@ -12,9 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, FileText, BookOpen, Trash2, Database, RefreshCw, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { FileUpload } from "@/components/global/FileUpload";
 
 export default function AdminResources() {
-  const [activeTab, setActiveTab] = useState("seed");
+  const [activeTab, setActiveTab] = useState("past-papers");
   const [selectedGrade, setSelectedGrade] = useState<number>(12);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
   const [seeding, setSeeding] = useState(false);
@@ -186,54 +187,11 @@ export default function AdminResources() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="seed">Seed Data</TabsTrigger>
           <TabsTrigger value="past-papers">Past Papers</TabsTrigger>
           <TabsTrigger value="study-resources">Study Resources</TabsTrigger>
           <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
         </TabsList>
 
-        {/* SEED DATA TAB */}
-        <TabsContent value="seed" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Database className="h-5 w-5 text-primary" />
-                Database Seed
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Seed the database with initial data. This will populate academic years, subjects, classes, students, teachers, past papers, study resources, and CAPS syllabus content.
-              </p>
-              {seedResult && (
-                <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Seed Complete</span>
-                  </div>
-                  <pre className="text-xs text-emerald-700 dark:text-emerald-300 whitespace-pre-wrap">{seedResult}</pre>
-                </div>
-              )}
-              <div className="flex gap-3">
-                <Button onClick={handleSeedBasic} disabled={seeding} variant="outline">
-                  {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  Seed Basic Data
-                </Button>
-                <Button onClick={handleSeedCaps} disabled={seeding} variant="outline">
-                  {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
-                  Seed CAPS Curriculum
-                </Button>
-                <Button onClick={handleSeedAll} disabled={seeding} className="bg-[#dc2626] text-black hover:bg-[#b91c1c]">
-                  {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
-                  Seed Everything
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                ⚠️ Seeding will clear existing data and re-create it. Run this after every Convex dev server restart.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="past-papers" className="space-y-4">
           <Card>
             <CardHeader><CardTitle className="text-base">Upload Past Paper</CardTitle></CardHeader>
@@ -289,9 +247,22 @@ export default function AdminResources() {
                 </div>
               </div>
               <div>
-                <Label className="text-sm font-medium mb-1.5 block">File URL *</Label>
-                <Input value={ppFileUrl} onChange={e => setPpFileUrl(e.target.value)} placeholder="https://your-storage.com/file.pdf" />
-                <p className="text-xs text-muted-foreground mt-1">Upload file to Cloudflare R2 first, then paste the URL here.</p>
+                <Label className="text-sm font-medium mb-1.5 block">File Attachment *</Label>
+                {!ppFileUrl ? (
+                  <FileUpload
+                    onUploadComplete={(result) => {
+                      setPpFileUrl(result.url);
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,image/*"
+                  />
+                ) : (
+                  <div className="p-3 border rounded-lg bg-muted/50 flex items-center justify-between">
+                    <span className="text-xs truncate font-medium">{ppFileUrl}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setPpFileUrl("")}>
+                      Remove
+                    </Button>
+                  </div>
+                )}
               </div>
               <Button onClick={handleAddPastPaper} className="bg-[#dc2626] text-black hover:bg-[#b91c1c]">
                 <Upload className="mr-2 h-4 w-4" /> Add Past Paper
@@ -348,7 +319,7 @@ export default function AdminResources() {
                 <Label className="text-sm font-medium mb-1.5 block">Description</Label>
                 <Input value={srDescription} onChange={e => setSrDescription(e.target.value)} placeholder="Brief description..." />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Grade</Label>
                   <Input type="number" value={srGrade} onChange={e => setSrGrade(e.target.value)} min={1} max={12} />
@@ -366,10 +337,24 @@ export default function AdminResources() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium mb-1.5 block">File URL *</Label>
-                  <Input value={srFileUrl} onChange={e => setSrFileUrl(e.target.value)} placeholder="https://..." />
-                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-1.5 block">File Attachment *</Label>
+                {!srFileUrl ? (
+                  <FileUpload
+                    onUploadComplete={(result) => {
+                      setSrFileUrl(result.url);
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,image/*"
+                  />
+                ) : (
+                  <div className="p-3 border rounded-lg bg-muted/50 flex items-center justify-between">
+                    <span className="text-xs truncate font-medium">{srFileUrl}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setSrFileUrl("")}>
+                      Remove
+                    </Button>
+                  </div>
+                )}
               </div>
               <Button onClick={handleAddResource} className="bg-[#dc2626] text-black hover:bg-[#b91c1c]">
                 <Upload className="mr-2 h-4 w-4" /> Add Resource

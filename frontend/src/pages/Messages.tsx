@@ -77,31 +77,33 @@ export default function MessagesPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>New Conversation</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                  {messageable === undefined ? (
-                    <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
-                  ) : messageable.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">No contacts available.</p>
-                  ) : (
-                    messageable.map((u: any) => (
-                      <button
-                        key={u._id}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
-                        onClick={() => handleNewConversation(u._id)}
-                      >
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {getInitials(u.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-sm">{u.name}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{u.role}</p>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
+                <ScrollArea className="max-h-[300px] pr-2">
+                  <div className="space-y-1">
+                    {messageable === undefined ? (
+                      <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                    ) : messageable.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">No contacts available.</p>
+                    ) : (
+                      messageable.map((u: any) => (
+                        <button
+                          key={u._id}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted transition-colors text-left text-foreground"
+                          onClick={() => handleNewConversation(u._id)}
+                        >
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                              {getInitials(u.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm text-foreground">{u.name}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{u.role}</p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
               </DialogContent>
             </Dialog>
           </div>
