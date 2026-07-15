@@ -91,3 +91,18 @@ export const update = mutation({
     return { success: true };
   },
 });
+
+export const remove = mutation({
+  args: { id: v.id("whiteboards") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const board = await ctx.db.get(args.id);
+    if (!board) throw new Error("Whiteboard not found");
+    if (board.ownerId !== userId) throw new Error("Only the owner can delete this whiteboard");
+
+    await ctx.db.delete(args.id);
+    return { success: true };
+  },
+});

@@ -91,7 +91,7 @@ export const addPastPaper = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Only admins can upload past papers");
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Only admins and teachers can upload past papers");
     return await ctx.db.insert("pastPapers", {
       title: args.title,
       grade: args.grade,
@@ -117,7 +117,7 @@ export const deletePastPaper = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Only admins can delete");
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Only admins and teachers can delete past papers");
     await ctx.db.delete(args.id);
   },
 });
@@ -162,7 +162,7 @@ export const addStudyResource = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Only admins can upload resources");
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Only admins and teachers can upload resources");
     return await ctx.db.insert("studyResources", {
       title: args.title,
       description: args.description,
@@ -187,7 +187,7 @@ export const deleteStudyResource = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Only admins can delete");
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Only admins and teachers can delete study resources");
     await ctx.db.delete(args.id);
   },
 });

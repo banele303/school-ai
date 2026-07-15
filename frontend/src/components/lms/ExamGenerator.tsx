@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useForm, Controller, type Resolver } from "react-hook-form";
+import { useNavigate } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Sparkles, Loader2, BookOpen, Zap, GraduationCap, ChevronDown, ChevronUp, Plus, Minus, LayoutTemplate } from "lucide-react";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 import { Button } from "@/components/ui/button";
@@ -226,7 +227,8 @@ const schema = z.object({
   subject: z.string().min(1, "Subject is required"),
   class: z.string().min(1, "Class is required"),
   examType: z.enum(["quiz", "exam"]),
-  topics: z.array(z.string()).min(1, "Select at least one topic"),
+  topics: z.array(z.string()).optional(),
+  duration: z.coerce.number().min(5, "Duration must be at least 5 minutes"),
   difficulty: z.enum(["Easy", "Medium", "Hard"]),
   questionMix: z.array(
     z.object({
@@ -249,15 +251,18 @@ interface Props {
 }
 
 const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
+  const navigate = useNavigate();
   const convexSubjects = useQuery(api.subjects.getSubjects);
   const convexClasses = useQuery(api.classes.getClasses, { academicYear: undefined });
   const generateExamAction = useAction(api.exams.generateExam);
+  const createExamMutation = useMutation(api.exams.createExam);
 
   const subjects = convexSubjects || [];
   const classes = convexClasses || [];
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"template" | "configure">("template");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [isScratch, setIsScratch] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const form = useForm<FormValues>({
@@ -265,6 +270,7 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
     defaultValues: {
       examType: "exam",
       topics: [],
+      duration: 60,
       difficulty: "Medium",
       questionMix: [
         { type: "MCQ", count: 5, points: 1 },
@@ -388,7 +394,36 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
   };
 
   const onSubmit = async (values: FormValues) => {
-    if (values.topics.length === 0) {
+    if (isScratch) {
+      try {
+        setLoading(true);
+        const examId = await createExamMutation({
+          title: values.title,
+          subject: values.subject as any,
+          class: values.class as any,
+          duration: values.duration,
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // default 1 week
+          examType: values.examType,
+          maxAttempts: values.maxAttempts,
+          instantFeedback: values.instantFeedback,
+          templateUsed: "scratch",
+        });
+        toast.success("Blank assessment created successfully!");
+        onSuccess();
+        onOpenChange(false);
+        setStep("template");
+        setSelectedTemplate(null);
+        setIsScratch(false);
+        navigate(`/lms/exams/${examId}`);
+      } catch (error: any) {
+        toast.error(error.message || "Failed to create assessment");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!values.topics || values.topics.length === 0) {
       toast.error("Please select at least one syllabus topic");
       return;
     }
@@ -444,6 +479,7 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
       // Reset
       setStep("template");
       setSelectedTemplate(null);
+      setIsScratch(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to start generation");
     } finally {
@@ -569,6 +605,7 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
               className="w-full"
               onClick={() => {
                 setSelectedTemplate(null);
+                setIsScratch(true);
                 setStep("configure");
               }}
             >
@@ -581,7 +618,10 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
               {/* Back button */}
               <button
                 type="button"
-                onClick={() => setStep("template")}
+                onClick={() => {
+                  setStep("template");
+                  setIsScratch(false);
+                }}
                 className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
                 ← Back to templates
@@ -647,168 +687,185 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
                 />
               </div>
 
-              {/* Syllabus Topics Multi-Select */}
-              <Field>
-                <FieldLabel className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" />
-                  Syllabus Topics
-                  {selectedTopics.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto">
-                      {selectedTopics.length} selected
-                    </Badge>
-                  )}
-                </FieldLabel>
-                {syllabusTopics && syllabusTopics.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/30">
-                    {syllabusTopics.map((t: any) => (
-                      <button
-                        key={t._id}
-                        type="button"
-                        onClick={() => toggleTopic(t.topic)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
-                          selectedTopics.includes(t.topic)
-                            ? "bg-violet-600 text-white border-violet-600"
-                            : "bg-background hover:bg-violet-50 dark:hover:bg-violet-950/30 border-border"
-                        )}
-                      >
-                        {t.topic}
-                        {t.subTopics?.length > 0 && (
-                          <span className="ml-1 opacity-60">({t.subTopics.length} sub-topics)</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 border rounded-lg bg-muted/30 text-sm text-muted-foreground">
-                    {selectedSubjectId
-                      ? "No syllabus topics found for this subject. You can still generate questions."
-                      : "Select a subject first to see syllabus topics."}
-                  </div>
-                )}
-              </Field>
-
-              {/* Difficulty */}
+              {/* Duration */}
               <Controller
-                name="difficulty"
+                name="duration"
                 control={form.control}
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel>Difficulty Level</FieldLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Easy">🟢 Easy</SelectItem>
-                        <SelectItem value="Medium">🟡 Medium</SelectItem>
-                        <SelectItem value="Hard">🔴 Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel>Duration (minutes)</FieldLabel>
+                    <Input type="number" min={5} max={180} {...field} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
               />
 
-              {/* Question Type Mix */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <FieldLabel className="mb-0">Question Types</FieldLabel>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={addQuestionTypeRow}
-                    className="h-7 text-xs"
-                  >
-                    <Plus className="h-3 w-3 mr-1" /> Add Type
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {questionMix.map((mix, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 border rounded-lg bg-muted/20">
-                      <Select
-                        value={mix.type}
-                        onValueChange={(val) => {
-                          const updated = [...questionMix];
-                          updated[index] = { ...updated[index], type: val };
-                          form.setValue("questionMix", updated);
-                        }}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableQuestionTypes.map((qt) => (
-                            <SelectItem key={qt.value} value={qt.value}>
-                              {qt.icon} {qt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateQuestionMixCount(index, -1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm font-medium">{mix.count}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateQuestionMixCount(index, 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+              {!isScratch && (
+                <>
+                  {/* Syllabus Topics Multi-Select */}
+                  <Field>
+                    <FieldLabel className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      Syllabus Topics
+                      {selectedTopics && selectedTopics.length > 0 && (
+                        <Badge variant="secondary" className="ml-auto">
+                          {selectedTopics.length} selected
+                        </Badge>
+                      )}
+                    </FieldLabel>
+                    {syllabusTopics && syllabusTopics.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/30">
+                        {syllabusTopics.map((t: any) => (
+                          <button
+                            key={t._id}
+                            type="button"
+                            onClick={() => toggleTopic(t.topic)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                              selectedTopics.includes(t.topic)
+                                ? "bg-violet-600 text-white border-violet-600"
+                                : "bg-background hover:bg-violet-50 dark:hover:bg-violet-950/30 border-border"
+                            )}
+                          >
+                            {t.topic}
+                            {t.subTopics?.length > 0 && (
+                              <span className="ml-1 opacity-60">({t.subTopics.length} sub-topics)</span>
+                            )}
+                          </button>
+                        ))}
                       </div>
-
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        ×
-                        <Input
-                          type="number"
-                          min={1}
-                          max={10}
-                          className="w-12 h-7 text-xs"
-                          value={mix.points}
-                          onChange={(e) => {
-                            const updated = [...questionMix];
-                            updated[index] = { ...updated[index], points: parseInt(e.target.value) || 1 };
-                            form.setValue("questionMix", updated);
-                          }}
-                        />
-                        pts
+                    ) : (
+                      <div className="p-3 border rounded-lg bg-muted/30 text-sm text-muted-foreground">
+                        {selectedSubjectId
+                          ? "No syllabus topics found for this subject. You can still generate questions."
+                          : "Select a subject first to see syllabus topics."}
                       </div>
+                    )}
+                  </Field>
 
+                  {/* Difficulty */}
+                  <Controller
+                    name="difficulty"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel>Difficulty Level</FieldLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Easy">🟢 Easy</SelectItem>
+                            <SelectItem value="Medium">🟡 Medium</SelectItem>
+                            <SelectItem value="Hard">🔴 Hard</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    )}
+                  />
+
+                  {/* Question Type Mix */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <FieldLabel className="mb-0">Question Types</FieldLabel>
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 ml-auto text-muted-foreground hover:text-destructive"
-                        onClick={() => removeQuestionTypeRow(index)}
-                        disabled={questionMix.length <= 1}
+                        size="sm"
+                        onClick={addQuestionTypeRow}
+                        className="h-7 text-xs"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Plus className="h-3 w-3 mr-1" /> Add Type
                       </Button>
                     </div>
-                  ))}
-                </div>
 
-                {/* Summary */}
-                <div className="flex gap-3 text-xs text-muted-foreground">
-                  <span>Total: <strong className="text-foreground">{totalQuestions}</strong> questions</span>
-                  <span>•</span>
-                  <span>Points: <strong className="text-foreground">{totalPoints}</strong></span>
-                  <span>•</span>
-                  <span>Est. time: <strong className="text-foreground">{Math.max(5, Math.ceil(totalQuestions * 2))}</strong> min</span>
-                </div>
-              </div>
+                    <div className="space-y-2">
+                      {questionMix.map((mix, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 border rounded-lg bg-muted/20">
+                          <Select
+                            value={mix.type}
+                            onValueChange={(val) => {
+                              const updated = [...questionMix];
+                              updated[index] = { ...updated[index], type: val };
+                              form.setValue("questionMix", updated);
+                            }}
+                          >
+                            <SelectTrigger className="w-[180px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableQuestionTypes.map((qt) => (
+                                <SelectItem key={qt.value} value={qt.value}>
+                                  {qt.icon} {qt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateQuestionMixCount(index, -1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center text-sm font-medium">{mix.count}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateQuestionMixCount(index, 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            ×
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              className="w-12 h-7 text-xs"
+                              value={mix.points}
+                              onChange={(e) => {
+                                const updated = [...questionMix];
+                                updated[index] = { ...updated[index], points: parseInt(e.target.value) || 1 };
+                                form.setValue("questionMix", updated);
+                              }}
+                            />
+                            pts
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 ml-auto text-muted-foreground hover:text-destructive"
+                            onClick={() => removeQuestionTypeRow(index)}
+                            disabled={questionMix.length <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Summary */}
+                    <div className="flex gap-3 text-xs text-muted-foreground">
+                      <span>Total: <strong className="text-foreground">{totalQuestions}</strong> questions</span>
+                      <span>•</span>
+                      <span>Points: <strong className="text-foreground">{totalPoints}</strong></span>
+                      <span>•</span>
+                      <span>Est. time: <strong className="text-foreground">{Math.max(5, Math.ceil(totalQuestions * 2))}</strong> min</span>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Quiz-specific options */}
               {selectedExamType === "quiz" && (
@@ -843,37 +900,43 @@ const ExamGenerator = ({ open, onOpenChange, onSuccess }: Props) => {
               )}
 
               {/* Advanced toggle */}
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Advanced Options
-              </button>
+              {!isScratch && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    Advanced Options
+                  </button>
 
-              {showAdvanced && (
-                <div className="p-3 border rounded-lg bg-muted/20 text-xs text-muted-foreground space-y-2">
-                  <p><strong>Subject Category:</strong> {subjectCategory}</p>
-                  <p><strong>Available Question Types:</strong> {availableQuestionTypes.map((t) => t.label).join(", ")}</p>
-                  <p className="text-[10px]">
-                    Auto-graded types: MCQ, True/False, Fill-in-blank, Match Columns, Calculation.
-                    Manual grading: Short Answer, Essay.
-                  </p>
-                </div>
+                  {showAdvanced && (
+                    <div className="p-3 border rounded-lg bg-muted/20 text-xs text-muted-foreground space-y-2">
+                      <p><strong>Subject Category:</strong> {subjectCategory}</p>
+                      <p><strong>Available Question Types:</strong> {availableQuestionTypes.map((t) => t.label).join(", ")}</p>
+                      <p className="text-[10px]">
+                        Auto-graded types: MCQ, True/False, Fill-in-blank, Match Columns, Calculation.
+                        Manual grading: Short Answer, Essay.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Submit */}
-              <Button type="submit" className="w-full" disabled={loading || totalQuestions === 0}>
+              <Button type="submit" className="w-full" disabled={loading || (!isScratch && totalQuestions === 0)}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating with AI...
+                    {isScratch ? "Creating..." : "Generating with AI..."}
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate {selectedExamType === "quiz" ? "Quiz" : "Exam"} ({totalQuestions} questions)
+                    {isScratch ? <Plus className="mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    {isScratch 
+                      ? `Create ${selectedExamType === "quiz" ? "Quiz" : "Exam"} from Scratch`
+                      : `Generate ${selectedExamType === "quiz" ? "Quiz" : "Exam"} (${totalQuestions} questions)`}
                   </>
                 )}
               </Button>

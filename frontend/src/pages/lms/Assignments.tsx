@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Calendar, BookOpen } from "lucide-react";
+import { Loader2, Plus, Calendar, BookOpen, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { FileUpload } from "@/components/global/FileUpload";
+import type { UploadResult } from "@/lib/cloudflareWorker";
 
 export default function AssignmentsPage() {
   const assignments = useQuery(api.lms.getAssignments, {});
@@ -25,6 +27,8 @@ export default function AssignmentsPage() {
   const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [fileUrl, setFileUrl] = useState("");
+  const [uploadFilename, setUploadFilename] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
@@ -40,6 +44,7 @@ export default function AssignmentsPage() {
         subjectId: subjectId as any,
         classId: classId as any,
         dueDate,
+        fileUrl: fileUrl || undefined,
       });
       toast.success("Assignment created successfully!");
       setOpen(false);
@@ -48,6 +53,8 @@ export default function AssignmentsPage() {
       setSubjectId("");
       setClassId("");
       setDueDate("");
+      setFileUrl("");
+      setUploadFilename("");
     } catch (e: any) {
       toast.error(e.message || "Failed to create assignment.");
     } finally {
@@ -134,6 +141,25 @@ export default function AssignmentsPage() {
                   onChange={(e) => setDueDate(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium mb-1.5 block">Worksheet / Attachment (Optional)</Label>
+                {!fileUrl ? (
+                  <FileUpload
+                    onUploadComplete={(result) => {
+                      setFileUrl(result.url);
+                      setUploadFilename(result.filename || "assignment-worksheet");
+                    }}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,image/*"
+                  />
+                ) : (
+                  <div className="p-3 border rounded-lg bg-muted/50 flex items-center justify-between">
+                    <span className="text-xs truncate font-medium">{uploadFilename || "File uploaded"}</span>
+                    <Button variant="ghost" size="sm" onClick={() => { setFileUrl(""); setUploadFilename(""); }}>
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={handleCreate} disabled={saving} className="bg-[#dc2626] text-black hover:bg-[#b91c1c]">
@@ -167,7 +193,17 @@ export default function AssignmentsPage() {
                 <CardTitle className="text-xl">{assignment.title}</CardTitle>
                 <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
+                {assignment.fileUrl && (
+                  <a
+                    href={assignment.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline font-semibold flex items-center gap-1.5 bg-primary/5 p-2 rounded-lg border border-primary/10"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Download Worksheet / Attachment
+                  </a>
+                )}
                 <Link to={`/lms/assignments/${assignment._id}`}>
                   <Button variant="outline" className="w-full">View Submissions</Button>
                 </Link>

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Plus, Loader2, Trash2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, getDay, addMonths, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/AuthProvider";
 
 const EVENT_COLORS: Record<string, string> = {
   exam: "bg-red-500",
@@ -22,6 +23,8 @@ const EVENT_COLORS: Record<string, string> = {
 };
 
 export default function EventsCalendar() {
+  const { user } = useAuth();
+  const isStaff = user?.role === "admin" || user?.role === "teacher";
   const [currentDate, setCurrentDate] = useState(new Date());
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,12 +155,18 @@ export default function EventsCalendar() {
                         className={cn("text-[10px] text-white rounded px-1 py-0.5 truncate flex items-center justify-between gap-1 group", EVENT_COLORS[ev.type])}
                       >
                         <span className="truncate">{ev.title}</span>
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => deleteEvent({ id: ev._id }).catch((e) => toast.error(e.message))}
-                        >
-                          <Trash2 className="h-2.5 w-2.5" />
-                        </button>
+                        {isStaff && (
+                          <button
+                            className="opacity-50 hover:opacity-100 hover:text-red-300 transition-opacity"
+                            onClick={() => {
+                              if (confirm("Are you sure you want to delete this event?")) {
+                                deleteEvent({ id: ev._id }).catch((e) => toast.error(e.message));
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>

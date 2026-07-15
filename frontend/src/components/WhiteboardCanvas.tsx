@@ -321,7 +321,11 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           return;
         }
         newShape.text = textVal;
+        const updatedShapes = [...shapes, newShape];
+        setShapes(updatedShapes);
+        commitShapes(updatedShapes, true);
         setIsDrawing(false);
+        return;
       }
 
       // Do NOT notify parent on initial click (will notify on mouseUp)

@@ -63,7 +63,7 @@ export const deleteEvent = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Unauthorized");
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Unauthorized");
     await ctx.db.delete(args.id);
   },
 });

@@ -33,7 +33,7 @@ export default function MessagesPage() {
   const markRead = useMutation(api.messages.markConversationRead);
   const sendMessage = useMutation(api.messages.sendMessage);
 
-  const selectedContact = conversations?.find((c: any) => c.contact?._id === selectedUserId)?.contact;
+  const selectedContact = conversations?.find((c: any) => c.contact?._id === selectedUserId)?.contact || messageable?.find((u: any) => u._id === selectedUserId);
 
   const handleSelect = (userId: string) => {
     setSelectedUserId(userId);

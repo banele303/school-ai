@@ -16,6 +16,7 @@ export const getAnnouncements = query({
     const role = user?.role || "student";
 
     const all = await ctx.db.query("announcements").order("desc").collect();
+    if (role === "admin" || role === "teacher") return all;
 
     // Filter by target role
     return all.filter(
@@ -54,7 +55,7 @@ export const deleteAnnouncement = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Unauthorized");
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Unauthorized");
     await ctx.db.delete(args.id);
   },
 });
@@ -71,7 +72,7 @@ export const generateAnnouncement = action({
     if (!apiKey) return { text: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
 
     const prompt = `You are a professional South African school administrator. Write a clear, friendly school announcement based on these bullet points.
-    If the bullet points imply a specific language (like isiZulu, Sesotho, Afrikaans, Tshivenda, or isiXhosa), write the announcement entirely in that language. Otherwise, use English.
+    By default, write the announcement in English. Only use another South African language (like Afrikaans, isiZulu, isiXhosa, Sesotho, Sepedi) if the user's bullet points are explicitly written in that language or if the user explicitly requests it.
     
 Bullet points: ${args.bulletPoints}
 Tone: ${args.tone || "professional and friendly"}
