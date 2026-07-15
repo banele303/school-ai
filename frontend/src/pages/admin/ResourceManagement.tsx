@@ -85,14 +85,37 @@ export default function AdminResources() {
   const [srType, setSrType] = useState("notes");
   const [srFileUrl, setSrFileUrl] = useState("");
 
+  // Subject form states
+  const [subName, setSubName] = useState("");
+  const [subCode, setSubCode] = useState("");
+  const [subPhase, setSubPhase] = useState("FET");
+  const [subCompulsory, setSubCompulsory] = useState(false);
+  const [subLanguage, setSubLanguage] = useState(false);
+  const [subDesc, setSubDesc] = useState("");
+  const [showAddSubject, setShowAddSubject] = useState(false);
+
+  // Syllabus topic form states
+  const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
+  const [topicName, setTopicName] = useState("");
+  const [topicTerm, setTopicTerm] = useState("1");
+  const [topicSubtopics, setTopicSubtopics] = useState("");
+  const [topicOutline, setTopicOutline] = useState("");
+  const [topicHours, setTopicHours] = useState("10");
+
   const subjects = useQuery(capsApi.capsActions?.getCapsSubjects, { grade: selectedGrade });
   const pastPapers = useQuery(capsApi.capsActions?.getPastPapers, { grade: selectedGrade });
   const studyResources = useQuery(capsApi.capsActions?.getStudyResources, { grade: selectedGrade });
+  const syllabusTopicsList = useQuery(capsApi.capsActions?.getSyllabusTopics, 
+    expandedSubjectId ? { subjectId: expandedSubjectId as any } : "skip"
+  );
 
   const addPastPaper = useMutation(capsApi.capsActions?.addPastPaper);
   const deletePastPaper = useMutation(capsApi.capsActions?.deletePastPaper);
   const addStudyResource = useMutation(capsApi.capsActions?.addStudyResource);
   const deleteStudyResource = useMutation(capsApi.capsActions?.deleteStudyResource);
+  const addCapsSubject = useMutation(capsApi.capsActions?.addCapsSubject);
+  const addSyllabusTopic = useMutation(capsApi.capsActions?.addSyllabusTopic);
+  const deleteSyllabusTopic = useMutation(capsApi.capsActions?.deleteSyllabusTopic);
 
   const handleAddPastPaper = async () => {
     if (!ppTitle || !ppSubject || !ppFileUrl) return toast.error("Fill all required fields");
@@ -138,6 +161,56 @@ export default function AdminResources() {
   const langName = (code: string) => {
     const map: Record<string, string> = { en: "English", zu: "isiZulu", xh: "isiXhosa", af: "Afrikaans", nso: "Sepedi", tn: "Setswana", st: "Sesotho", ts: "Xitsonga", ss: "siSwati", ve: "Tshivenda", nr: "isiNdebele" };
     return map[code] || code;
+  };
+
+  const handleAddSubject = async () => {
+    if (!subName || !subCode) return toast.error("Name and Code are required");
+    try {
+      await addCapsSubject({
+        name: subName,
+        code: subCode,
+        grade: selectedGrade,
+        phase: subPhase,
+        isCompulsory: subCompulsory,
+        isLanguage: subLanguage,
+        description: subDesc,
+      });
+      toast.success("Subject added successfully!");
+      setSubName(""); setSubCode(""); setSubDesc("");
+      setShowAddSubject(false);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add subject");
+    }
+  };
+
+  const handleAddSyllabusTopic = async () => {
+    if (!expandedSubjectId || !topicName) return toast.error("Topic name is required");
+    try {
+      await addSyllabusTopic({
+        capsSubject: expandedSubjectId as any,
+        grade: selectedGrade,
+        term: Number(topicTerm),
+        topic: topicName,
+        subTopics: topicSubtopics.split(",").map((s) => s.trim()).filter(Boolean),
+        contentOutline: topicOutline,
+        hoursPerTerm: Number(topicHours),
+        language: selectedLanguage,
+      });
+      toast.success("Syllabus topic added successfully!");
+      setTopicName(""); setTopicSubtopics(""); setTopicOutline("");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add topic");
+    }
+  };
+
+  const handleDeleteSyllabusTopic = async (id: any) => {
+    if (!confirm("Are you sure you want to delete this topic?")) return;
+    try {
+      await deleteSyllabusTopic({ id });
+      toast.success("Syllabus topic deleted successfully");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete topic");
+    }
   };
 
   return (
@@ -251,7 +324,7 @@ export default function AdminResources() {
                 {!ppFileUrl ? (
                   <FileUpload
                     onUploadComplete={(result) => {
-                      setPpFileUrl(result.url);
+                      setPpFileUrl(result.fileUrl);
                     }}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,image/*"
                   />
@@ -343,7 +416,7 @@ export default function AdminResources() {
                 {!srFileUrl ? (
                   <FileUpload
                     onUploadComplete={(result) => {
-                      setSrFileUrl(result.url);
+                      setSrFileUrl(result.fileUrl);
                     }}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,image/*"
                   />
@@ -388,25 +461,194 @@ export default function AdminResources() {
 
         {/* SYLLABUS TAB */}
         <TabsContent value="syllabus" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-lg">Subjects & Curriculum</h3>
+            <Button
+              onClick={() => setShowAddSubject(!showAddSubject)}
+              className="bg-[#dc2626] text-black hover:bg-[#b91c1c]"
+            >
+              {showAddSubject ? "Hide Subject Form" : "+ Add Subject"}
+            </Button>
+          </div>
+
+          {showAddSubject && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Create New Subject</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-1.5 block">Subject Name *</Label>
+                    <Input value={subName} onChange={e => setSubName(e.target.value)} placeholder="e.g. Mathematical Literacy" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-1.5 block">Subject Code *</Label>
+                    <Input value={subCode} onChange={e => setSubCode(e.target.value)} placeholder="e.g. MATHLIT101" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-1.5 block">Phase</Label>
+                    <Select value={subPhase} onValueChange={setSubPhase}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FET">FET Phase (Gr 10-12)</SelectItem>
+                        <SelectItem value="Senior">Senior Phase (Gr 7-9)</SelectItem>
+                        <SelectItem value="Intermediate">Intermediate Phase (Gr 4-6)</SelectItem>
+                        <SelectItem value="Foundation">Foundation Phase (Gr 1-3)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-1.5 block">Is Compulsory?</Label>
+                    <Select value={subCompulsory ? "true" : "false"} onValueChange={(v) => setSubCompulsory(v === "true")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="false">No (Elective)</SelectItem>
+                        <SelectItem value="true">Yes (Compulsory)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-1.5 block">Is Language Subject?</Label>
+                    <Select value={subLanguage ? "true" : "false"} onValueChange={(v) => setSubLanguage(v === "true")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="false">No (Content Subject)</SelectItem>
+                        <SelectItem value="true">Yes (Language Subject)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium mb-1.5 block">Description</Label>
+                  <Input value={subDesc} onChange={e => setSubDesc(e.target.value)} placeholder="Brief description of the subject..." />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={handleAddSubject} className="bg-[#dc2626] text-black hover:bg-[#b91c1c]">Save Subject</Button>
+                  <Button variant="outline" onClick={() => setShowAddSubject(false)}>Cancel</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
-            <CardHeader><CardTitle className="text-base">Syllabus Overview — Grade {selectedGrade} ({langName(selectedLanguage)})</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Syllabus Overview — Grade {selectedGrade} ({langName(selectedLanguage)})</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">Click on a subject below to expand and manage its syllabus topics.</p>
+            </CardHeader>
             <CardContent>
-              {subjects === undefined ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+              {subjects === undefined ? <Loader2 className="h-6 w-6 animate-spin" /> : subjects.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No subjects found for Grade {selectedGrade}.</p>
+              ) : (
                 <div className="space-y-4">
-                  {subjects.map((s: any) => (
-                    <div key={s._id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold">{s.name}</h4>
-                        <div className="flex gap-2">
-                          <Badge variant={s.isCompulsory ? "default" : "outline"} className="text-xs">
-                            {s.isCompulsory ? "Compulsory" : "Elective"}
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs">{s.phase}</Badge>
-                        </div>
+                  {subjects.map((s: any) => {
+                    const isExpanded = expandedSubjectId === s._id;
+                    return (
+                      <div key={s._id} className="border rounded-lg p-4 transition-all">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSubjectId(isExpanded ? null : s._id)}
+                          className="w-full text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold hover:text-primary transition-colors">{s.name}</h4>
+                            <div className="flex gap-2 items-center">
+                              <Badge variant={s.isCompulsory ? "default" : "outline"} className="text-xs">
+                                {s.isCompulsory ? "Compulsory" : "Elective"}
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">{s.phase}</Badge>
+                              <span className="text-xs text-muted-foreground">{isExpanded ? "▲ Hide Topics" : "▼ Show Topics"}</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{s.description || "No description provided."}</p>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t space-y-4">
+                            <div className="space-y-3">
+                              <h5 className="font-semibold text-sm">Syllabus Topics</h5>
+                              {syllabusTopicsList === undefined ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : syllabusTopicsList.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">No syllabus topics added yet.</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {syllabusTopicsList.map((st: any) => (
+                                    <div key={st._id} className="p-3 border rounded bg-muted/20 flex justify-between items-start">
+                                      <div className="space-y-1.5 flex-1 pr-4">
+                                        <div className="flex items-center gap-2">
+                                          <Badge className="text-[10px]">Term {st.term}</Badge>
+                                          <h6 className="font-medium text-sm">{st.topic}</h6>
+                                          <span className="text-[10px] text-muted-foreground">{st.hoursPerTerm} hours</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">{st.contentOutline}</p>
+                                        {st.subTopics && st.subTopics.length > 0 && (
+                                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                            {st.subTopics.map((sub: string, idx: number) => (
+                                              <Badge key={idx} variant="outline" className="text-[9px] px-1 py-0">{sub}</Badge>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Button variant="ghost" size="sm" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => handleDeleteSyllabusTopic(st._id)}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Add Syllabus Topic Form */}
+                            <div className="p-4 border rounded bg-muted/10 space-y-3">
+                              <h6 className="font-medium text-sm">Add Syllabus Topic</h6>
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2">
+                                  <Label className="text-xs font-medium mb-1 block">Topic Title *</Label>
+                                  <Input value={topicName} onChange={e => setTopicName(e.target.value)} placeholder="e.g. Finance & Taxation" className="h-8 text-sm" />
+                                </div>
+                                <div>
+                                  <Label className="text-xs font-medium mb-1 block">Term *</Label>
+                                  <Select value={topicTerm} onValueChange={setTopicTerm}>
+                                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="1">Term 1</SelectItem>
+                                      <SelectItem value="2">Term 2</SelectItem>
+                                      <SelectItem value="3">Term 3</SelectItem>
+                                      <SelectItem value="4">Term 4</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2">
+                                  <Label className="text-xs font-medium mb-1 block">Sub-topics (comma-separated)</Label>
+                                  <Input value={topicSubtopics} onChange={e => setTopicSubtopics(e.target.value)} placeholder="e.g. VAT, Interest, Inflation" className="h-8 text-sm" />
+                                </div>
+                                <div>
+                                  <Label className="text-xs font-medium mb-1 block">Suggested Hours</Label>
+                                  <Input type="number" value={topicHours} onChange={e => setTopicHours(e.target.value)} min={1} max={50} className="h-8 text-sm" />
+                                </div>
+                              </div>
+
+                              <div>
+                                <Label className="text-xs font-medium mb-1 block">Content Description</Label>
+                                <Input value={topicOutline} onChange={e => setTopicOutline(e.target.value)} placeholder="Detailed CAPS outline description..." className="h-8 text-sm" />
+                              </div>
+
+                              <Button onClick={handleAddSyllabusTopic} size="sm" className="bg-[#dc2626] text-black hover:bg-[#b91c1c]">
+                                Save Topic
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{s.description}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

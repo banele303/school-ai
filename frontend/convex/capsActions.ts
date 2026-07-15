@@ -336,3 +336,61 @@ export const getGeneratedExams = query({
     return await ctx.db.query("generatedExams").collect();
   },
 });
+
+export const addCapsSubject = mutation({
+  args: {
+    name: v.string(),
+    code: v.string(),
+    grade: v.number(),
+    phase: v.string(),
+    isCompulsory: v.boolean(),
+    isLanguage: v.boolean(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Unauthorized");
+    return await ctx.db.insert("capsSubjects", {
+      name: args.name,
+      code: args.code,
+      grade: args.grade,
+      phase: args.phase,
+      isCompulsory: args.isCompulsory,
+      isLanguage: args.isLanguage,
+      description: args.description || "",
+    });
+  },
+});
+
+export const addSyllabusTopic = mutation({
+  args: {
+    capsSubject: v.id("capsSubjects"),
+    grade: v.number(),
+    term: v.number(),
+    topic: v.string(),
+    subTopics: v.array(v.string()),
+    contentOutline: v.string(),
+    hoursPerTerm: v.number(),
+    language: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Unauthorized");
+    return await ctx.db.insert("syllabusTopics", args);
+  },
+});
+
+export const deleteSyllabusTopic = mutation({
+  args: { id: v.id("syllabusTopics") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "admin" && user?.role !== "teacher") throw new Error("Unauthorized");
+    await ctx.db.delete(args.id);
+  },
+});

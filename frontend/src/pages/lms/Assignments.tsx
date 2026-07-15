@@ -146,8 +146,11 @@ export default function AssignmentsPage() {
                 {!fileUrl ? (
                   <FileUpload
                     onUploadComplete={(result) => {
-                      setFileUrl(result.url);
-                      setUploadFilename(result.filename || "assignment-worksheet");
+                      setFileUrl(result.fileUrl);
+                      const name = result.objectKey.includes("-")
+                        ? result.objectKey.slice(result.objectKey.indexOf("-") + 1)
+                        : result.objectKey;
+                      setUploadFilename(name);
                     }}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,image/*"
                   />
