@@ -103,6 +103,8 @@ export default function AdminResources() {
   const [topicHours, setTopicHours] = useState("10");
 
   const subjects = useQuery(capsApi.capsActions?.getCapsSubjects, { grade: selectedGrade });
+  const ppSubjects = useQuery(capsApi.capsActions?.getCapsSubjects, { grade: Number(ppGrade) });
+  const srSubjects = useQuery(capsApi.capsActions?.getCapsSubjects, { grade: Number(srGrade) });
   const pastPapers = useQuery(capsApi.capsActions?.getPastPapers, { grade: selectedGrade });
   const studyResources = useQuery(capsApi.capsActions?.getStudyResources, { grade: selectedGrade });
   const syllabusTopicsList = useQuery(capsApi.capsActions?.getSyllabusTopics, 
@@ -279,7 +281,7 @@ export default function AdminResources() {
                   <Select value={ppSubject} onValueChange={setPpSubject}>
                     <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
                     <SelectContent>
-                      {subjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                      {ppSubjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -287,7 +289,7 @@ export default function AdminResources() {
               <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Grade</Label>
-                  <Input type="number" value={ppGrade} onChange={e => setPpGrade(e.target.value)} min={1} max={12} />
+                  <Input type="number" value={ppGrade} onChange={e => { setPpGrade(e.target.value); setPpSubject(""); }} min={1} max={12} />
                 </div>
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Year</Label>
@@ -383,7 +385,7 @@ export default function AdminResources() {
                   <Select value={srSubject} onValueChange={setSrSubject}>
                     <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
                     <SelectContent>
-                      {subjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                      {srSubjects?.map((s: any) => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -395,7 +397,7 @@ export default function AdminResources() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Grade</Label>
-                  <Input type="number" value={srGrade} onChange={e => setSrGrade(e.target.value)} min={1} max={12} />
+                  <Input type="number" value={srGrade} onChange={e => { setSrGrade(e.target.value); setSrSubject(""); }} min={1} max={12} />
                 </div>
                 <div>
                   <Label className="text-sm font-medium mb-1.5 block">Type</Label>
