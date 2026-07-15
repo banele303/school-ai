@@ -1,22 +1,23 @@
 <!doctype html>
-<html lang="en" class="light">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/jpeg" href="/logo-school.jpeg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#09090b" />
     <title>Vhembe Rising Star Academy</title>
     <script>
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
       try {
-        localStorage.removeItem("edunexus-theme");
-        localStorage.removeItem("Vhembe Rising Star Academy-theme");
-        localStorage.setItem("vhembe-rising-theme", "light");
-      } catch {}
+        const theme = localStorage.getItem("vhembe-rising-theme") || "dark";
+        if (theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.add("light");
+        }
+      } catch (_) {}
     </script>
   </head>
-  <body style="background:#ffffff;color:#171717">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -24,7 +24,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
       <ConvexAuthProvider client={convex}>
-        <ThemeProvider defaultTheme="light" storageKey="vhembe-rising-theme">
+        <ThemeProvider defaultTheme="dark" storageKey="vhembe-rising-theme">
           <AuthProvider>
             <RouterProvider router={router} />
             <Toaster richColors position="top-right" />
