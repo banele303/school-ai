@@ -11,6 +11,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       profile(params) {
         const email = String(params.email || "").trim().toLowerCase();
         const role = email === "alexsouthflow@gmail.com" ? "admin" : ((params.role as string) || "student");
+        const isApproved = (role === "admin" || role === "parent") ? true : false;
         const studentClass = isConvexIdLike(params.studentClass)
           ? params.studentClass
           : undefined;
@@ -23,6 +24,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           name: params.name as string,
           role,
           isActive: true,
+          isApproved,
           studentClass: studentClass as any,
           teacherSubject: teacherSubject && teacherSubject.length > 0 ? teacherSubject as any : undefined,
         };

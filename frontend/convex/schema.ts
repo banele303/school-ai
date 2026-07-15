@@ -23,6 +23,7 @@ export default defineSchema({
       )
     ),
     isActive: v.optional(v.boolean()),
+    isApproved: v.optional(v.boolean()),
     studentClass: v.optional(v.id("classes")),
     teacherSubject: v.optional(v.array(v.id("subjects"))),
     linkedStudent: v.optional(v.id("users")), // for parents

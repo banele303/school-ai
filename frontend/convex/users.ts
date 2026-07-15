@@ -17,7 +17,8 @@ export const getMe = query({
       name: user.name,
       email: user.email,
       role: user.role,
-      isActive: user.isActive,
+      isActive: user.isActive ?? true,
+      isApproved: user.isApproved ?? true,
     };
   },
 });
@@ -46,7 +47,8 @@ export const getUsers = query({
       name: u.name,
       email: u.email,
       role: u.role,
-      isActive: u.isActive,
+      isActive: u.isActive ?? true,
+      isApproved: u.isApproved ?? true,
     }));
   },
 });
@@ -63,6 +65,7 @@ export const updateUser = mutation({
       v.literal("parent")
     )),
     isActive: v.optional(v.boolean()),
+    isApproved: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);

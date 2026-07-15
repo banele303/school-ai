@@ -12,6 +12,8 @@ export interface user {
   name: string;
   email: string;
   role: UserRole;
+  isActive?: boolean;
+  isApproved?: boolean;
   studentClass?: Class;
   teacherSubjects?: subject[];
 }

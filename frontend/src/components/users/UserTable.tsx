@@ -20,10 +20,16 @@ import {
   Trash2,
   Loader2,
   UserIcon,
+  Check,
+  Ban,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { user } from "@/types";
 import CustomPagination from "@/components/global/CustomPagination";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { toast } from "sonner";
 
 // ?page=${pageNum}&limit=10
 interface Props {
@@ -51,10 +57,31 @@ const UserTable = ({
   users,
   totalPages,
 }: Props) => {
+  const updateUserMutation = useMutation(api.users.updateUser);
+
   const handleEdit = (user: user) => {
     setEditingUser(user);
     setIsFormOpen(true);
   };
+
+  const handleApprove = async (id: string) => {
+    try {
+      await updateUserMutation({ id: id as any, isApproved: true });
+      toast.success("User approved successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve user");
+    }
+  };
+
+  const handleToggleActive = async (id: string, active: boolean) => {
+    try {
+      await updateUserMutation({ id: id as any, isActive: active });
+      toast.success(active ? "User enabled successfully" : "User disabled successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
+  };
+
   return (
     <div className="border rounded-md">
       <Table>
@@ -65,20 +92,21 @@ const UserTable = ({
             {role === "teacher" && <TableHead>Subjects</TableHead>}
             {/* Show Class only for students */}
             {role === "student" && <TableHead>Class</TableHead>}
+            <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={4} className="h-24 text-center">
+              <TableCell colSpan={5} className="h-24 text-center">
                 <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
               </TableCell>
             </TableRow>
           ) : users.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={4}
+                colSpan={5}
                 className="h-24 text-center text-muted-foreground"
               >
                 No {role}s found.
@@ -122,6 +150,21 @@ const UserTable = ({
                     )}
                   </TableCell>
                 )}
+                <TableCell>
+                  {user.isApproved === false ? (
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/20">
+                      Pending Approval
+                    </Badge>
+                  ) : user.isActive === false ? (
+                    <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50 dark:bg-red-950/20">
+                      Disabled
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20">
+                      Active
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -131,6 +174,20 @@ const UserTable = ({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      {user.isApproved === false && (
+                        <DropdownMenuItem onClick={() => handleApprove(user._id)}>
+                          <UserCheck className="mr-2 h-4 w-4 text-emerald-600" /> Approve
+                        </DropdownMenuItem>
+                      )}
+                      {user.isActive === false ? (
+                        <DropdownMenuItem onClick={() => handleToggleActive(user._id, true)}>
+                          <Check className="mr-2 h-4 w-4 text-emerald-600" /> Enable Account
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handleToggleActive(user._id, false)}>
+                          <Ban className="mr-2 h-4 w-4 text-amber-600" /> Disable Account
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => handleEdit(user)}>
                         <Pencil className="mr-2 h-4 w-4" /> Edit
                       </DropdownMenuItem>

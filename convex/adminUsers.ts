@@ -44,6 +44,7 @@ export const createUserAdmin = mutation({
       email: args.email,
       role: args.role,
       isActive: true,
+      isApproved: true,
       studentClass: args.classId,
       teacherSubject: args.subjectIds,
     });
