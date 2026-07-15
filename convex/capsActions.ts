@@ -264,7 +264,7 @@ JSON FORMAT:
 
     try {
       const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-      const { text } = await generateText({ prompt, model: openai("deepseek-chat") });
+      const { text } = await generateText({ prompt, model: openai.chat("deepseek-chat") });
       const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const start = clean.indexOf('{');
       const end = clean.lastIndexOf('}');

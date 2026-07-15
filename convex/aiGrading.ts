@@ -81,7 +81,7 @@ RETURN ONLY valid JSON — no markdown fences, no explanation text:
     const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
       prompt,
-      model: openai("deepseek-chat"),
+      model: openai.chat("deepseek-chat"),
     });
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();

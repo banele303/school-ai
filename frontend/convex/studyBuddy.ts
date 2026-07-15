@@ -88,7 +88,7 @@ If you don't know something, say so honestly and suggest how the student can fin
 
     const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
-      model: openai("deepseek-chat"),
+      model: openai.chat("deepseek-chat"),
       system: systemPrompt,
       prompt,
     });

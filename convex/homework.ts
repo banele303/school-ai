@@ -83,7 +83,7 @@ Respond in JSON format:
 
         const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
         const { text } = await generateText({
-          model: openai("deepseek-chat"),
+          model: openai.chat("deepseek-chat"),
           prompt,
         });
 
