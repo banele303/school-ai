@@ -10,7 +10,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     Password({
       profile(params) {
         const email = String(params.email || "").trim().toLowerCase();
-        const role = (email === "alexsouthflow@gmail.com" || email === "ramadimukondi13@gmail.com") ? "admin" : ((params.role as string) || "student");
+        const role = (email === "alexsouthflow@gmail.com" || email === "ramadimukondi13@gmail.com" || email === "alexsouthflow2@gmail.com" || email === "alxsouthflow2@gmail.com") ? "admin" : ((params.role as string) || "student");
         const isApproved = (role === "admin" || role === "parent") ? true : false;
         const studentClass = isConvexIdLike(params.studentClass)
           ? params.studentClass

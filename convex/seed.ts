@@ -10,8 +10,10 @@ export const seedAll = mutation({
     // Clear auth tables to prevent orphaned credentials crashing login
     const authAccounts = await ctx.db.query("authAccounts" as any).collect();
     for (const a of authAccounts) await ctx.db.delete(a._id);
-    const sessions = await ctx.db.query("sessions" as any).collect();
+    const sessions = await ctx.db.query("authSessions" as any).collect();
     for (const s of sessions) await ctx.db.delete(s._id);
+    const credentials = await ctx.db.query("authCredentials" as any).collect();
+    for (const c of credentials) await ctx.db.delete(c._id);
     const verifications = await ctx.db.query("authVerifications" as any).collect();
     for (const v of verifications) await ctx.db.delete(v._id);
     const verificationCodes = await ctx.db.query("authVerificationCodes" as any).collect();
@@ -177,6 +179,20 @@ export const seedAll = mutation({
     await ctx.db.insert("users", {
       name: "Mukondi Ramadi",
       email: "ramadimukondi13@gmail.com",
+      role: "admin",
+      isActive: true,
+    });
+
+    await ctx.db.insert("users", {
+      name: "Admin User 2",
+      email: "alexsouthflow2@gmail.com",
+      role: "admin",
+      isActive: true,
+    });
+
+    await ctx.db.insert("users", {
+      name: "Admin User 3",
+      email: "alxsouthflow2@gmail.com",
       role: "admin",
       isActive: true,
     });
