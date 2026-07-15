@@ -174,6 +174,13 @@ export const seedAll = mutation({
       isActive: true,
     });
 
+    await ctx.db.insert("users", {
+      name: "Mukondi Ramadi",
+      email: "ramadimukondi13@gmail.com",
+      role: "admin",
+      isActive: true,
+    });
+
     // 8. Study Materials
     await ctx.db.insert("materials", {
       title: "Grade 10 Algebra Fundamentals",
