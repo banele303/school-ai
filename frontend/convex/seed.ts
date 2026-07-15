@@ -4,20 +4,8 @@ export const seedAll = mutation({
   args: {},
   handler: async (ctx) => {
     // Clear existing data first
-    const allUsers = await ctx.db.query("users").collect();
-    for (const u of allUsers) await ctx.db.delete(u._id);
-    
-    // Clear auth tables to prevent orphaned credentials crashing login
-    const authAccounts = await ctx.db.query("authAccounts" as any).collect();
-    for (const a of authAccounts) await ctx.db.delete(a._id);
-    const sessions = await ctx.db.query("authSessions" as any).collect();
-    for (const s of sessions) await ctx.db.delete(s._id);
-    const credentials = await ctx.db.query("authCredentials" as any).collect();
-    for (const c of credentials) await ctx.db.delete(c._id);
-    const verifications = await ctx.db.query("authVerifications" as any).collect();
-    for (const v of verifications) await ctx.db.delete(v._id);
-    const verificationCodes = await ctx.db.query("authVerificationCodes" as any).collect();
-    for (const c of verificationCodes) await ctx.db.delete(c._id);
+    // Note: Do NOT clear users or auth credentials in production to prevent data loss.
+    // Instead, only clear transaction logs or non-user entities.
     const allSubjects = await ctx.db.query("subjects").collect();
     for (const s of allSubjects) await ctx.db.delete(s._id);
     const allClasses = await ctx.db.query("classes").collect();
