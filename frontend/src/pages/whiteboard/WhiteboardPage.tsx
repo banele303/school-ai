@@ -317,18 +317,21 @@ const WhiteboardPage: React.FC = () => {
         </div>
       </header>
 
-      {/* ── Canvas Area ─────────────────────────────────── */}
-      <div className="flex-1 w-full h-full relative overflow-hidden">
-        <WhiteboardCanvas
-          ref={canvasRef}
-          content={board.content || ""}
-          onChange={handleCanvasChange}
-          title={title}
-          color={color}
-          strokeWidth={strokeWidth}
-          fillMode={fillMode}
-          gridType={gridType}
-        />
+      {/* ── Scrollable Canvas Area ─────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden relative w-full h-full">
+        {/* Full width, vertically scrollable canvas */}
+        <div className="w-full" style={{ height: "2000px" }}>
+          <WhiteboardCanvas
+            ref={canvasRef}
+            content={board.content || ""}
+            onChange={handleCanvasChange}
+            title={title}
+            color={color}
+            strokeWidth={strokeWidth}
+            fillMode={fillMode}
+            gridType={gridType}
+          />
+        </div>
       </div>
     </div>
   );
