@@ -181,6 +181,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   const userRole = (user?.role || "student") as UserRole;
+  const isApproved = user?.isApproved !== false || user?.role === "admin" || user?.role === "parent";
 
   const filteredNav = useMemo(() => {
     return sidebardata.navMain
@@ -200,8 +201,33 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               isActive: subItem.url === pathname,
             })),
         };
+      })
+      .filter((item) => {
+        // If not approved, only show Dashboard and System menus
+        if (!isApproved) {
+          return item.title === "Dashboard" || item.title === "System";
+        }
+        return true;
+      })
+      .map((item) => {
+        // If not approved, restrict sub-items to only dashboard and profile
+        if (!isApproved) {
+          if (item.title === "Dashboard") {
+            return {
+              ...item,
+              items: item.items?.filter((sub) => sub.url === "/dashboard"),
+            };
+          }
+          if (item.title === "System") {
+            return {
+              ...item,
+              items: item.items?.filter((sub) => sub.url === "/profile"),
+            };
+          }
+        }
+        return item;
       });
-  }, [pathname, userRole]);
+  }, [pathname, userRole, isApproved]);
 
   const logout = async () => {
     try {
@@ -219,25 +245,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={sidebardata.teams} yearName={year?.name!} />
       </SidebarHeader>
       {/* AI Chat Button */}
-      <div className="px-3 py-2">
-        <Button
-          className={cn(
-            "w-full gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-medium shadow-md transition-all duration-300 rounded-lg text-xs",
-            isCollapsed ? "h-8 w-8 p-0 justify-center rounded-lg" : "h-9"
-          )}
-          onClick={() => navigate("/study-buddy")}
-          title="AI Study Chat"
-        >
-          {!isCollapsed ? (
-            <span className="flex items-center gap-1.5 justify-center">
-              <Sparkles className="h-3.5 w-3.5 text-rose-100" />
-              AI Study Chat
-            </span>
-          ) : (
-            <Sparkles className="h-4 w-4 text-rose-100" />
-          )}
-        </Button>
-      </div>
+      {isApproved && (
+        <div className="px-3 py-2">
+          <Button
+            className={cn(
+              "w-full gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-medium shadow-md transition-all duration-300 rounded-lg text-xs",
+              isCollapsed ? "h-8 w-8 p-0 justify-center rounded-lg" : "h-9"
+            )}
+            onClick={() => navigate("/study-buddy")}
+            title="AI Study Chat"
+          >
+            {!isCollapsed ? (
+              <span className="flex items-center gap-1.5 justify-center">
+                <Sparkles className="h-3.5 w-3.5 text-rose-100" />
+                AI Study Chat
+              </span>
+            ) : (
+              <Sparkles className="h-4 w-4 text-rose-100" />
+            )}
+          </Button>
+        </div>
+      )}
       <SidebarContent>
         <NavMain items={filteredNav} />
       </SidebarContent>

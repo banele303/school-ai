@@ -36,6 +36,7 @@ export default function Dashboard() {
     ? useQuery(api.liveClasses.getTeacherLiveClasses, {}) : null;
 
   const loading = statsData === undefined;
+  const isApproved = user?.isApproved !== false || user?.role === "admin" || user?.role === "parent";
 
   const quickLinks = [
     { label: "Live Classes", icon: Radio, path: "/lives", roles: ["admin", "teacher", "student"], color: "text-red-500", bg: "bg-red-500/10" },
@@ -48,7 +49,8 @@ export default function Dashboard() {
     { label: "Resources", icon: BookOpen, path: "/resources", roles: ["admin", "teacher", "student", "parent"], color: "text-indigo-500", bg: "bg-indigo-500/10" },
     { label: "Timetable", icon: Calendar, path: "/timetable", roles: ["admin", "teacher", "student", "parent"], color: "text-cyan-500", bg: "bg-cyan-500/10" },
     { label: "Exams", icon: GraduationCap, path: "/lms/exams", roles: ["admin", "teacher", "student"], color: "text-orange-500", bg: "bg-orange-500/10" },
-  ].filter(l => l.roles.includes(user?.role || "student"));
+  ].filter(l => l.roles.includes(user?.role || "student"))
+   .filter(() => isApproved); // Hide quickLinks completely if not approved
 
   if (loading) {
     return (
@@ -91,6 +93,24 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Approval Pending Banner */}
+      {!isApproved && (
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-850 dark:text-amber-300 p-4 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3">
+            <Clock className="h-6 w-6 text-amber-500 shrink-0 animate-pulse" />
+            <div>
+              <h4 className="font-bold text-base">Account Approval Pending</h4>
+              <p className="text-sm text-amber-800/80 dark:text-amber-400/90 max-w-2xl">
+                Your account is currently waiting to be reviewed and approved by a school administrator. You can view the dashboard, but other pages and features will become available once you are approved.
+              </p>
+            </div>
+          </div>
+          <Button onClick={() => window.location.reload()} size="sm" variant="outline" className="border-amber-500/30 hover:bg-amber-500/20 gap-2 font-medium shrink-0">
+            Check Status
+          </Button>
+        </div>
+      )}
 
       {/* Student-specific XP & Streak Banner */}
       {isStudent && myXP && (

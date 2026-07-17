@@ -51,36 +51,13 @@ const PrivateRoutes = () => {
     );
   }
 
-  // Approval Pending Screen
-  if (user.isApproved === false && (user.role === "student" || user.role === "teacher")) {
-    return (
-      <div className="h-screen w-full flex flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-center">
-        <div className="max-w-md w-full p-8 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 space-y-6">
-          <div className="mx-auto w-16 h-16 bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Approval Pending</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-              Hello, <span className="font-semibold">{user.name}</span>. Your account registration is pending approval by the school administrator. You will be able to access the dashboard once approved.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <Button onClick={() => window.location.reload()} className="flex-1 gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3m0 0l3 3m-3-3v12" />
-              </svg>
-              Check Status
-            </Button>
-            <Button onClick={() => void signOut()} variant="outline" className="flex-1">
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+  // Redirect unapproved student/teacher users back to /dashboard if they try to access other pages
+  const isApproved = user.isApproved !== false || user.role === "admin" || user.role === "parent";
+  if (!isApproved && (user.role === "student" || user.role === "teacher")) {
+    const allowedPaths = ["/dashboard", "/profile"];
+    if (!allowedPaths.includes(location.pathname)) {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   if (!year) {
