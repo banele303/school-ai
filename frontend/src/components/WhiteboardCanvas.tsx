@@ -407,7 +407,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         ref={containerRef}
       >
         {/* Immersive Floating Left Toolbar */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in slide-in-from-left-4 duration-300">
+        <div className="fixed left-4 top-24 z-10 flex flex-col gap-2 p-2 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in slide-in-from-left-4 duration-300">
           <Button
             variant={tool === "select" ? "default" : "ghost"}
             size="icon"
@@ -496,7 +496,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
         {/* Floating STEM Tools Panel */}
         {showMathPanel && (
-          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-3 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-left-2 duration-200 w-44 max-h-[80vh] overflow-y-auto">
+          <div className="fixed left-20 top-24 z-10 flex flex-col gap-3 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-left-2 duration-200 w-44 max-h-[80vh] overflow-y-auto">
             <div>
               <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                 Math Tools
@@ -598,7 +598,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         {/* Styling controls now live in the page header above the canvas */}
 
         {/* Navigation Controls (Bottom Right) */}
-        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 p-1.5 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-lg shadow border border-zinc-200 dark:border-zinc-800">
+        <div className="fixed bottom-4 right-4 z-10 flex items-center gap-1.5 p-1.5 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-lg shadow border border-zinc-200 dark:border-zinc-800">
           <Button variant="ghost" size="icon" onClick={() => handleZoom(0.85)} title="Zoom Out">
             <ZoomOut className="h-4 w-4" />
           </Button>
