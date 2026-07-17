@@ -1,4 +1,5 @@
 import UniversalUserForm from "@/components/auth/UniversalUserForm";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import { SchoolBrand } from "@/components/brand/SchoolBrand";
 import { useAuth } from "@/hooks/AuthProvider";
 import { Navigate } from "react-router";
@@ -36,6 +37,21 @@ const Login = () => {
             </div>
 
             {/* Form */}
+            {mode === "login" && (
+              <>
+                <GoogleSignInButton />
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      or continue with email
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
             <UniversalUserForm type={mode} />
 
             {/* Toggle */}
