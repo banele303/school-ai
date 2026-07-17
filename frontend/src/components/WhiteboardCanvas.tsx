@@ -3,6 +3,7 @@ import { Stage, Layer, Rect, Line, Circle, Arrow, Text, Group, RegularPolygon } 
 import {
   MousePointer,
   Pencil,
+  Eraser,
   Type,
   Square,
   Circle as CircleIcon,
@@ -27,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 interface Shape {
   id: string;
-  type: "pen" | "rect" | "circle" | "triangle" | "line" | "arrow" | "axes" | "text" | "rightTriangle" | "parabola" | "circleRadius" | "pieSlice" | "benzene" | "beaker" | "resistor" | "battery" | "dna";
+  type: "pen" | "eraser" | "rect" | "circle" | "triangle" | "line" | "arrow" | "axes" | "text" | "rightTriangle" | "parabola" | "circleRadius" | "pieSlice" | "benzene" | "beaker" | "resistor" | "battery" | "dna";
   x: number;
   y: number;
   points?: number[];
@@ -54,10 +55,23 @@ interface WhiteboardCanvasProps {
   content: string;
   onChange?: (content: string) => void;
   title?: string;
+  // Controlled from parent header
+  color?: string;
+  strokeWidth?: number;
+  fillMode?: "none" | "semi" | "solid";
+  gridType?: "none" | "dot" | "square";
 }
 
 const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
-  ({ content, onChange, title = "Sandbox Board" }, ref) => {
+  ({
+    content,
+    onChange,
+    title = "Sandbox Board",
+    color = "#2563eb",
+    strokeWidth = 4,
+    fillMode = "none",
+    gridType = "dot",
+  }, ref) => {
     const stageRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -66,12 +80,6 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
     const [shapes, setShapes] = useState<Shape[]>([]);
     const [history, setHistory] = useState<Shape[][]>([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
-
-    // Settings
-    const [color, setColor] = useState("#2563eb");
-    const [fillMode, setFillMode] = useState<"none" | "semi" | "solid">("none");
-    const [strokeWidth, setStrokeWidth] = useState(4);
-    const [gridType, setGridType] = useState<"none" | "dot" | "square">("dot");
 
     // Interaction State
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -94,16 +102,6 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
       observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
       return () => observer.disconnect();
     }, []);
-
-    const PALETTE = [
-      { name: "Slate", hex: isDarkMode ? "#f8fafc" : "#0f172a" },
-      { name: "Blue", hex: "#2563eb" },
-      { name: "Emerald", hex: "#10b981" },
-      { name: "Rose", hex: "#f43f5e" },
-      { name: "Amber", hex: "#f59e0b" },
-      { name: "Violet", hex: "#8b5cf6" },
-      { name: "White", hex: isDarkMode ? "#1e293b" : "#ffffff" },
-    ];
 
     // Map drawing slate/white colors for dark mode visibility
     const getRenderColor = (c: string) => {
@@ -229,6 +227,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
         // Mode switch keys
         if (e.key === "v") setTool("select");
         if (e.key === "p") setTool("pen");
+        if (e.key === "e") setTool("eraser");
         if (e.key === "t") setTool("text");
         if (e.key === "r") setTool("rect");
         if (e.key === "c") setTool("circle");
@@ -281,19 +280,22 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
       setIsDrawing(true);
       const pointer = getTransformedPointer();
       const id = `shape_${Date.now()}`;
-      const fillHex = fillMode === "solid" ? color : fillMode === "semi" ? `${color}44` : undefined;
+      const isEraser = tool === "eraser";
+      const fillHex = !isEraser && fillMode === "solid" ? color
+        : !isEraser && fillMode === "semi" ? `${color}44`
+        : undefined;
 
       let newShape: Shape = {
         id,
-        type: tool,
+        type: tool as Shape["type"],
         x: pointer.x,
         y: pointer.y,
-        color,
+        color: isEraser ? "#000000" : color,
         fillColor: fillHex,
-        strokeWidth,
+        strokeWidth: isEraser ? Math.max(strokeWidth * 3, 18) : strokeWidth,
       };
 
-      if (tool === "pen") {
+      if (tool === "pen" || tool === "eraser") {
         newShape.points = [pointer.x, pointer.y];
       } else if (
         tool === "rect" ||
@@ -340,7 +342,7 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
 
       if (!active) return;
 
-      if (active.type === "pen" && active.points) {
+      if ((active.type === "pen" || active.type === "eraser") && active.points) {
         active.points = [...active.points, pointer.x, pointer.y];
       } else if (
         active.type === "rect" ||
@@ -395,16 +397,17 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
     const getStageCursor = () => {
       if (tool === "select") return "default";
       if (tool === "text") return "text";
+      if (tool === "eraser") return "cell";
       return "crosshair";
     };
 
     return (
       <div
-        className="relative flex w-full h-full bg-zinc-50 dark:bg-zinc-950 select-none overflow-hidden"
+        className="relative flex w-full h-full bg-zinc-50 dark:bg-zinc-950 select-none"
         ref={containerRef}
       >
         {/* Immersive Floating Left Toolbar */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 animate-in fade-in slide-in-from-left-4 duration-300">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 p-2 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in slide-in-from-left-4 duration-300">
           <Button
             variant={tool === "select" ? "default" : "ghost"}
             size="icon"
@@ -462,6 +465,14 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
             title="Directional Arrow"
           >
             <MoveUpRight className="h-5 w-5" />
+          </Button>
+          <Button
+            variant={tool === "eraser" ? "default" : "ghost"}
+            size="icon"
+            onClick={() => setTool("eraser")}
+            title="Eraser (e) — erases drawn content"
+          >
+            <Eraser className="h-5 w-5" />
           </Button>
 
           {/* Math Tools Expandable Panel */}
@@ -584,81 +595,10 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
           </div>
         )}
 
-        {/* Floating Styling and Formatting Controls (Top) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 px-4 py-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/80 dark:border-zinc-800/80 max-w-[90%] overflow-x-auto">
-          {/* Colors */}
-          <div className="flex gap-1.5 items-center pr-3 border-r border-zinc-200 dark:border-zinc-800">
-            {PALETTE.map((c) => (
-              <button
-                key={c.hex}
-                onClick={() => setColor(c.hex)}
-                className={cn(
-                  "h-6 w-6 rounded-full border border-zinc-300 dark:border-zinc-700 transition hover:scale-110",
-                  color === c.hex && "ring-2 ring-indigo-500 ring-offset-2"
-                )}
-                style={{ backgroundColor: c.hex }}
-                title={c.name}
-              />
-            ))}
-          </div>
-
-          {/* Thickness */}
-          <div className="flex items-center gap-1.5 pr-3 border-r border-zinc-200 dark:border-zinc-800">
-            <span className="text-xs text-zinc-500 font-medium">Stroke</span>
-            {[2, 4, 8].map((size) => (
-              <button
-                key={size}
-                onClick={() => setStrokeWidth(size)}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition",
-                  strokeWidth === size
-                    ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-                    : "text-zinc-500"
-                )}
-              >
-                {size === 2 ? "Thin" : size === 4 ? "Med" : "Thick"}
-              </button>
-            ))}
-          </div>
-
-          {/* Fill Style */}
-          <div className="flex items-center gap-1.5 pr-3 border-r border-zinc-200 dark:border-zinc-800">
-            <span className="text-xs text-zinc-500 font-medium">Fill</span>
-            {(["none", "semi", "solid"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setFillMode(mode)}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-semibold capitalize hover:bg-zinc-100 dark:hover:bg-zinc-800 transition",
-                  fillMode === mode
-                    ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
-                    : "text-zinc-500"
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-
-          {/* Grid Setting */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (gridType === "none") setGridType("dot");
-                else if (gridType === "dot") setGridType("square");
-                else setGridType("none");
-              }}
-              title="Toggle Grid Type"
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        {/* Styling controls now live in the page header above the canvas */}
 
         {/* Navigation Controls (Bottom Right) */}
-        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 p-1.5 bg-white/90 dark:bg-zinc-900/90 backdrop-blur rounded-lg shadow border border-zinc-200 dark:border-zinc-800">
+        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 p-1.5 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-lg shadow border border-zinc-200 dark:border-zinc-800">
           <Button variant="ghost" size="icon" onClick={() => handleZoom(0.85)} title="Zoom Out">
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -757,6 +697,19 @@ const WhiteboardCanvas = forwardRef<WhiteboardCanvasRef, WhiteboardCanvasProps>(
                         tension={0.5}
                         lineCap="round"
                         lineJoin="round"
+                      />
+                    )}
+
+                    {/* Eraser — destination-out removes drawn pixels */}
+                    {shape.type === "eraser" && shape.points && (
+                      <Line
+                        points={shape.points}
+                        stroke="rgba(0,0,0,1)"
+                        strokeWidth={shape.strokeWidth}
+                        tension={0.5}
+                        lineCap="round"
+                        lineJoin="round"
+                        globalCompositeOperation="destination-out"
                       />
                     )}
 

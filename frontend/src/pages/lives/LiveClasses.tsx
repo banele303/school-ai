@@ -530,7 +530,6 @@ function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
             </div>
             <div className="flex flex-wrap gap-3">
               <Button onClick={startPreview} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs py-2 px-4 rounded-xl shadow-md"><Video className="h-4 w-4" /> Camera preview</Button>
-              <Button variant="outline" className="gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl"><MonitorUp className="h-4 w-4" /> Share screen</Button>
               {lesson && <Button variant="outline" className="gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl" onClick={() => onStatus(lesson._id, "live")}><Radio className="h-4 w-4 text-red-500 animate-pulse" /> Mark live</Button>}
               {lesson && <Button variant="outline" className="gap-2 text-xs border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl" onClick={() => onStatus(lesson._id, "ended")}><CheckCircle className="h-4 w-4 text-emerald-500" /> End class</Button>}
             </div>

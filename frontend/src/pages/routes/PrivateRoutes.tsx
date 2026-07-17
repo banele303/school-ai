@@ -106,7 +106,7 @@ const PrivateRoutes = () => {
 
   if (isLiveRoom || isWhiteboardCanvas) {
     return (
-      <main className="h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100">
+      <main className="h-screen w-screen overflow-hidden bg-zinc-950">
         <Outlet />
       </main>
     );
