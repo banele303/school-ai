@@ -66,6 +66,8 @@ export const updateUser = mutation({
     )),
     isActive: v.optional(v.boolean()),
     isApproved: v.optional(v.boolean()),
+    studentClass: v.optional(v.id("classes")),
+    teacherSubject: v.optional(v.array(v.id("subjects"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -78,8 +80,43 @@ export const updateUser = mutation({
       throw new Error("Unauthorized");
     }
 
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
+    const targetUser = await ctx.db.get(args.id);
+    if (!targetUser) throw new Error("User not found");
+
+    const { id, studentClass, teacherSubject, ...updates } = args;
+
+    const patchData: any = { ...updates };
+    if (studentClass !== undefined) {
+      patchData.studentClass = studentClass;
+    }
+    if (teacherSubject !== undefined) {
+      patchData.teacherSubject = teacherSubject;
+    }
+
+    await ctx.db.patch(id, patchData);
+
+    // Sync class roster if studentClass changed
+    if (studentClass !== undefined && studentClass !== targetUser.studentClass) {
+      // Remove from old class
+      if (targetUser.studentClass) {
+        const oldClass = await ctx.db.get(targetUser.studentClass);
+        if (oldClass) {
+          const updatedStudents = (oldClass.students || []).filter((sId) => sId !== id);
+          await ctx.db.patch(oldClass._id, { students: updatedStudents });
+        }
+      }
+      // Add to new class
+      if (studentClass) {
+        const newClass = await ctx.db.get(studentClass);
+        if (newClass) {
+          const currentStudents = newClass.students || [];
+          if (!currentStudents.includes(id)) {
+            await ctx.db.patch(newClass._id, { students: [...currentStudents, id] });
+          }
+        }
+      }
+    }
+
     return { success: true };
   },
 });

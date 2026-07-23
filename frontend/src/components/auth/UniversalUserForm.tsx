@@ -37,7 +37,7 @@ const createSchema = (type: FormType) => {
           : z.string().min(2, "Name is required"),
       classId: z.string().optional(),
       subjectIds: z.array(z.string()).optional(),
-      email: z.email("Invalid email address"),
+      email: z.string().email("Invalid email address"),
       role: z.string().optional(),
       password:
         type === "update"
@@ -72,7 +72,6 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   useAuth(); // ensure auth context is initialized
   const isUpdate = type === "update";
   const isLogin = type === "login";
-  // const { setUser } = useAuth();
 
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,8 +90,6 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
     },
   });
 
-  // Only fetch classes/subjects if it's not a login form
-  // We can now fetch them even if not logged in because the queries are public.
   const shouldFetch = !isLogin;
   const convexClasses = useQuery(
     api.classes.getClasses,
@@ -129,7 +126,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
     if (initialData && isUpdate) {
       const existingClassId =
         typeof initialData.studentClass === "object"
-          ? initialData.studentClass?._id
+          ? (initialData.studentClass as any)?._id
           : initialData.studentClass;
 
       form.reset({
@@ -151,7 +148,6 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
           password: data.password!,
           flow: "signIn",
         });
-        // signIn throws on failure, returns null on success
         toast.success("Logged in successfully");
         window.location.href = "/dashboard";
       } else if (type === "create") {
@@ -179,7 +175,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
             classId: data.classId as any,
             subjectIds: data.subjectIds as any,
           });
-          toast.success("User created successfully. They can now sign up with this email.");
+          toast.success("User created successfully.");
           if (onSuccess) onSuccess();
         }
       } else if (type === "update" && initialData?._id) {
@@ -188,6 +184,8 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
           name: data.name,
           email: data.email,
           role: data.role as UserRole,
+          studentClass: data.classId as any,
+          teacherSubject: data.subjectIds as any,
         });
         toast.success("User updated successfully");
         if (onSuccess) onSuccess();
@@ -197,7 +195,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
       let friendlyMessage = error.message || "An error occurred. Please try again.";
       if (friendlyMessage.includes("InvalidAccountId")) {
         friendlyMessage = isLogin
-          ? "Account not found. If you recently seeded the database, please use the 'Create Account' tab to register your password."
+          ? "Account not found. Please sign up to register."
           : "Account not found. Please sign up to register.";
       } else if (friendlyMessage.includes("InvalidSecret")) {
         friendlyMessage = "Incorrect password. Please try again.";
@@ -229,7 +227,6 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   const selectedRole = form.watch("role");
   const pending = form.formState.isSubmitting;
   const showRoleSelector = !isLogin;
-  // you can also include teacher is needed
   const showClassSelector = !isLogin && selectedRole === "student";
   const showSubjectSelector = !isLogin && selectedRole === "teacher";
 
@@ -246,85 +243,80 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
               disabled={pending}
             />
           )}
-          {/* role selector */}
-          {showRoleSelector && (
-            <CustomSelect
-              control={form.control}
-              name="role"
-              label="Role"
-              placeholder="Select role"
-              options={roleOptions}
-              disabled={pending}
-            />
-          )}
-          <div className="col-span-2 space-y-2">
-            {/* class */}
-            {showClassSelector && (
-              <CustomSelect
-                control={form.control}
-                name="classId"
-                label="Class"
-                placeholder="Select Class"
-                options={classOptions}
-                disabled={pending || classOptions.length === 0}
-                loading={loading}
-              />
-            )}
-            {/* subjects(multiple select is need here) */}
-            {showSubjectSelector && (
-              <CustomMultiSelect
-                control={form.control}
-                name="subjectIds"
-                label="Subjects"
-                placeholder="Select subjects..."
-                options={subjectOptions}
-                loading={loadingOptions}
-                disabled={pending || subjectOptions.length === 0}
-              />
-            )}
-            <CustomInput
-              control={form.control}
-              name="email"
-              label="Email Address"
-              type="email"
-              placeholder="m@example.com"
-              disabled={pending}
-            />
-          </div>
-          <div className="col-span-2">
+
+          <CustomInput
+            control={form.control}
+            name="email"
+            label="Email Address"
+            placeholder="jane@school.com"
+            disabled={pending}
+          />
+
+          {!isUpdate && (
             <CustomInput
               control={form.control}
               name="password"
               label="Password"
               type="password"
-              placeholder={isUpdate ? "New Password (Optional)" : "Password"}
+              placeholder="••••••••"
               disabled={pending}
             />
-          </div>
-          {type === "create" && (
-            <div className="col-span-2">
-              <CustomInput
-                control={form.control}
-                name="confirmPassword"
-                label="Confirm Password"
-                type="password"
-                placeholder={"Confirm Password"}
-                disabled={pending}
-              />
-            </div>
           )}
-          <div className="col-span-2 mt-2">
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending
-                ? "Processing..."
-                : type === "login"
-                ? "Sign In"
-                : type === "create"
-                ? "Create Account"
-                : "Save Changes"}
-            </Button>
-          </div>
+
+          {type === "create" && (
+            <CustomInput
+              control={form.control}
+              name="confirmPassword"
+              label="Confirm Password"
+              type="password"
+              placeholder="••••••••"
+              disabled={pending}
+            />
+          )}
+
+          {showRoleSelector && (
+            <CustomSelect
+              control={form.control}
+              name="role"
+              label="Role"
+              placeholder="Select Role"
+              options={roleOptions}
+              disabled={pending || Boolean(role)}
+            />
+          )}
+
+          {showClassSelector && (
+            <CustomSelect
+              control={form.control}
+              name="classId"
+              label="Assigned Class"
+              placeholder={loading ? "Loading classes..." : "Select Class"}
+              options={classOptions}
+              disabled={loading || pending}
+            />
+          )}
+
+          {showSubjectSelector && (
+            <CustomMultiSelect
+              control={form.control}
+              name="subjectIds"
+              label="Teaching Subjects"
+              placeholder={loadingOptions ? "Loading subjects..." : "Select Subjects"}
+              options={subjectOptions}
+              disabled={loadingOptions || pending}
+            />
+          )}
         </div>
+
+        <Button type="submit" className="w-full mt-4" disabled={pending}>
+          {pending
+            ? "Processing..."
+            : isLogin
+            ? "Sign In"
+            : isUpdate
+            ? "Update User"
+            : "Create User"}
+        </Button>
       </FieldGroup>
     </form>
   );

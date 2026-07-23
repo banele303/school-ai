@@ -66,6 +66,12 @@ export default function LiveRoomPage() {
   const toggleScreenSharePermissionMutation = useMutation(api.liveClasses.toggleScreenSharePermission);
   // @ts-ignore
   const participants = useQuery(api.liveClasses.getLiveClassParticipants, id ? { liveClassId: id as any } : "skip") || [];
+  // @ts-ignore
+  const sendWebRtcSignal = useMutation(api.liveClasses.sendWebRtcSignal);
+  // @ts-ignore
+  const clearWebRtcSignals = useMutation(api.liveClasses.clearWebRtcSignals);
+  // @ts-ignore
+  const webRtcSignals = useQuery(api.liveClasses.getWebRtcSignals, id ? { liveClassId: id as any } : "skip") || [];
 
   const myParticipantRecord = participants.find((p: any) => p.studentId === user?._id);
   const myMuteStatus = (myParticipantRecord as any)?.isMuted ?? false;
@@ -94,6 +100,7 @@ export default function LiveRoomPage() {
   const [showRosterForStudent, setShowRosterForStudent] = useState(false);
   const [resolvedRecordingUrl, setResolvedRecordingUrl] = useState<string | null>(null);
   const [resolvingRecording, setResolvingRecording] = useState(false);
+  const [speakingStudents, setSpeakingStudents] = useState<string[]>([]);
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -109,6 +116,51 @@ export default function LiveRoomPage() {
   const whepTimeoutRef = useRef<any>(null);
   const whipResourceUrlRef = useRef<string | null>(null);
   const whepResourceUrlRef = useRef<string | null>(null);
+
+  // Student Microphone WebRTC Audio Signaling Refs
+  const studentAudioPcRef = useRef<RTCPeerConnection | null>(null);
+  const teacherAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const teacherPeerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+
+  // Mobile Audio Constraints Helper
+  const getMobileAudioConstraints = (selectedDeviceId?: string): MediaTrackConstraints | boolean => {
+    const base: MediaTrackConstraints = {
+      echoCancellation: { ideal: true },
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: true },
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 },
+    };
+    if (selectedDeviceId && selectedDeviceId.trim() !== "") {
+      base.deviceId = { exact: selectedDeviceId };
+    }
+    return base;
+  };
+
+  // Mobile Browser AudioContext Gesture Unlocker (iOS Safari / Chrome Mobile)
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const dummyCtx = new AudioCtx();
+          if (dummyCtx.state === "suspended") {
+            dummyCtx.resume();
+          }
+        }
+      } catch (e) {
+        console.warn("AudioContext unlock failed:", e);
+      }
+    };
+
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("click", unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
+    };
+  }, []);
 
   // Clock state updater
   useEffect(() => {
@@ -521,6 +573,25 @@ export default function LiveRoomPage() {
     }
   }, [isCreator, isScreenSharing, classItem?.status, classItem?.playbackUrl, classItem?.whepUrl, (classItem as any)?.lastStreamUpdate]);
 
+  // Teacher auto-resume stream on page refresh if class status is live
+  useEffect(() => {
+    if (isCreator && classItem && classItem.status === "live" && !isBroadcasting) {
+      console.log("Teacher reloaded page during live stream. Auto-resuming WHIP broadcast...");
+      setIsBroadcasting(true);
+      startPreview().then(async () => {
+        if (classItem.whipUrl && localStreamRef.current) {
+          try {
+            await publishWhip(localStreamRef.current, classItem.whipUrl);
+            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+            toast.success("Broadcast auto-resumed after refresh.");
+          } catch (err: any) {
+            console.warn("WHIP auto-resume failed:", err);
+          }
+        }
+      }).catch(console.error);
+    }
+  }, [isCreator, classItem?.status, classItem?.whipUrl]);
+
   // Teardown student player
   const teardownStudentPlayer = () => {
     terminateWhepSession();
@@ -763,23 +834,22 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Student specific media track setup
+  // Student specific media track setup with Mobile Audio Optimization & WebRTC Signal Exchange
   const startStudentMedia = async (needAudio: boolean, needVideo: boolean) => {
     try {
       const deviceList = await navigator.mediaDevices.enumerateDevices();
       const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
       const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
 
+      const audioConstraints = getMobileAudioConstraints(selectedAudioDevice);
       const constraints: MediaStreamConstraints = {
-        audio: needAudio && hasAudioInput,
-        video: needVideo && hasVideoInput,
+        audio: needAudio && hasAudioInput ? audioConstraints : false,
+        video: needVideo && hasVideoInput ? (selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true) : false,
       };
 
       if (!constraints.audio && !constraints.video) {
-        if (studentStreamRef.current) {
-          studentStreamRef.current.getTracks().forEach(t => t.stop());
-          studentStreamRef.current = null;
-        }
+        stopStudentAudio();
+        stopStudentVideoOnly();
         return;
       }
 
@@ -788,6 +858,45 @@ export default function LiveRoomPage() {
 
       if (studentLocalVideoRef.current) {
         studentLocalVideoRef.current.srcObject = stream;
+      }
+
+      // If student is unmuting microphone and broadcasting audio to teacher, set up WebRTC audio connection
+      if (needAudio && classItem?.teacher && !isCreator) {
+        const audioTrack = stream.getAudioTracks()[0];
+        if (audioTrack) {
+          if (studentAudioPcRef.current) {
+            studentAudioPcRef.current.close();
+          }
+
+          const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+          });
+          studentAudioPcRef.current = pc;
+
+          pc.addTrack(audioTrack, stream);
+
+          pc.onicecandidate = (event) => {
+            if (event.candidate) {
+              sendWebRtcSignal({
+                liveClassId: id as any,
+                targetUserId: classItem.teacher,
+                signalType: "candidate",
+                candidate: JSON.stringify(event.candidate),
+              }).catch(console.error);
+            }
+          };
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          await sendWebRtcSignal({
+            liveClassId: id as any,
+            targetUserId: classItem.teacher,
+            signalType: "offer",
+            sdp: offer.sdp,
+          });
+          console.log("Sent WebRTC audio offer to teacher:", classItem.teacher);
+        }
       }
     } catch (err: any) {
       console.error("Student media capture failed:", err);
@@ -798,6 +907,10 @@ export default function LiveRoomPage() {
   const stopStudentAudio = () => {
     if (studentStreamRef.current) {
       studentStreamRef.current.getAudioTracks().forEach(t => t.stop());
+    }
+    if (studentAudioPcRef.current) {
+      studentAudioPcRef.current.close();
+      studentAudioPcRef.current = null;
     }
   };
 
@@ -840,13 +953,124 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Clean up student local stream on unmount
+  // Process incoming WebRTC audio signaling messages for active student speakers
+  useEffect(() => {
+    if (!webRtcSignals || webRtcSignals.length === 0 || !user?._id) return;
+
+    const processedIds: any[] = [];
+
+    webRtcSignals.forEach(async (sig: any) => {
+      processedIds.push(sig._id);
+
+      if (isCreator) {
+        // Teacher receives audio WebRTC offer or ICE candidate from speaking student
+        if (sig.signalType === "offer" && sig.sdp) {
+          const studentId = sig.sender;
+          console.log("Teacher receiving audio WebRTC offer from student:", studentId);
+
+          if (teacherPeerConnectionsRef.current.has(studentId)) {
+            teacherPeerConnectionsRef.current.get(studentId)?.close();
+          }
+
+          const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+          });
+          teacherPeerConnectionsRef.current.set(studentId, pc);
+
+          pc.ontrack = (event) => {
+            console.log("Teacher received student audio track:", event.track.kind, studentId);
+            let audioEl = teacherAudioElementsRef.current.get(studentId);
+            if (!audioEl) {
+              audioEl = document.createElement("audio");
+              audioEl.autoplay = true;
+              audioEl.playsInline = true;
+              audioEl.style.display = "none";
+              document.body.appendChild(audioEl);
+              teacherAudioElementsRef.current.set(studentId, audioEl);
+            }
+
+            const mediaStream = new MediaStream([event.track]);
+            audioEl.srcObject = mediaStream;
+            audioEl.volume = 1.0;
+            audioEl.muted = false;
+            audioEl.play().catch(err => console.warn("Failed to play student audio track:", err));
+
+            setSpeakingStudents(prev => Array.from(new Set([...prev, studentId])));
+            toast.info("A student is speaking!");
+          };
+
+          pc.onicecandidate = (e) => {
+            if (e.candidate) {
+              sendWebRtcSignal({
+                liveClassId: id as any,
+                targetUserId: studentId,
+                signalType: "candidate",
+                candidate: JSON.stringify(e.candidate)
+              }).catch(console.error);
+            }
+          };
+
+          await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sig.sdp }));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          await sendWebRtcSignal({
+            liveClassId: id as any,
+            targetUserId: studentId,
+            signalType: "answer",
+            sdp: answer.sdp
+          });
+        } else if (sig.signalType === "candidate" && sig.candidate) {
+          const pc = teacherPeerConnectionsRef.current.get(sig.sender);
+          if (pc) {
+            try {
+              const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
+              await pc.addIceCandidate(candidate);
+            } catch (e) {
+              console.warn("Failed to add ICE candidate:", e);
+            }
+          }
+        }
+      } else {
+        // Student receiving WebRTC answer or candidate from teacher
+        if (sig.signalType === "answer" && sig.sdp && studentAudioPcRef.current) {
+          try {
+            await studentAudioPcRef.current.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sig.sdp }));
+            console.log("Student set remote description from teacher answer");
+          } catch (e) {
+            console.warn("Failed to set student remote description:", e);
+          }
+        } else if (sig.signalType === "candidate" && sig.candidate && studentAudioPcRef.current) {
+          try {
+            const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
+            await studentAudioPcRef.current.addIceCandidate(candidate);
+          } catch (e) {
+            console.warn("Failed to add teacher ICE candidate:", e);
+          }
+        }
+      }
+    });
+
+    if (processedIds.length > 0) {
+      clearWebRtcSignals({ liveClassId: id as any, signalIds: processedIds }).catch(console.error);
+    }
+  }, [webRtcSignals, isCreator, id, user?._id]);
+
+  // Clean up student local streams & teacher audio connections on unmount
   useEffect(() => {
     return () => {
       if (studentStreamRef.current) {
         studentStreamRef.current.getTracks().forEach(t => t.stop());
         studentStreamRef.current = null;
       }
+      if (studentAudioPcRef.current) {
+        studentAudioPcRef.current.close();
+        studentAudioPcRef.current = null;
+      }
+      teacherPeerConnectionsRef.current.forEach(pc => pc.close());
+      teacherPeerConnectionsRef.current.clear();
+      teacherAudioElementsRef.current.forEach(el => el.remove());
+      teacherAudioElementsRef.current.clear();
     };
   }, []);
 
@@ -1859,10 +2083,15 @@ export default function LiveRoomPage() {
                               {participants.filter((p: any) => p.isOnline).map((p: any) => (
                                 <div key={p.studentId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-850">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className="w-6 h-6 rounded-full bg-emerald-950 border border-emerald-800 flex items-center justify-center text-[10px] font-bold text-emerald-450 shrink-0">
+                                    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0", speakingStudents.includes(p.studentId) || !p.isMuted ? "bg-emerald-500 text-zinc-950 ring-2 ring-emerald-400 animate-pulse" : "bg-emerald-950 border border-emerald-800 text-emerald-450")}>
                                       {p.name.charAt(0).toUpperCase()}
                                     </div>
                                     <span className="text-xs font-medium text-zinc-200 truncate" title={p.name}>{p.name}</span>
+                                    {(speakingStudents.includes(p.studentId) || (!p.isMuted && p.isOnline)) && (
+                                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] px-1.5 py-0 h-4 font-semibold uppercase animate-pulse">
+                                        Speaking
+                                      </Badge>
+                                    )}
                                   </div>
                                   
                                   <div className="flex items-center gap-1 shrink-0">

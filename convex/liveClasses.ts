@@ -144,16 +144,22 @@ export const getLiveClasses = query({
       results = results.filter((c) => {
         if (c.accessMode === "school-only") {
           const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
-          const isClassAssigned = c.class && c.class === studentClassId;
-          const isClassInvited = studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false);
-          if (!isUserInvited && !isClassAssigned && !isClassInvited) {
+          const isClassAssigned = Boolean(c.class && c.class === studentClassId);
+          const isClassInvited = Boolean(studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false));
+          const isGradeMatching = Boolean(studentGrade && c.targetGrades?.includes(studentGrade));
+          
+          // If specific class/users are designated for school-only, require match; otherwise allow for school students
+          if ((c.class || (c.invitedClasses && c.invitedClasses.length > 0) || (c.invitedUsers && c.invitedUsers.length > 0)) &&
+              !isUserInvited && !isClassAssigned && !isClassInvited && !isGradeMatching) {
             return false;
           }
         }
         
-        // Filter by grade if targetGrades is specified and not empty
-        if (c.targetGrades && c.targetGrades.length > 0) {
-          if (!studentGrade || !c.targetGrades.includes(studentGrade)) {
+        // Filter by grade only if student's grade is resolved and targetGrades is specified
+        if (c.targetGrades && c.targetGrades.length > 0 && studentGrade !== undefined) {
+          const isClassInvited = Boolean(studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false));
+          const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
+          if (!c.targetGrades.includes(studentGrade) && !isClassInvited && !isUserInvited) {
             return false;
           }
         }
@@ -429,7 +435,7 @@ export const getUpcomingClassesForStudent = query({
   },
 });
 
-// Helper to get student grade from userPreferences (not directly on users table)
+// Helper to get student grade from userPreferences or user's assigned class name
 async function userPreferences_grade(
   userId: any,
   ctx: any
@@ -438,7 +444,22 @@ async function userPreferences_grade(
     .query("userPreferences")
     .withIndex("by_student", (q: any) => q.eq("student", userId))
     .first();
-  return prefs?.grade;
+
+  if (prefs?.grade) return prefs.grade;
+
+  // Fallback: Resolve grade from student's class name (e.g. "Grade 12A" -> 12)
+  const user = await ctx.db.get(userId);
+  if (user?.studentClass) {
+    const classDoc = await ctx.db.get(user.studentClass);
+    if (classDoc?.name) {
+      const match = classDoc.name.match(/\b(1[0-2]|[1-9])\b/);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export const getLiveChatMessages = query({
@@ -1175,3 +1196,69 @@ export const toggleScreenSharePermission = mutation({
     return { success: false };
   },
 });
+
+// ─── WEBRTC AUDIO SIGNALING FOR STUDENT REPLIES ─────────────────────────────
+
+export const sendWebRtcSignal = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    targetUserId: v.id("users"),
+    signalType: v.union(v.literal("offer"), v.literal("answer"), v.literal("candidate")),
+    sdp: v.optional(v.string()),
+    candidate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    await ctx.db.insert("liveClassWebRtcSignals", {
+      liveClass: args.liveClassId,
+      sender: userId,
+      targetUser: args.targetUserId,
+      signalType: args.signalType,
+      sdp: args.sdp,
+      candidate: args.candidate,
+      timestamp: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+export const getWebRtcSignals = query({
+  args: {
+    liveClassId: v.id("liveClasses"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const signals = await ctx.db
+      .query("liveClassWebRtcSignals")
+      .withIndex("by_target", (q) => q.eq("liveClass", args.liveClassId).eq("targetUser", userId))
+      .collect();
+
+    return signals;
+  },
+});
+
+export const clearWebRtcSignals = mutation({
+  args: {
+    liveClassId: v.id("liveClasses"),
+    signalIds: v.array(v.id("liveClassWebRtcSignals")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    for (const signalId of args.signalIds) {
+      const sig = await ctx.db.get(signalId);
+      if (sig && (sig.targetUser === userId || sig.sender === userId)) {
+        await ctx.db.delete(signalId);
+      }
+    }
+
+    return { success: true };
+  },
+});
+

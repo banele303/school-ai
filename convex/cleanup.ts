@@ -1,4 +1,24 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+
+export const printAuthData = query({
+  args: {},
+  handler: async (ctx) => {
+    const accounts = await ctx.db.query("authAccounts" as any).collect();
+    const credentials = await ctx.db.query("authCredentials" as any).collect();
+    return {
+      accounts,
+      credentials,
+    };
+  },
+});
+
+export const checkUserExists = query({
+  args: { id: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id as any);
+  },
+});
 
 export const fixDuplicateYears = mutation({
   args: {},
@@ -20,29 +40,43 @@ export const fixDuplicateYears = mutation({
   },
 });
 
-export const deleteOrphanedAccounts = mutation({
+export const cleanOrphanedAuth = mutation({
   args: {},
   handler: async (ctx) => {
-    const accounts = await ctx.db.query("authAccounts").collect();
-    let deletedCount = 0;
+    // 1. Clean orphaned authAccounts
+    const accounts = await ctx.db.query("authAccounts" as any).collect();
+    let accountsDeleted = 0;
     for (const acc of accounts) {
       const user = await ctx.db.get(acc.userId);
       if (!user) {
-        // Delete orphaned account
         await ctx.db.delete(acc._id);
-        deletedCount++;
-        
-        // Also delete any sessions pointing to this user
-        const sessions = await ctx.db
-          .query("authSessions")
-          .filter((q) => q.eq(q.field("userId"), acc.userId))
-          .collect();
-        for (const sess of sessions) {
-          await ctx.db.delete(sess._id);
-        }
+        accountsDeleted++;
       }
     }
-    return `Deleted ${deletedCount} orphaned auth accounts and their sessions.`;
+
+    // 2. Clean orphaned authSessions
+    const sessions = await ctx.db.query("authSessions" as any).collect();
+    let sessionsDeleted = 0;
+    for (const sess of sessions) {
+      const user = await ctx.db.get(sess.userId);
+      if (!user) {
+        await ctx.db.delete(sess._id);
+        sessionsDeleted++;
+      }
+    }
+
+    // 3. Clean orphaned authCredentials
+    const credentials = await ctx.db.query("authCredentials" as any).collect();
+    let credentialsDeleted = 0;
+    for (const cred of credentials) {
+      const account = await ctx.db.get(cred.accountId);
+      if (!account) {
+        await ctx.db.delete(cred._id);
+        credentialsDeleted++;
+      }
+    }
+
+    return `Successfully cleaned up orphaned auth data: ${accountsDeleted} accounts, ${sessionsDeleted} sessions, ${credentialsDeleted} credentials deleted.`;
   },
 });
 

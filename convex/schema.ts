@@ -627,6 +627,17 @@ export default defineSchema({
   }).index("by_class", ["liveClass"])
     .index("by_student_class", ["student", "liveClass"]),
 
+  liveClassWebRtcSignals: defineTable({
+    liveClass: v.id("liveClasses"),
+    sender: v.id("users"),
+    targetUser: v.id("users"),
+    signalType: v.union(v.literal("offer"), v.literal("answer"), v.literal("candidate")),
+    sdp: v.optional(v.string()),
+    candidate: v.optional(v.string()),
+    timestamp: v.number(),
+  }).index("by_class", ["liveClass"])
+    .index("by_target", ["liveClass", "targetUser"]),
+
   videoLibrary: defineTable({
     title: v.string(),
     description: v.optional(v.string()),

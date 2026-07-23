@@ -31,16 +31,19 @@ interface Props {
 }
 const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
   const convexTeachers = useQuery(api.users.getUsers, { role: "teacher" });
+  const convexStudents = useQuery(api.users.getUsers, { role: "student" });
   const convexYears = useQuery(api.academicYears.getAcademicYears);
   const convexSubjects = useQuery(api.subjects.getSubjects);
   const createClassMutation = useMutation(api.classes.createClass);
   const updateClassMutation = useMutation(api.classes.updateClass);
 
   const teachers = convexTeachers || [];
+  const studentsList = convexStudents || [];
   const years = convexYears || [];
   const subjects = convexSubjects || [];
   const loadingOptions = convexTeachers === undefined || convexYears === undefined;
   const loadingSubjects = convexSubjects === undefined;
+  const loadingStudents = convexStudents === undefined;
 
   //   form
   const form = useForm<ClassFormValues>({
@@ -51,6 +54,7 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
       academicYear: "",
       classTeacher: "",
       subjectIds: [],
+      studentIds: [],
     },
   });
 
@@ -63,6 +67,7 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
         academicYear: initialData.academicYear?._id || "",
         classTeacher: initialData.classTeacher?._id || "",
         subjectIds: initialData.subjects?.map((s: any) => s._id) || [],
+        studentIds: initialData.students?.map((st: any) => st._id) || [],
       });
     } else {
       form.reset({
@@ -71,6 +76,7 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
         academicYear: "",
         classTeacher: "",
         subjectIds: [],
+        studentIds: [],
       });
     }
   }, [initialData, form, open]);
@@ -92,6 +98,7 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
           academicYearId: payload.academicYear as any,
           classTeacherId: payload.classTeacher as any,
           subjectIds: payload.subjects as any,
+          studentIds: payload.studentIds as any,
         });
         toast.success("Class updated successfully");
       } else {
@@ -126,6 +133,11 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
     label: teacher.name || "Unknown Teacher",
     value: teacher._id as any,
   }));
+  const studentOptions = studentsList.map((st) => ({
+    label: st.name || st.email || "Unknown Student",
+    value: st._id as any,
+  }));
+
   return (
     <Modal
       open={open}
@@ -184,6 +196,15 @@ const ClassForm = ({ open, onOpenChange, initialData, onSuccess }: Props) => {
             placeholder="Select subjects..."
             options={subjectOptions}
             loading={loadingSubjects}
+            disabled={pending}
+          />
+          <CustomMultiSelect
+            control={form.control}
+            name="studentIds"
+            label="Enrolled Students"
+            placeholder="Select students to assign to this class..."
+            options={studentOptions}
+            loading={loadingStudents}
             disabled={pending}
           />
         </FieldGroup>
