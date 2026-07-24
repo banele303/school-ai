@@ -1201,7 +1201,7 @@ export const toggleScreenSharePermission = mutation({
 
 export const sendWebRtcSignal = mutation({
   args: {
-    liveClassId: v.id("liveClasses"),
+    liveClassId: v.string(),
     targetUserId: v.id("users"),
     signalType: v.union(v.literal("offer"), v.literal("answer"), v.literal("candidate")),
     sdp: v.optional(v.string()),
@@ -1211,8 +1211,18 @@ export const sendWebRtcSignal = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
+    let liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) {
+      const byRoom = await ctx.db
+        .query("liveClasses")
+        .filter((q) => q.eq(q.field("roomId"), args.liveClassId))
+        .first();
+      if (byRoom) liveClassId = byRoom._id;
+    }
+    if (!liveClassId) throw new Error("Live class not found");
+
     await ctx.db.insert("liveClassWebRtcSignals", {
-      liveClass: args.liveClassId,
+      liveClass: liveClassId,
       sender: userId,
       targetUser: args.targetUserId,
       signalType: args.signalType,
@@ -1227,15 +1237,25 @@ export const sendWebRtcSignal = mutation({
 
 export const getWebRtcSignals = query({
   args: {
-    liveClassId: v.id("liveClasses"),
+    liveClassId: v.string(),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    let liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+    if (!liveClassId) {
+      const byRoom = await ctx.db
+        .query("liveClasses")
+        .filter((q) => q.eq(q.field("roomId"), args.liveClassId))
+        .first();
+      if (byRoom) liveClassId = byRoom._id;
+    }
+    if (!liveClassId) return [];
+
     const signals = await ctx.db
       .query("liveClassWebRtcSignals")
-      .withIndex("by_target", (q) => q.eq("liveClass", args.liveClassId).eq("targetUser", userId))
+      .withIndex("by_target", (q) => q.eq("liveClass", liveClassId).eq("targetUser", userId))
       .collect();
 
     return signals;
@@ -1244,7 +1264,7 @@ export const getWebRtcSignals = query({
 
 export const clearWebRtcSignals = mutation({
   args: {
-    liveClassId: v.id("liveClasses"),
+    liveClassId: v.string(),
     signalIds: v.array(v.id("liveClassWebRtcSignals")),
   },
   handler: async (ctx, args) => {
@@ -1261,4 +1281,5 @@ export const clearWebRtcSignals = mutation({
     return { success: true };
   },
 });
+
 

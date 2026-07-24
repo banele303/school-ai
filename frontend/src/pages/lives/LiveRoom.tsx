@@ -28,11 +28,13 @@ export default function LiveRoomPage() {
   const [showInvite, setShowInvite] = useState(false);
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
+  const classItem = liveClasses?.find((c: any) => c._id === id || c.roomId === id);
+  const targetClassId = classItem?._id || id;
+
 // @ts-ignore generated Convex types update after codegen
-  const chatMessages = useQuery(api.liveClasses.getLiveChatMessages, id ? { liveClassId: id as any } : "skip") || [];
+  const chatMessages = useQuery(api.liveClasses.getLiveChatMessages, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
 // @ts-ignore generated Convex types update after codegen
-  const raisedHands = useQuery(api.liveClasses.getRaisedHands, id ? { liveClassId: id as any } : "skip") || [];
-  const classItem = liveClasses?.find((c: any) => c._id === id);
+  const raisedHands = useQuery(api.liveClasses.getRaisedHands, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
 
   // Mutations
 // @ts-ignore
@@ -45,11 +47,11 @@ export default function LiveRoomPage() {
   const startNativeLiveClass = useMutation(api.liveClasses.startNativeLiveClass);
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
   const sendReaction = useMutation(api.liveClasses.sendReaction);
-  const recentReactions = useQuery(api.liveClasses.getRecentReactions, id ? { liveClassId: id as any } : "skip") || [];
+  const recentReactions = useQuery(api.liveClasses.getRecentReactions, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
   // getReactionStats query is currently unused in the UI
 
-  const approvalStatus = useQuery(api.liveClasses.getApprovalStatus, id ? { liveClassId: id as any } : "skip");
-  const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, id ? { liveClassId: id as any } : "skip") || [];
+  const approvalStatus = useQuery(api.liveClasses.getApprovalStatus, targetClassId ? { liveClassId: targetClassId as any } : "skip");
+  const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
   const requestJoin = useMutation(api.liveClasses.requestJoinClass);
   const approveStudentMutation = useMutation(api.liveClasses.approveStudent);
   
@@ -65,13 +67,13 @@ export default function LiveRoomPage() {
   // @ts-ignore
   const toggleScreenSharePermissionMutation = useMutation(api.liveClasses.toggleScreenSharePermission);
   // @ts-ignore
-  const participants = useQuery(api.liveClasses.getLiveClassParticipants, id ? { liveClassId: id as any } : "skip") || [];
+  const participants = useQuery(api.liveClasses.getLiveClassParticipants, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
   // @ts-ignore
   const sendWebRtcSignal = useMutation(api.liveClasses.sendWebRtcSignal);
   // @ts-ignore
   const clearWebRtcSignals = useMutation(api.liveClasses.clearWebRtcSignals);
   // @ts-ignore
-  const webRtcSignals = useQuery(api.liveClasses.getWebRtcSignals, id ? { liveClassId: id as any } : "skip") || [];
+  const webRtcSignals = useQuery(api.liveClasses.getWebRtcSignals, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
 
   const myParticipantRecord = participants.find((p: any) => p.studentId === user?._id);
   const myMuteStatus = (myParticipantRecord as any)?.isMuted ?? false;
@@ -486,19 +488,19 @@ export default function LiveRoomPage() {
   // Mark student attendance when in live room and clean up on exit/unload
   useEffect(() => {
     if (user?.role === "student" && classItem?.status && classItem?.status !== "ended" && classItem?.status !== "cancelled" && approvalStatus?.status === "approved") {
-      joinLiveClassMutation({ liveClassId: id as any }).catch(console.error);
+      joinLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
 
       const handleUnload = () => {
-        leaveLiveClassMutation({ liveClassId: id as any }).catch(console.error);
+        leaveLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
       };
       window.addEventListener("beforeunload", handleUnload);
 
       return () => {
         window.removeEventListener("beforeunload", handleUnload);
-        leaveLiveClassMutation({ liveClassId: id as any }).catch(console.error);
+        leaveLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
       };
     }
-  }, [user?.role, classItem?.status, approvalStatus?.status, id]);
+  }, [user?.role, classItem?.status, approvalStatus?.status, targetClassId]);
 
   // Detect new raised hands (for creator/moderator)
   useEffect(() => {
@@ -582,7 +584,7 @@ export default function LiveRoomPage() {
         if (classItem.whipUrl && localStreamRef.current) {
           try {
             await publishWhip(localStreamRef.current, classItem.whipUrl);
-            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+            await updateStreamTimestamp({ liveClassId: targetClassId as any }).catch(console.error);
             toast.success("Broadcast auto-resumed after refresh.");
           } catch (err: any) {
             console.warn("WHIP auto-resume failed:", err);
@@ -878,7 +880,7 @@ export default function LiveRoomPage() {
           pc.onicecandidate = (event) => {
             if (event.candidate) {
               sendWebRtcSignal({
-                liveClassId: id as any,
+                liveClassId: targetClassId as any,
                 targetUserId: classItem.teacher,
                 signalType: "candidate",
                 candidate: JSON.stringify(event.candidate),
@@ -890,7 +892,7 @@ export default function LiveRoomPage() {
           await pc.setLocalDescription(offer);
 
           await sendWebRtcSignal({
-            liveClassId: id as any,
+            liveClassId: targetClassId as any,
             targetUserId: classItem.teacher,
             signalType: "offer",
             sdp: offer.sdp,
@@ -924,9 +926,9 @@ export default function LiveRoomPage() {
   };
 
   const toggleStudentMic = async () => {
-    if (!id || !user?._id) return;
+    if (!targetClassId || !user?._id) return;
     try {
-      const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: user._id as any });
+      const res = await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
       if (!res.isMuted) {
         await startStudentMedia(true, !myBlockCameraStatus);
       } else {
@@ -939,9 +941,9 @@ export default function LiveRoomPage() {
   };
 
   const toggleStudentVideo = async () => {
-    if (!id || !user?._id) return;
+    if (!targetClassId || !user?._id) return;
     try {
-      const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: user._id as any });
+      const res = await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
       if (!res.isCameraBlocked) {
         await startStudentMedia(!myMuteStatus, true);
       } else {
@@ -1002,7 +1004,7 @@ export default function LiveRoomPage() {
           pc.onicecandidate = (e) => {
             if (e.candidate) {
               sendWebRtcSignal({
-                liveClassId: id as any,
+                liveClassId: targetClassId as any,
                 targetUserId: studentId,
                 signalType: "candidate",
                 candidate: JSON.stringify(e.candidate)
@@ -1015,7 +1017,7 @@ export default function LiveRoomPage() {
           await pc.setLocalDescription(answer);
 
           await sendWebRtcSignal({
-            liveClassId: id as any,
+            liveClassId: targetClassId as any,
             targetUserId: studentId,
             signalType: "answer",
             sdp: answer.sdp
@@ -1052,9 +1054,9 @@ export default function LiveRoomPage() {
     });
 
     if (processedIds.length > 0) {
-      clearWebRtcSignals({ liveClassId: id as any, signalIds: processedIds }).catch(console.error);
+      clearWebRtcSignals({ liveClassId: targetClassId as any, signalIds: processedIds }).catch(console.error);
     }
-  }, [webRtcSignals, isCreator, id, user?._id]);
+  }, [webRtcSignals, isCreator, targetClassId, user?._id]);
 
   // Clean up student local streams & teacher audio connections on unmount
   useEffect(() => {
@@ -1175,14 +1177,14 @@ export default function LiveRoomPage() {
 
       // Update Convex status
       await startNativeLiveClass({
-        liveClassId: id as any,
+        liveClassId: targetClassId as any,
         rtmpsUrl: rtmpsUrl || "",
         streamKey: streamKey || "",
         srtUrl: classItem.srtUrl || "",
         srtStreamId: classItem.srtStreamId || "",
         srtPassphrase: classItem.srtPassphrase || "",
         playbackUrl: playbackUrl || "",
-        streamInputId: streamInputId || `mock_${id}`,
+        streamInputId: streamInputId || `mock_${targetClassId}`,
         whipUrl,
         whepUrl,
       });
@@ -1216,7 +1218,7 @@ export default function LiveRoomPage() {
       }
 
       await updateStatus({
-        liveClassId: id as any,
+        liveClassId: targetClassId as any,
         status: "ended",
         recordingUrl: classItem?.playbackUrl, // default to live link which Cloudflare automatically transcodes to recording
       });
@@ -1290,7 +1292,7 @@ export default function LiveRoomPage() {
 
           if (isBroadcasting && classItem.whipUrl) {
             await publishWhip(localStreamRef.current, classItem.whipUrl);
-            await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+            await updateStreamTimestamp({ liveClassId: targetClassId as any }).catch(console.error);
           }
           toast.info("Switched stream back to webcam feed.");
         } else {
@@ -1362,7 +1364,7 @@ export default function LiveRoomPage() {
         // Publish stream
         if (classItem.whipUrl) {
           await publishWhip(combinedStream, classItem.whipUrl);
-          await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+          await updateStreamTimestamp({ liveClassId: targetClassId as any }).catch(console.error);
         }
 
         screenVideoTrack.onended = async () => {
@@ -1399,7 +1401,7 @@ export default function LiveRoomPage() {
 
             if (isBroadcasting && classItem.whipUrl) {
               await publishWhip(localStreamRef.current, classItem.whipUrl);
-              await updateStreamTimestamp({ liveClassId: id as any }).catch(console.error);
+              await updateStreamTimestamp({ liveClassId: targetClassId as any }).catch(console.error);
             }
             toast.info("Switched stream back to webcam feed.");
           } else {
@@ -1421,7 +1423,7 @@ export default function LiveRoomPage() {
 
     try {
       await sendChatMessage({
-        liveClassId: id as any,
+        liveClassId: targetClassId as any,
         content: chatInput.trim(),
       });
       setChatInput("");
@@ -1433,7 +1435,7 @@ export default function LiveRoomPage() {
   // Raise hand (Student)
   const handleRaiseHand = async () => {
     try {
-      const res = await toggleRaiseHand({ liveClassId: id as any });
+      const res = await toggleRaiseHand({ liveClassId: targetClassId as any });
       if (res.raised) {
         toast.success("Hand raised! The teacher has been notified.");
       } else {
@@ -1447,7 +1449,7 @@ export default function LiveRoomPage() {
   const handleSendReaction = async (type: string) => {
     try {
       await sendReaction({
-        liveClassId: id as any,
+        liveClassId: targetClassId as any,
         type,
       });
     } catch (err: any) {
@@ -2006,7 +2008,7 @@ export default function LiveRoomPage() {
                           className="text-[10px] text-zinc-500 hover:text-white px-2 py-1 h-auto"
                           onClick={async () => {
                             for (const h of raisedHands) {
-                              await lowerStudentHand({ liveClassId: id as any, studentId: h.studentId });
+                              await lowerStudentHand({ liveClassId: targetClassId as any, studentId: h.studentId });
                             }
                             toast.info("Cleared raised hands queue.");
                           }}
@@ -2040,7 +2042,7 @@ export default function LiveRoomPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 px-2.5 rounded-lg bg-amber-505/15 hover:bg-amber-505/25 text-[10px] text-amber-500 font-semibold"
-                                onClick={() => lowerStudentHand({ liveClassId: id as any, studentId: hand.studentId })}
+                                onClick={() => lowerStudentHand({ liveClassId: targetClassId as any, studentId: hand.studentId })}
                               >
                                 Lower
                               </Button>
@@ -2103,7 +2105,7 @@ export default function LiveRoomPage() {
                                           className={cn("h-7 w-7 rounded-lg", p.isMuted ? "text-red-500 hover:bg-red-955/20" : "text-zinc-400 hover:bg-zinc-800")}
                                           onClick={async () => {
                                             try {
-                                              const res = await toggleMuteStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                              const res = await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: p.studentId });
                                               toast.success(res.isMuted ? `${p.name} muted.` : `${p.name} unmuted.`);
                                             } catch (err: any) {
                                               toast.error(err.message || "Failed to toggle mute.");
@@ -2119,7 +2121,7 @@ export default function LiveRoomPage() {
                                           className={cn("h-7 w-7 rounded-lg", p.isCameraBlocked ? "text-red-500 hover:bg-red-955/20" : "text-zinc-400 hover:bg-zinc-800")}
                                           onClick={async () => {
                                             try {
-                                              const res = await toggleBlockCameraStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                              const res = await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: p.studentId });
                                               toast.success(res.isCameraBlocked ? `${p.name} camera blocked.` : `${p.name} camera unblocked.`);
                                             } catch (err: any) {
                                               toast.error(err.message || "Failed to toggle camera block.");
@@ -2144,7 +2146,7 @@ export default function LiveRoomPage() {
                                             try {
                                               const nextState = !p.canShareScreen;
                                               await toggleScreenSharePermissionMutation({ 
-                                                liveClassId: id as any, 
+                                                liveClassId: targetClassId as any, 
                                                 studentId: p.studentId, 
                                                 granted: nextState 
                                               });
@@ -2173,7 +2175,7 @@ export default function LiveRoomPage() {
                                           className="h-7 w-7 text-red-550 hover:text-red-400 hover:bg-red-955/20 rounded-lg"
                                           onClick={async () => {
                                             try {
-                                              await evictStudentMutation({ liveClassId: id as any, studentId: p.studentId });
+                                              await evictStudentMutation({ liveClassId: targetClassId as any, studentId: p.studentId });
                                               toast.success(`${p.name} evicted from class.`);
                                             } catch (err: any) {
                                               toast.error(err.message || "Failed to evict student.");
@@ -2367,7 +2369,7 @@ export default function LiveRoomPage() {
               onClick={async () => {
                 if (myRequestedScreenShare) return;
                 try {
-                  await requestScreenShareMutation({ liveClassId: id as any });
+                  await requestScreenShareMutation({ liveClassId: targetClassId as any });
                   toast.success("Screen share permission requested!");
                 } catch (err: any) {
                   toast.error(err.message || "Failed to request screen share.");
