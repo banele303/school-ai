@@ -1124,12 +1124,12 @@ export default function LiveRoomPage() {
             if (recordings && recordings.length > 0) {
               setResolvedRecordingUrl(recordings[0].iframeUrl);
             } else {
-              setResolvedRecordingUrl(classItem.recordingUrl);
+              setResolvedRecordingUrl(null); // Recording not ready yet
             }
           })
           .catch((err) => {
             console.error("Failed to resolve live recording:", err);
-            setResolvedRecordingUrl(classItem.recordingUrl);
+            setResolvedRecordingUrl(null);
           })
           .finally(() => {
             setResolvingRecording(false);
