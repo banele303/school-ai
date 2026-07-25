@@ -81,10 +81,14 @@ export default function VideoLibraryPage() {
       setResolvingVideoId(video._id);
       try {
         const recordings = await getLiveInputRecordings(video.streamInputId);
-        if (recordings && recordings.length > 0) {
-          setNowPlaying({ ...video, videoType: "cloudflare", videoUrl: recordings[0].iframeUrl });
-        } else {
+        const readyRecording = recordings?.find((r: any) => r.status === "ready");
+        
+        if (readyRecording) {
+          setNowPlaying({ ...video, videoType: "cloudflare", videoUrl: readyRecording.iframeUrl });
+        } else if (recordings && recordings.length > 0) {
           toast.info("Recording is still processing. Please check back later.");
+        } else {
+          toast.info("No recordings found for this class.");
         }
       } catch (err) {
         toast.error("Failed to load recording.");
