@@ -88,25 +88,25 @@ export const getVideos = query({
 
     // Apply class subjects restriction for students/parents
     if (allowedSubjectIds !== null) {
-      videos = videos.filter((v) => allowedSubjectIds!.has(v.subject));
+      videos = videos.filter((v: any) => allowedSubjectIds!.has(v.subject));
     }
 
     // Apply additional filters
     if (args.subject && args.playlist) {
-      videos = videos.filter((v) => v.subject === args.subject);
+      videos = videos.filter((v: any) => v.subject === args.subject);
     }
     if (args.grade && (args.subject || args.playlist)) {
-      videos = videos.filter((v) => v.grade === args.grade);
+      videos = videos.filter((v: any) => v.grade === args.grade);
     }
 
     // Search filter
     if (args.searchTerm) {
       const term = args.searchTerm.toLowerCase();
       videos = videos.filter(
-        (v) =>
+        (v: any) =>
           v.title.toLowerCase().includes(term) ||
           (v.description && v.description.toLowerCase().includes(term)) ||
-          v.tags.some((t) => t.toLowerCase().includes(term)) ||
+          v.tags.some((t: any) => t.toLowerCase().includes(term)) ||
           (v.topic && v.topic.toLowerCase().includes(term))
       );
     }
