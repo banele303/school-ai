@@ -73,18 +73,6 @@ export const createMaterial = mutation({
   },
 });
 
-export const updateMaterialExtractedText = mutation({
-  args: {
-    materialId: v.id("materials"),
-    extractedText: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthorized");
-    await ctx.db.patch(args.materialId, { extractedText: args.extractedText });
-  },
-});
-
 export const getAssignmentSubmissions = query({
   args: { assignmentId: v.id("assignments") },
   handler: async (ctx, args) => {

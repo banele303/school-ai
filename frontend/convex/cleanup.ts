@@ -79,3 +79,4 @@ export const cleanOrphanedAuth = mutation({
     return `Successfully cleaned up orphaned auth data: ${accountsDeleted} accounts, ${sessionsDeleted} sessions, ${credentialsDeleted} credentials deleted.`;
   },
 });
+

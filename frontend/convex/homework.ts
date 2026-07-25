@@ -136,7 +136,7 @@ export const saveHomework = mutation({
   handler: async (ctx, args) => {
     return await ctx.db.insert("homeworkSubmissions", {
       student: args.studentId,
-      subject: args.subjectId,
+      subject: args.subjectId!,
       question: args.question,
       studentAnswer: args.studentAnswer,
       imageUrl: args.imageUrl,

@@ -9,10 +9,9 @@
  */
 
 import type * as academicYears from "../academicYears.js";
-import type * as adminSeed from "../adminSeed.js";
 import type * as adminUsers from "../adminUsers.js";
+import type * as aiGrading from "../aiGrading.js";
 import type * as announcements from "../announcements.js";
-import type * as arenas from "../arenas.js";
 import type * as attendance from "../attendance.js";
 import type * as auth from "../auth.js";
 import type * as badges from "../badges.js";
@@ -38,7 +37,6 @@ import type * as messages from "../messages.js";
 import type * as notifications from "../notifications.js";
 import type * as parents from "../parents.js";
 import type * as questionBank from "../questionBank.js";
-import type * as repairDb from "../repairDb.js";
 import type * as schoolSettings from "../schoolSettings.js";
 import type * as search from "../search.js";
 import type * as seed from "../seed.js";
@@ -61,10 +59,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   academicYears: typeof academicYears;
-  adminSeed: typeof adminSeed;
   adminUsers: typeof adminUsers;
+  aiGrading: typeof aiGrading;
   announcements: typeof announcements;
-  arenas: typeof arenas;
   attendance: typeof attendance;
   auth: typeof auth;
   badges: typeof badges;
@@ -90,7 +87,6 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   parents: typeof parents;
   questionBank: typeof questionBank;
-  repairDb: typeof repairDb;
   schoolSettings: typeof schoolSettings;
   search: typeof search;
   seed: typeof seed;

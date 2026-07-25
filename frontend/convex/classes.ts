@@ -74,6 +74,7 @@ export const updateClass = mutation({
     academicYearId: v.optional(v.id("academicYears")),
     classTeacherId: v.optional(v.id("users")),
     subjectIds: v.optional(v.array(v.id("subjects"))),
+    studentIds: v.optional(v.array(v.id("users"))),
     capacity: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -87,13 +88,42 @@ export const updateClass = mutation({
       throw new Error("Unauthorized");
     }
 
-    const { id, academicYearId, classTeacherId, subjectIds, ...updates } = args;
-    await ctx.db.patch(id, {
+    const targetClass = await ctx.db.get(args.id);
+    if (!targetClass) throw new Error("Class not found");
+
+    const { id, academicYearId, classTeacherId, subjectIds, studentIds, ...updates } = args;
+
+    const patchObj: any = {
       ...updates,
       ...(academicYearId && { academicYear: academicYearId }),
       ...(classTeacherId !== undefined && { classTeacher: classTeacherId }),
       ...(subjectIds && { subjects: subjectIds }),
-    });
+      ...(studentIds && { students: studentIds }),
+    };
+
+    await ctx.db.patch(id, patchObj);
+
+    // Sync studentClass on student user documents if studentIds updated
+    if (studentIds) {
+      const oldStudentIds = targetClass.students || [];
+      const removedStudents = oldStudentIds.filter((sId) => !studentIds.includes(sId));
+      const addedStudents = studentIds.filter((sId) => !oldStudentIds.includes(sId));
+
+      for (const rId of removedStudents) {
+        const student = await ctx.db.get(rId);
+        if (student && student.studentClass === id) {
+          await ctx.db.patch(rId, { studentClass: undefined });
+        }
+      }
+
+      for (const aId of addedStudents) {
+        const student = await ctx.db.get(aId);
+        if (student) {
+          await ctx.db.patch(aId, { studentClass: id });
+        }
+      }
+    }
+
     return { success: true };
   },
 });

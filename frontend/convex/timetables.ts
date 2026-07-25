@@ -1,7 +1,7 @@
 declare const process: { env: Record<string, string | undefined> };
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { api } from "./_generated/api";
 
@@ -337,7 +337,7 @@ export const generateTimetable = action({
       academicYearId: args.academicYearId,
     });
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) return { schedule: [] };
 
     const prompt = `
@@ -357,10 +357,10 @@ export const generateTimetable = action({
       4. No conversational text or markdown.
     `;
 
-    const google = createGoogleGenerativeAI({ apiKey });
+    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
       prompt,
-      model: google("gemini-2.5-flash"),
+      model: openai.chat("deepseek-chat"),
     });
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();

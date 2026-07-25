@@ -326,9 +326,6 @@ export const createExam = mutation({
     syllabusTopics: v.optional(v.array(v.string())),
     subjectCategory: v.optional(v.string()),
     templateUsed: v.optional(v.string()),
-    capsPhase: v.optional(v.union(v.literal("Senior"), v.literal("FET"))),
-    grade: v.optional(v.number()),
-    southAfricanExamType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -353,9 +350,6 @@ export const createExam = mutation({
       syllabusTopics: args.syllabusTopics,
       subjectCategory: args.subjectCategory,
       templateUsed: args.templateUsed,
-      capsPhase: args.capsPhase,
-      grade: args.grade,
-      southAfricanExamType: args.southAfricanExamType,
       totalPoints: 0,
       questions: [],
     });
@@ -466,8 +460,6 @@ export const generateExam = action({
     templateUsed: v.optional(v.string()),
     maxAttempts: v.optional(v.number()),
     instantFeedback: v.optional(v.boolean()),
-    grade: v.optional(v.number()),
-    southAfricanExamType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user: any = await ctx.runQuery(api.users.getCurrentUser);
@@ -490,11 +482,6 @@ export const generateExam = action({
     const subject = subjects.find((s: any) => s._id === args.subjectId);
     const subjectName = subject?.name || "General";
     const subjectCategory = (subject?.category || "other").toLowerCase();
-    const grade = args.grade || subject?.grade || 8;
-    const capsPhase = grade >= 10 ? "FET" : "Senior";
-    const southAfricanExamType =
-      args.southAfricanExamType ||
-      (grade >= 12 ? "NSC Paper Simulation" : grade >= 10 ? "CAPS Formal Test" : "Senior Phase Term Test");
 
     // Create the exam record
     const { examId }: any = await ctx.runMutation("exams:createExam" as any, {
@@ -509,9 +496,6 @@ export const generateExam = action({
       syllabusTopics: topics,
       subjectCategory,
       templateUsed: args.templateUsed,
-      capsPhase,
-      grade,
-      southAfricanExamType,
     });
 
     const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -639,23 +623,17 @@ export const generateExam = action({
 CONTEXT:
 - Subject: ${subjectName} (${subjectCategory})
 - Topics: ${topicsList}
-- Grade: ${grade} (${capsPhase} Phase)
-- Assessment type: ${southAfricanExamType}
-- Difficulty: ${args.difficulty}
+- Grade Level: ${args.difficulty}
 - Total Questions: ${args.count}
 - Target approximately ${questionsPerTopic} questions per topic
 - Questions should be distributed across the topics proportionally
-- Apply CAPS cognitive weighting approximately: Knowledge & Recall 25%, Routine Procedures 30%, Complex Procedures 30%, Problem Solving / Creative Analysis 15%.
 
 QUESTION TYPE MIX:
 ${mixDescription}
 
 STRICT JSON SCHEMA — Output a JSON array of exactly ${args.count} question objects.
-Each question must include: questionText, type, options, correctAnswer, points, topic, difficulty, cognitiveLevel.
+Each question must include: questionText, type, options, correctAnswer, points, topic, difficulty.
 For MATCH_COLUMN questions, also include matchPairs array.
-For CALCULATION questions, include calculationSteps array with expected mark-bearing working steps.
-For DIAGRAM_LABEL questions, include diagramHotspots array with percentage x/y coordinates.
-Where possible, include bilingual fields: questionTextZulu, questionTextAfrikaans, optionsZulu, optionsAfrikaans, correctAnswerZulu, correctAnswerAfrikaans.
 
 Example question formats:
 [${exampleQuestions}]
@@ -668,12 +646,11 @@ RULES:
 5. For FILL_BLANK: options must be empty []. correctAnswer is the exact missing word/phrase.
 6. For MATCH_COLUMN: include matchPairs array with 3-5 pairs.
 7. For SHORT_ANSWER/ESSAY: options must be []. correctAnswer is a detailed model answer for grading.
-8. For CALCULATION: correctAnswer must include the full working/solution and calculationSteps must show partial-mark steps.
-9. For DIAGRAM_LABEL: correctAnswer lists all labels and diagramHotspots must contain 3-6 hotspots.
+8. For CALCULATION: correctAnswer must include the full working/solution.
+9. For DIAGRAM_LABEL: correctAnswer lists all labels.
 10. Each question's "topic" field must be ONE of: ${topicsList}
 11. Questions should be appropriate for ${args.difficulty} difficulty level.
-12. Use South African contexts, rand values, local provinces, CAPS terminology, NSC/IEB-style phrasing where relevant.
-13. cognitiveLevel must be one of: knowledge, routine, complex, problem_solving.`;
+12. Use South African context and examples where relevant.`;
 
     const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
     const { text } = await generateText({
@@ -684,6 +661,7 @@ RULES:
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const questions = JSON.parse(cleanJson);
 
+    // Save questions to exam
     await ctx.runMutation("exams:updateExamQuestions" as any, {
       examId,
       questions,
@@ -701,16 +679,6 @@ RULES:
         difficulty: q.difficulty || args.difficulty,
         subject: args.subjectId,
         matchPairs: q.matchPairs,
-        diagramUrl: q.diagramUrl,
-        questionTextZulu: q.questionTextZulu,
-        questionTextAfrikaans: q.questionTextAfrikaans,
-        optionsZulu: q.optionsZulu,
-        optionsAfrikaans: q.optionsAfrikaans,
-        correctAnswerZulu: q.correctAnswerZulu,
-        correctAnswerAfrikaans: q.correctAnswerAfrikaans,
-        cognitiveLevel: q.cognitiveLevel,
-        calculationSteps: q.calculationSteps,
-        diagramHotspots: q.diagramHotspots,
         tags: [subjectName, q.topic, q.type, args.difficulty],
         isPublished: true,
       });
