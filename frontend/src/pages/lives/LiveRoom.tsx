@@ -29,7 +29,7 @@ export default function LiveRoomPage() {
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
   const classItem = liveClasses?.find((c: any) => c._id === id || c.roomId === id);
-  const targetClassId = classItem?._id || id;
+  const targetClassId = classItem?._id;
 
 // @ts-ignore generated Convex types update after codegen
   const chatMessages = useQuery(api.liveClasses.getLiveChatMessages, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
