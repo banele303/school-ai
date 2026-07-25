@@ -228,6 +228,7 @@ export default function VideoLibraryPage() {
                           )}
                           {progress?.completed && <CheckCircle className="absolute right-3 top-3 h-6 w-6 rounded-full bg-white text-emerald-600" />}
                         </div>
+                      </button>
                       <CardContent className="space-y-3 p-4">
                         <div>
                           <h2 className="line-clamp-2 text-sm font-semibold leading-5">{video.title}</h2>
