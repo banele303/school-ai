@@ -1221,9 +1221,13 @@ export const sendWebRtcSignal = mutation({
     }
     if (!liveClassId) throw new Error("Live class not found");
 
+    // Assign to const so TypeScript correctly narrows away null for db.insert
+    const resolvedClassId = liveClassId;
+    const resolvedUserId = userId;
+
     await ctx.db.insert("liveClassWebRtcSignals", {
-      liveClass: liveClassId,
-      sender: userId,
+      liveClass: resolvedClassId,
+      sender: resolvedUserId,
       targetUser: args.targetUserId,
       signalType: args.signalType,
       sdp: args.sdp,
@@ -1253,9 +1257,13 @@ export const getWebRtcSignals = query({
     }
     if (!liveClassId) return [];
 
+    // Assign to const so TypeScript correctly narrows away null for withIndex
+    const resolvedClassId = liveClassId;
+    const resolvedUserId = userId;
+
     const signals = await ctx.db
       .query("liveClassWebRtcSignals")
-      .withIndex("by_target", (q) => q.eq("liveClass", liveClassId).eq("targetUser", userId))
+      .withIndex("by_target", (q) => q.eq("liveClass", resolvedClassId).eq("targetUser", resolvedUserId))
       .collect();
 
     return signals;
