@@ -26,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { uploadFileToR2 } from "@/lib/cloudflareWorker";
+import { uploadFileToR2, getLiveInputRecordings } from "@/lib/cloudflareWorker";
 
 const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -37,6 +37,7 @@ export default function VideoLibraryPage() {
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [activeTab, setActiveTab] = useState("all");
   const [nowPlaying, setNowPlaying] = useState<any>(null);
+  const [resolvingVideoId, setResolvingVideoId] = useState<string | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   const isTeacher = user?.role === "teacher" || user?.role === "admin";
@@ -75,7 +76,24 @@ export default function VideoLibraryPage() {
     );
   });
 
-  const handlePlayVideo = (video: any) => {
+  const handlePlayVideo = async (video: any) => {
+    if (video.videoType === "cloudflare-live") {
+      setResolvingVideoId(video._id);
+      try {
+        const recordings = await getLiveInputRecordings(video.streamInputId);
+        if (recordings && recordings.length > 0) {
+          setNowPlaying({ ...video, videoType: "cloudflare", videoUrl: recordings[0].iframeUrl });
+        } else {
+          toast.info("Recording is still processing. Please check back later.");
+        }
+      } catch (err) {
+        toast.error("Failed to load recording.");
+      } finally {
+        setResolvingVideoId(null);
+      }
+      return;
+    }
+    
     setNowPlaying(video);
     void incrementView({ videoId: video._id });
   };
@@ -187,17 +205,29 @@ export default function VideoLibraryPage() {
                               <Play className="h-12 w-12 text-white/80" />
                             </div>
                           )}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition group-hover:opacity-100">
-                            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg">
-                              <Play className="ml-1 h-6 w-6" />
-                            </span>
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            {resolvingVideoId === video._id ? (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/80 backdrop-blur text-white shadow-lg">
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              </div>
+                            ) : (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/80 backdrop-blur text-white shadow-lg">
+                                <Play className="h-4 w-4 fill-current ml-0.5" />
+                              </div>
+                            )}
                           </div>
+                          <button 
+                            onClick={() => handlePlayVideo(video)}
+                            disabled={resolvingVideoId === video._id}
+                            className="absolute inset-0 z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t-lg"
+                          >
+                            <span className="sr-only">Play {video.title}</span>
+                          </button>
                           {!video.isPublished && isTeacher && (
                             <Badge className="absolute left-3 top-3 bg-amber-500 text-slate-950">Draft</Badge>
                           )}
                           {progress?.completed && <CheckCircle className="absolute right-3 top-3 h-6 w-6 rounded-full bg-white text-emerald-600" />}
                         </div>
-                      </button>
                       <CardContent className="space-y-3 p-4">
                         <div>
                           <h2 className="line-clamp-2 text-sm font-semibold leading-5">{video.title}</h2>
@@ -261,6 +291,13 @@ export default function VideoLibraryPage() {
                   {nowPlaying.videoType === "youtube" ? (
                     <iframe
                       src={getYoutubeEmbedUrl(nowPlaying.videoUrl)}
+                      className="h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : nowPlaying.videoType === "cloudflare" ? (
+                    <iframe
+                      src={nowPlaying.videoUrl}
                       className="h-full w-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen

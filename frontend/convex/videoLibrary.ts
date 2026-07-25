@@ -59,6 +59,33 @@ export const getVideos = query({
         .collect();
     }
 
+    // Include ended live classes with recordings
+    const endedLiveClasses = await ctx.db
+      .query("liveClasses")
+      .withIndex("by_status", (q) => q.eq("status", "ended"))
+      .collect();
+      
+    const liveRecordings = endedLiveClasses
+      .filter((lc) => lc.recordingUrl) // has a recording URL
+      .map((lc) => ({
+        _id: lc._id,
+        _creationTime: lc._creationTime,
+        title: `Live Recording: ${lc.title}`,
+        description: lc.description,
+        subject: lc.subject,
+        teacher: lc.teacher,
+        videoUrl: lc.recordingUrl!,
+        videoType: "cloudflare-live" as any,
+        streamInputId: lc.streamInputId,
+        isPublished: true,
+        viewCount: 0, // we can't easily track views on live classes yet
+        tags: ["live-recording"],
+        playlist: "Live Recordings",
+        playlistOrder: lc._creationTime,
+      }));
+
+    videos = [...videos, ...liveRecordings] as any;
+
     // Apply class subjects restriction for students/parents
     if (allowedSubjectIds !== null) {
       videos = videos.filter((v) => allowedSubjectIds!.has(v.subject));
