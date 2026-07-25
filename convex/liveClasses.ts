@@ -1244,29 +1244,36 @@ export const getWebRtcSignals = query({
     liveClassId: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return [];
 
-    let liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
-    if (!liveClassId) {
-      const byRoom = await ctx.db
-        .query("liveClasses")
-        .filter((q) => q.eq(q.field("roomId"), args.liveClassId))
-        .first();
-      if (byRoom) liveClassId = byRoom._id;
+      // Guard: reject obviously-invalid IDs early
+      if (!args.liveClassId || args.liveClassId.trim() === "") return [];
+
+      let liveClassId = ctx.db.normalizeId("liveClasses", args.liveClassId);
+      if (!liveClassId) {
+        const byRoom = await ctx.db
+          .query("liveClasses")
+          .filter((q) => q.eq(q.field("roomId"), args.liveClassId))
+          .first();
+        if (byRoom) liveClassId = byRoom._id;
+      }
+      if (!liveClassId) return [];
+
+      // Assign to const so TypeScript correctly narrows away null for withIndex
+      const resolvedClassId = liveClassId;
+      const resolvedUserId = userId;
+
+      const signals = await ctx.db
+        .query("liveClassWebRtcSignals")
+        .withIndex("by_target", (q) => q.eq("liveClass", resolvedClassId).eq("targetUser", resolvedUserId))
+        .collect();
+
+      return signals;
+    } catch {
+      return [];
     }
-    if (!liveClassId) return [];
-
-    // Assign to const so TypeScript correctly narrows away null for withIndex
-    const resolvedClassId = liveClassId;
-    const resolvedUserId = userId;
-
-    const signals = await ctx.db
-      .query("liveClassWebRtcSignals")
-      .withIndex("by_target", (q) => q.eq("liveClass", resolvedClassId).eq("targetUser", resolvedUserId))
-      .collect();
-
-    return signals;
   },
 });
 
