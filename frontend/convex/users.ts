@@ -2,6 +2,13 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
+const ADMIN_EMAILS = [
+  "alexsouthflow@gmail.com",
+  "ramadimukondi13@gmail.com",
+  "alexsouthflow2@gmail.com",
+  "alxsouthflow2@gmail.com",
+];
+
 export const getMe = query({
   args: {},
   handler: async (ctx) => {
@@ -12,13 +19,18 @@ export const getMe = query({
     const user = await ctx.db.get(userId);
     if (!user) return null;
 
+    const isAdminEmail = Boolean(user.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
+    const effectiveRole = isAdminEmail ? "admin" : (user.role || "student");
+
     return {
       _id: user._id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: effectiveRole,
       isActive: user.isActive ?? true,
-      isApproved: user.isApproved ?? true,
+      isApproved: isAdminEmail ? true : (user.isApproved ?? true),
+      studentClass: user.studentClass,
+      teacherSubject: user.teacherSubject,
     };
   },
 });
@@ -32,7 +44,12 @@ export const getUsers = query({
     }
 
     const currentUser = await ctx.db.get(userId);
-    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "teacher")) {
+    const isCurrentUserAdmin = Boolean(
+      currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())
+    );
+    const currentUserRole = isCurrentUserAdmin ? "admin" : currentUser?.role;
+
+    if (!currentUser || (currentUserRole !== "admin" && currentUserRole !== "teacher")) {
       throw new Error("Unauthorized");
     }
 
@@ -42,14 +59,45 @@ export const getUsers = query({
     }
 
     const allUsers = await usersQuery.collect();
-    return allUsers.map((u) => ({
-      _id: u._id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      isActive: u.isActive ?? true,
-      isApproved: u.isApproved ?? true,
-    }));
+
+    return await Promise.all(
+      allUsers.map(async (u) => {
+        const isAdmin = Boolean(u.email && ADMIN_EMAILS.includes(u.email.toLowerCase()));
+        const role = isAdmin ? "admin" : (u.role || "student");
+
+        let studentClassDoc = null;
+        if (u.studentClass) {
+          studentClassDoc = await ctx.db.get(u.studentClass);
+        }
+
+        let teacherSubjectsDocs: any[] = [];
+        if (u.teacherSubject && Array.isArray(u.teacherSubject)) {
+          const subjects = await Promise.all(
+            u.teacherSubject.map((sId) => ctx.db.get(sId))
+          );
+          teacherSubjectsDocs = subjects.filter(Boolean);
+        }
+
+        return {
+          _id: u._id,
+          name: u.name,
+          email: u.email,
+          role,
+          isActive: u.isActive ?? true,
+          isApproved: isAdmin ? true : (u.isApproved ?? true),
+          studentClass: studentClassDoc
+            ? { _id: studentClassDoc._id, name: studentClassDoc.name }
+            : u.studentClass,
+          teacherSubject: u.teacherSubject,
+          teacherSubjects: teacherSubjectsDocs.map((s) => ({
+            _id: s._id,
+            name: s.grade ? `${s.name} (Grade ${s.grade})` : s.name,
+            code: s.code,
+            grade: s.grade,
+          })),
+        };
+      })
+    );
   },
 });
 
@@ -76,7 +124,12 @@ export const updateUser = mutation({
     }
 
     const currentUser = await ctx.db.get(userId);
-    if (!currentUser || currentUser.role !== "admin") {
+    const isCurrentUserAdmin = Boolean(
+      currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())
+    );
+    const currentUserRole = isCurrentUserAdmin ? "admin" : currentUser?.role;
+
+    if (!currentUser || currentUserRole !== "admin") {
       throw new Error("Unauthorized");
     }
 
@@ -112,6 +165,33 @@ export const updateUser = mutation({
           const currentStudents = newClass.students || [];
           if (!currentStudents.includes(id)) {
             await ctx.db.patch(newClass._id, { students: [...currentStudents, id] });
+          }
+        }
+      }
+    }
+
+    // Sync subjects' teacher array if teacherSubject changed
+    if (teacherSubject !== undefined && Array.isArray(teacherSubject)) {
+      const oldSubjectIds: string[] = targetUser.teacherSubject || [];
+      const newSubjectIds: string[] = teacherSubject;
+
+      // Remove teacher from subjects no longer assigned
+      const removedSubjectIds = oldSubjectIds.filter((sId) => !newSubjectIds.includes(sId));
+      for (const sId of removedSubjectIds) {
+        const sub = await ctx.db.get(sId as any);
+        if (sub && sub.teacher) {
+          const updatedTeachers = (sub.teacher || []).filter((tId: any) => tId !== id);
+          await ctx.db.patch(sub._id, { teacher: updatedTeachers });
+        }
+      }
+
+      // Add teacher to newly assigned subjects
+      for (const sId of newSubjectIds) {
+        const sub = await ctx.db.get(sId as any);
+        if (sub) {
+          const currentTeachers = sub.teacher || [];
+          if (!currentTeachers.includes(id as any)) {
+            await ctx.db.patch(sub._id, { teacher: [...currentTeachers, id as any] });
           }
         }
       }
@@ -154,9 +234,9 @@ export const getAnalyticsStats = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthorized");
     const user = await ctx.db.get(userId);
-    if (user?.role !== "admin") throw new Error("Unauthorized");
+    const isUserAdmin = Boolean(user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
+    if (!isUserAdmin && user?.role !== "admin") throw new Error("Unauthorized");
 
     const [users, classes, submissions, fees, attendance] = await Promise.all([
       ctx.db.query("users").collect(),
@@ -203,5 +283,26 @@ export const updateMyProfile = mutation({
     if (userId === null) throw new Error("Unauthorized");
     await ctx.db.patch(userId, { name: args.name });
     return { success: true };
+  },
+});
+
+// Fix / restore admin role if previously overwritten or in ADMIN_EMAILS
+export const fixAdminRole = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    if (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+      await ctx.db.patch(userId, {
+        role: "admin",
+        isApproved: true,
+        isActive: true,
+      });
+      return { success: true, fixed: true, role: "admin" };
+    }
+    return { success: true, fixed: false, role: user.role };
   },
 });

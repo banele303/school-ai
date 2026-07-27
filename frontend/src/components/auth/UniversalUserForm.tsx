@@ -129,13 +129,19 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
           ? (initialData.studentClass as any)?._id
           : initialData.studentClass;
 
+      const existingSubjectIds =
+        initialData.teacherSubjects?.map((s) => s._id) ||
+        (Array.isArray((initialData as any).teacherSubject)
+          ? (initialData as any).teacherSubject
+          : []);
+
       form.reset({
         name: initialData.name || "",
         email: initialData.email || "",
         role: initialData.role || "student",
         password: "",
         classId: existingClassId || "",
-        subjectIds: initialData.teacherSubjects?.map((s) => s._id) || [],
+        subjectIds: existingSubjectIds,
       });
     }
   }, [isUpdate, initialData, form, classes]);
@@ -213,7 +219,10 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
 
   const subjectOptions =
     Array.isArray(subjects) && subjects.length > 0
-      ? subjects.map((s) => ({ label: s.name, value: s._id }))
+      ? subjects.map((s) => ({
+          label: s.grade ? `${s.name} (Grade ${s.grade})` : s.name,
+          value: s._id,
+        }))
       : [];
 
   const roleOptions = role

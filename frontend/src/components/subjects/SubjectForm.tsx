@@ -43,13 +43,13 @@ export function SubjectForm({
       code: "",
       teacher: [],
       isActive: true,
+      grade: undefined,
     },
   });
 
   // 2. Populate or Reset Form
   useEffect(() => {
     if (initialData) {
-      // FIX: Map the array of teacher objects to an array of IDs (strings)
       const teacherIds = initialData.teacher
         ? initialData.teacher.map((t: any) =>
             typeof t === "object" ? t._id : t
@@ -59,8 +59,9 @@ export function SubjectForm({
       form.reset({
         name: initialData.name || "",
         code: initialData.code || "",
-        teacher: teacherIds, // <--- Send IDs only, not objects
+        teacher: teacherIds,
         isActive: initialData.isActive ?? true,
+        grade: initialData.grade,
       });
     } else {
       form.reset({
@@ -68,14 +69,13 @@ export function SubjectForm({
         code: "",
         teacher: [],
         isActive: true,
+        grade: undefined,
       });
     }
   }, [initialData, form, open]);
 
   const onSubmit = async (values: SubjectFormValues) => {
-    // console.log("Submitting:", values);
     try {
-      // Logic: Convert empty array -> null for the backend
       const payload = {
         ...values,
         teacher:
@@ -91,6 +91,7 @@ export function SubjectForm({
           code: payload.code,
           teacherId: payload.teacher as any,
           isActive: payload.isActive,
+          grade: payload.grade ? Number(payload.grade) : undefined,
         });
         toast.success("Subject updated successfully");
       } else {
@@ -99,6 +100,7 @@ export function SubjectForm({
           code: payload.code,
           teacherId: payload.teacher as any,
           isActive: payload.isActive,
+          grade: payload.grade ? Number(payload.grade) : undefined,
         });
         toast.success("Subject created successfully");
       }
@@ -145,15 +147,25 @@ export function SubjectForm({
               disabled={pending}
             />
           </div>
-          <CustomMultiSelect
-            control={form.control}
-            name="teacher"
-            label="Teacher"
-            placeholder="Select teacher..."
-            options={teachersOptions}
-            loading={loadingOptions}
-            disabled={pending}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <CustomInput
+              control={form.control}
+              name="grade"
+              label="Grade / Level"
+              type="number"
+              placeholder="e.g. 10"
+              disabled={pending}
+            />
+            <CustomMultiSelect
+              control={form.control}
+              name="teacher"
+              label="Assigned Teacher(s)"
+              placeholder="Select teacher..."
+              options={teachersOptions}
+              loading={loadingOptions}
+              disabled={pending}
+            />
+          </div>
           <Controller
             name="isActive"
             control={form.control}

@@ -18,42 +18,53 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     Password({
       profile(params) {
         const email = String(params.email || "").trim().toLowerCase();
-        const role = ADMIN_EMAILS.includes(email)
-          ? "admin"
-          : ((params.role as string) || "student");
-        const isApproved = role === "admin" || role === "parent";
-        const studentClass = isConvexIdLike(params.studentClass)
-          ? params.studentClass
-          : undefined;
-        const teacherSubject = Array.isArray(params.teacherSubject)
-          ? params.teacherSubject.filter(isConvexIdLike)
-          : undefined;
+        const profileObj: Record<string, any> = { email };
 
-        return {
-          email,
-          name: params.name as string,
-          role,
-          isActive: true,
-          isApproved,
-          studentClass: studentClass as any,
-          teacherSubject: teacherSubject && teacherSubject.length > 0 ? teacherSubject as any : undefined,
-        };
+        if (params.name) {
+          profileObj.name = params.name;
+        }
+
+        const isAdminEmail = ADMIN_EMAILS.includes(email);
+        if (isAdminEmail) {
+          profileObj.role = "admin";
+          profileObj.isApproved = true;
+          profileObj.isActive = true;
+        } else if (params.role) {
+          profileObj.role = params.role;
+          profileObj.isApproved = params.role === "admin" || params.role === "parent";
+          profileObj.isActive = true;
+        }
+
+        if (isConvexIdLike(params.studentClass)) {
+          profileObj.studentClass = params.studentClass;
+        }
+
+        if (Array.isArray(params.teacherSubject)) {
+          const teacherSubject = params.teacherSubject.filter(isConvexIdLike);
+          if (teacherSubject.length > 0) {
+            profileObj.teacherSubject = teacherSubject;
+          }
+        }
+
+        return profileObj;
       },
     }),
     Google({
       profile(googleProfile) {
         const email = String(googleProfile.email || "").trim().toLowerCase();
-        const role = ADMIN_EMAILS.includes(email) ? "admin" : "student";
-        const isApproved = role === "admin";
-        return {
+        const isAdminEmail = ADMIN_EMAILS.includes(email);
+        const profileObj: Record<string, any> = {
           id: googleProfile.sub,
           email,
           name: googleProfile.name,
           image: googleProfile.picture,
-          role,
-          isActive: true,
-          isApproved,
         };
+        if (isAdminEmail) {
+          profileObj.role = "admin";
+          profileObj.isApproved = true;
+          profileObj.isActive = true;
+        }
+        return profileObj;
       },
     }),
   ],

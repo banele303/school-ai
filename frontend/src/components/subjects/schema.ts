@@ -22,6 +22,8 @@ export const subjectFormSchema = z.object({
     .toUpperCase(), // Force Uppercase for consistency
   teacher: z.array(z.string()).optional(), // ID or "unassigned"
   isActive: z.boolean().optional().default(true),
+  grade: z.coerce.number().min(1).max(12).optional(),
+  category: z.string().optional(),
 });
 
 export type SubjectFormValues = z.infer<typeof subjectFormSchema>;
