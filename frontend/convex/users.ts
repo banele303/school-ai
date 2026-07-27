@@ -234,7 +234,8 @@ export const getAnalyticsStats = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    const user = await ctx.db.get(userId);
+    if (!userId) throw new Error("Unauthorized");
+    const user: any = await ctx.db.get(userId);
     const isUserAdmin = Boolean(user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
     if (!isUserAdmin && user?.role !== "admin") throw new Error("Unauthorized");
 
@@ -292,7 +293,7 @@ export const fixAdminRole = mutation({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
-    const user = await ctx.db.get(userId);
+    const user: any = await ctx.db.get(userId);
     if (!user) throw new Error("User not found");
 
     if (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
