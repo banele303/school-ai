@@ -863,7 +863,9 @@ export default function LiveRoomPage() {
       }
 
       // If student is unmuting microphone and broadcasting audio to teacher, set up WebRTC audio connection
-      if (needAudio && classItem?.teacher && !isCreator) {
+      const teacherId = typeof classItem?.teacher === "object" ? (classItem.teacher as any)._id : classItem?.teacher;
+
+      if (needAudio && teacherId && !isCreator) {
         const audioTrack = stream.getAudioTracks()[0];
         if (audioTrack) {
           if (studentAudioPcRef.current) {
@@ -871,7 +873,10 @@ export default function LiveRoomPage() {
           }
 
           const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+            ]
           });
           studentAudioPcRef.current = pc;
 
@@ -881,7 +886,7 @@ export default function LiveRoomPage() {
             if (event.candidate) {
               sendWebRtcSignal({
                 liveClassId: targetClassId as any,
-                targetUserId: classItem.teacher,
+                targetUserId: teacherId as any,
                 signalType: "candidate",
                 candidate: JSON.stringify(event.candidate),
               }).catch(console.error);
@@ -893,11 +898,11 @@ export default function LiveRoomPage() {
 
           await sendWebRtcSignal({
             liveClassId: targetClassId as any,
-            targetUserId: classItem.teacher,
+            targetUserId: teacherId as any,
             signalType: "offer",
             sdp: offer.sdp,
           });
-          console.log("Sent WebRTC audio offer to teacher:", classItem.teacher);
+          console.log("Sent WebRTC audio offer to teacher:", teacherId);
         }
       }
     } catch (err: any) {
@@ -975,9 +980,18 @@ export default function LiveRoomPage() {
           }
 
           const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+            ]
           });
           teacherPeerConnectionsRef.current.set(studentId, pc);
+
+          try {
+            pc.addTransceiver("audio", { direction: "recvonly" });
+          } catch (e) {
+            console.warn("Could not add recvonly transceiver:", e);
+          }
 
           pc.ontrack = (event) => {
             console.log("Teacher received student audio track:", event.track.kind, studentId);
@@ -991,11 +1005,20 @@ export default function LiveRoomPage() {
               teacherAudioElementsRef.current.set(studentId, audioEl);
             }
 
-            const mediaStream = new MediaStream([event.track]);
+            const mediaStream = event.streams[0] || new MediaStream([event.track]);
             audioEl.srcObject = mediaStream;
             audioEl.volume = 1.0;
             audioEl.muted = false;
-            audioEl.play().catch(err => console.warn("Failed to play student audio track:", err));
+
+            const playAudio = () => {
+              audioEl?.play().catch((err) => {
+                console.warn("Failed to play student audio track automatically:", err);
+              });
+            };
+
+            playAudio();
+            window.addEventListener("click", playAudio, { once: true });
+            window.addEventListener("keydown", playAudio, { once: true });
 
             setSpeakingStudents(prev => Array.from(new Set([...prev, studentId])));
             toast.info("A student is speaking!");

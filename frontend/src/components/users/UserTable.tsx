@@ -208,7 +208,7 @@ const UserTable = ({
           )}
         </TableBody>
       </Table>
-      {users.length > 10 && (
+      {totalPages > 1 && (
         <CustomPagination
           loading={loading}
           page={pageNum}
