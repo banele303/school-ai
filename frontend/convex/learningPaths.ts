@@ -50,12 +50,9 @@ export const generateLearningPath = action({
     academicYearId: v.id("academicYears"),
   },
   handler: async (ctx, args) => {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) return { plan: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
+    const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 
-    // In a real app, we would fetch the student's past grades, attendance, and missed assignments here.
-    // For now, we simulate pulling that context.
-    
     const prompt = `
       You are an expert South African educator. Generate a personalized, weekly learning path for a student based on standard curriculum.
       Identify 3 key focus areas and suggest actionable study activities.
@@ -70,11 +67,43 @@ export const generateLearningPath = action({
       }
     `;
 
-    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-    const { text } = await generateText({
-      prompt,
-      model: openai.chat("deepseek-chat"),
-    });
+    let text = "";
+
+    if (apiKey) {
+      try {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: process.env.DEEPSEEK_API_KEY ? "https://api.deepseek.com/v1" : undefined,
+        });
+        const res = await generateText({
+          prompt,
+          model: openai.chat("deepseek-chat"),
+        });
+        text = res.text;
+      } catch (err) {
+        console.warn("Primary AI provider failed, trying Cloudflare Workers AI:", err);
+      }
+    }
+
+    if (!text) {
+      try {
+        const cfRes = await fetch(`${cfWorkerUrl}/api/generate-path`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+        if (cfRes.ok) {
+          const cfData: any = await cfRes.json();
+          text = typeof cfData === "string" ? cfData : JSON.stringify(cfData);
+        }
+      } catch (cfErr) {
+        console.error("Cloudflare Workers AI generate-path failed:", cfErr);
+      }
+    }
+
+    if (!text) {
+      return { plan: "AI service is currently unavailable. Please verify your Cloudflare Worker or API key setup." };
+    }
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
 

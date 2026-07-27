@@ -14,13 +14,6 @@ export const gradeWithAI = action({
     submissionId: v.id("submissions"),
   },
   handler: async (ctx, args) => {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) {
-      return {
-        success: false,
-        message: "AI service not configured. Please set DEEPSEEK_API_KEY in Convex dashboard.",
-      };
-    }
 
     // Fetch submission + exam details
     const detail: any = await ctx.runQuery(api.submissions.getSubmissionForGrading, {
@@ -78,11 +71,51 @@ RETURN ONLY valid JSON — no markdown fences, no explanation text:
   "overallFeedback": "<2-4 sentences: overall summary, strengths, areas to improve, encouragement>"
 }`;
 
-    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-    const { text } = await generateText({
-      prompt,
-      model: openai.chat("deepseek-chat"),
-    });
+    const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
+
+    let text = "";
+
+    if (apiKey) {
+      try {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: process.env.DEEPSEEK_API_KEY ? "https://api.deepseek.com/v1" : undefined,
+        });
+        const res = await generateText({
+          prompt,
+          model: openai.chat("deepseek-chat"),
+        });
+        text = res.text;
+      } catch (err) {
+        console.warn("Primary AI provider failed, trying Cloudflare Workers AI:", err);
+      }
+    }
+
+    if (!text) {
+      try {
+        const cfRes = await fetch(`${cfWorkerUrl}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+        if (cfRes.ok) {
+          const cfData: any = await cfRes.json();
+          text = cfData.response || "";
+        }
+      } catch (cfErr) {
+        console.error("Cloudflare Workers AI grading fallback failed:", cfErr);
+      }
+    }
+
+    if (!text) {
+      return {
+        success: false,
+        message: "AI service is currently unavailable. Please verify API keys or Cloudflare Workers AI setup.",
+      };
+    }
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
     let result: any;

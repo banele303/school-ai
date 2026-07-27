@@ -86,13 +86,50 @@ If you don't know something, say so honestly and suggest how the student can fin
     const historyText = history.map((h: any) => `${h.role === "user" ? "Student" : "EduBot"}: ${h.content}`).join("\n");
     const prompt: string = `${historyText ? historyText + "\n" : ""}Student: ${args.question}\nEduBot:`;
 
-    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-    const { text } = await generateText({
-      model: openai.chat("deepseek-chat"),
-      system: systemPrompt,
-      prompt,
-    });
+    const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 
-    return { answer: sanitizeStudyBuddyAnswer(String(text)) };
+    if (apiKey) {
+      try {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: process.env.DEEPSEEK_API_KEY ? "https://api.deepseek.com/v1" : undefined,
+        });
+        const { text } = await generateText({
+          model: openai.chat("deepseek-chat"),
+          system: systemPrompt,
+          prompt,
+        });
+        return { answer: sanitizeStudyBuddyAnswer(String(text)) };
+      } catch (err) {
+        console.warn("Primary AI provider failed, trying Cloudflare Workers AI:", err);
+      }
+    }
+
+    // Cloudflare Workers AI fallback (@cf/meta/llama-3.3-70b-instruct or llama-3-8b)
+    try {
+      const cfRes = await fetch(`${cfWorkerUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            ...history,
+            { role: "user", content: args.question }
+          ],
+          subjectId: args.subjectId,
+        }),
+      });
+
+      if (cfRes.ok) {
+        const cfData: any = await cfRes.json();
+        if (cfData.response) {
+          return { answer: sanitizeStudyBuddyAnswer(String(cfData.response)) };
+        }
+      }
+    } catch (cfErr) {
+      console.error("Cloudflare Workers AI service failed:", cfErr);
+    }
+
+    return { answer: SCHOOL_ASSISTANT_GREETING };
   },
 });
