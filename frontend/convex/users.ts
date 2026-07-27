@@ -89,7 +89,7 @@ export const getUsers = query({
             ? { _id: studentClassDoc._id, name: studentClassDoc.name }
             : u.studentClass,
           teacherSubject: u.teacherSubject,
-          teacherSubjects: teacherSubjectsDocs.map((s) => ({
+          teacherSubjects: teacherSubjectsDocs.map((s: any) => ({
             _id: s._id,
             name: s.grade ? `${s.name} (Grade ${s.grade})` : s.name,
             code: s.code,
@@ -152,15 +152,15 @@ export const updateUser = mutation({
     if (studentClass !== undefined && studentClass !== targetUser.studentClass) {
       // Remove from old class
       if (targetUser.studentClass) {
-        const oldClass = await ctx.db.get(targetUser.studentClass);
+        const oldClass: any = await ctx.db.get(targetUser.studentClass);
         if (oldClass) {
-          const updatedStudents = (oldClass.students || []).filter((sId) => sId !== id);
+          const updatedStudents = (oldClass.students || []).filter((sId: any) => sId !== id);
           await ctx.db.patch(oldClass._id, { students: updatedStudents });
         }
       }
       // Add to new class
       if (studentClass) {
-        const newClass = await ctx.db.get(studentClass);
+        const newClass: any = await ctx.db.get(studentClass);
         if (newClass) {
           const currentStudents = newClass.students || [];
           if (!currentStudents.includes(id)) {
@@ -178,7 +178,7 @@ export const updateUser = mutation({
       // Remove teacher from subjects no longer assigned
       const removedSubjectIds = oldSubjectIds.filter((sId) => !newSubjectIds.includes(sId));
       for (const sId of removedSubjectIds) {
-        const sub = await ctx.db.get(sId as any);
+        const sub: any = await ctx.db.get(sId as any);
         if (sub && sub.teacher) {
           const updatedTeachers = (sub.teacher || []).filter((tId: any) => tId !== id);
           await ctx.db.patch(sub._id, { teacher: updatedTeachers });
@@ -187,7 +187,7 @@ export const updateUser = mutation({
 
       // Add teacher to newly assigned subjects
       for (const sId of newSubjectIds) {
-        const sub = await ctx.db.get(sId as any);
+        const sub: any = await ctx.db.get(sId as any);
         if (sub) {
           const currentTeachers = sub.teacher || [];
           if (!currentTeachers.includes(id as any)) {
