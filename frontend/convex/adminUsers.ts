@@ -39,14 +39,17 @@ export const createUserAdmin = mutation({
       throw new Error("User with this email already exists");
     }
 
+    const cleanClassId = args.classId && (args.classId as string).trim() !== "" ? args.classId : undefined;
+    const cleanSubjectIds = args.subjectIds && args.subjectIds.length > 0 ? args.subjectIds : undefined;
+
     const newUserId = await ctx.db.insert("users", {
       name: args.name,
       email: args.email,
       role: args.role,
       isActive: true,
       isApproved: true,
-      studentClass: args.classId,
-      teacherSubject: args.subjectIds,
+      studentClass: cleanClassId,
+      teacherSubject: cleanSubjectIds,
     });
 
     return { success: true, newUserId };

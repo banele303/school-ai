@@ -148,6 +148,9 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
 
   async function onSubmit(data: FormValues) {
     try {
+      const cleanClassId = data.classId && data.classId.trim() !== "" ? data.classId : undefined;
+      const cleanSubjectIds = data.subjectIds && data.subjectIds.length > 0 ? data.subjectIds : undefined;
+
       if (isLogin) {
         await signIn("password", {
           email: data.email,
@@ -165,8 +168,8 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
             flow: "signUp",
             name: data.name!,
             role: (data.role || role || "student") as UserRole,
-            studentClass: data.classId as any,
-            teacherSubject: data.subjectIds as any,
+            studentClass: cleanClassId as any,
+            teacherSubject: cleanSubjectIds as any,
           });
           if (result?.signingIn) {
             toast.success("Account created successfully!");
@@ -178,8 +181,8 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
             name: data.name as string,
             email: data.email,
             role: (data.role || role || "student") as UserRole,
-            classId: data.classId as any,
-            subjectIds: data.subjectIds as any,
+            classId: cleanClassId as any,
+            subjectIds: cleanSubjectIds as any,
           });
           toast.success("User created successfully.");
           if (onSuccess) onSuccess();
@@ -190,8 +193,8 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
           name: data.name,
           email: data.email,
           role: data.role as UserRole,
-          studentClass: data.classId as any,
-          teacherSubject: data.subjectIds as any,
+          studentClass: cleanClassId as any,
+          teacherSubject: cleanSubjectIds as any,
         });
         toast.success("User updated successfully");
         if (onSuccess) onSuccess();

@@ -138,12 +138,15 @@ export const updateUser = mutation({
 
     const { id, studentClass, teacherSubject, ...updates } = args;
 
+    const cleanStudentClass = studentClass && (studentClass as string).trim() !== "" ? studentClass : undefined;
+    const cleanTeacherSubject = teacherSubject && teacherSubject.length > 0 ? teacherSubject : undefined;
+
     const patchData: any = { ...updates };
     if (studentClass !== undefined) {
-      patchData.studentClass = studentClass;
+      patchData.studentClass = cleanStudentClass;
     }
     if (teacherSubject !== undefined) {
-      patchData.teacherSubject = teacherSubject;
+      patchData.teacherSubject = cleanTeacherSubject;
     }
 
     await ctx.db.patch(id, patchData);
