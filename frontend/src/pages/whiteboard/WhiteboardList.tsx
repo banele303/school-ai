@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Presentation, Calendar } from "lucide-react";

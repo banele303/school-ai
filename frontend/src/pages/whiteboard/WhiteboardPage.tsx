@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import WhiteboardCanvas from "@/components/WhiteboardCanvas";
 import type { WhiteboardCanvasRef } from "@/components/WhiteboardCanvas";
 import { Button } from "@/components/ui/button";
