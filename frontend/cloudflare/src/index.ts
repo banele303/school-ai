@@ -67,7 +67,7 @@ app.post("/api/chat", async (c) => {
       }
     }
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [
         {
           role: "system",
@@ -99,7 +99,7 @@ Schema:
   ]
 }`;
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 1024,
     });
@@ -376,7 +376,7 @@ Return ONLY JSON:
   "rubricBreakdown": [{"criterion":"string","mark":number,"comment":"string"}]
 }`;
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 2048,
     });
@@ -495,7 +495,7 @@ Items: ${JSON.stringify(items)}
 Return the result STRICTLY as a JSON array of the IDs of the top 3 most relevant items.
 Example: ["id1", "id2", "id3"]`;
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 512,
     });
@@ -525,7 +525,7 @@ Grade the student out of ${assignment.maxPoints || 100}.
 Provide short constructive feedback.
 Return as JSON: { "grade": number, "feedback": "string" }`;
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 1024,
     });
@@ -572,7 +572,7 @@ app.post("/api/generate-exam", async (c) => {
       3. Tailor questions to the specified difficulty/grade level.
     `;
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 2048,
     });
@@ -613,7 +613,7 @@ app.post("/api/generate-timetable", async (c) => {
       3. No conversational text or markdown.
     `;
 
-    const response = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    const response = await c.env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages: [{ role: "user", content: prompt }],
       max_tokens: 2560,
     });
