@@ -68,8 +68,8 @@ export const generateAnnouncement = action({
     tone: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) return { text: "AI service is not configured. Please set DEEPSEEK_API_KEY in your Convex environment." };
+    const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 
     const prompt = `You are a professional South African school administrator. Write a clear, friendly school announcement based on these bullet points.
     By default, write the announcement in English. Only use another South African language (like Afrikaans, isiZulu, isiXhosa, Sesotho, Sepedi) if the user's bullet points are explicitly written in that language or if the user explicitly requests it.
@@ -79,11 +79,45 @@ Tone: ${args.tone || "professional and friendly"}
 
 Write ONLY the announcement text (title on first line, then body). No markdown, no extra explanation.`;
 
-    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-    const { text } = await generateText({
-      model: openai.chat("deepseek-chat"),
-      prompt,
-    });
+    let text = "";
+
+    if (apiKey) {
+      try {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: process.env.DEEPSEEK_API_KEY ? "https://api.deepseek.com/v1" : undefined,
+        });
+        const res = await generateText({
+          model: openai.chat("deepseek-chat"),
+          prompt,
+        });
+        text = res.text;
+      } catch (err) {
+        console.warn("Primary AI announcement generation failed, attempting Cloudflare Workers AI:", err);
+      }
+    }
+
+    if (!text) {
+      try {
+        const cfRes = await fetch(`${cfWorkerUrl}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+        if (cfRes.ok) {
+          const cfData: any = await cfRes.json();
+          text = cfData.response || "";
+        }
+      } catch (cfErr) {
+        console.error("Cloudflare Workers AI announcement generation failed:", cfErr);
+      }
+    }
+
+    if (!text) {
+      return { text: "AI announcement generation is currently unavailable." };
+    }
 
     return { text };
   },

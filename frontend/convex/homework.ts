@@ -49,19 +49,20 @@ export const submitHomework = action({
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<any> => {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
+
+    const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 
     let aiScore: number | undefined;
     let aiFeedback: string | undefined;
     let aiCorrectAnswer: string | undefined;
     let status: "pending" | "graded" = "pending";
 
-    if (apiKey) {
-      try {
-        const prompt = `You are an experienced South African teacher helping a student with their homework. Grade 5-12 level.
+    let text = "";
+
+    const prompt = `You are an experienced South African teacher helping a student with their homework. Grade 5-12 level.
 
 HOMEWORK QUESTION: ${args.question}
 
@@ -81,24 +82,55 @@ Respond in JSON format:
   "correctAnswer": "The correct answer or solution here..."
 }`;
 
-        const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-        const { text } = await generateText({
+    if (apiKey) {
+      try {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: process.env.DEEPSEEK_API_KEY ? "https://api.deepseek.com/v1" : undefined,
+        });
+        const res = await generateText({
           model: openai.chat("deepseek-chat"),
           prompt,
         });
+        text = res.text;
+      } catch (e) {
+        console.warn("Primary AI homework grading failed, falling back to Cloudflare Workers AI:", e);
+      }
+    }
 
-        const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const start = clean.indexOf("{");
-        const end = clean.lastIndexOf("}");
-        if (start !== -1 && end !== -1) {
+    if (!text) {
+      try {
+        const cfRes = await fetch(`${cfWorkerUrl}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+        if (cfRes.ok) {
+          const cfData: any = await cfRes.json();
+          text = cfData.response || "";
+        }
+      } catch (cfErr) {
+        console.error("Cloudflare Workers AI homework fallback failed:", cfErr);
+      }
+    }
+
+    if (text) {
+      const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const start = clean.indexOf("{");
+      const end = clean.lastIndexOf("}");
+      if (start !== -1 && end !== -1) {
+        try {
           const parsed = JSON.parse(clean.substring(start, end + 1));
           aiScore = parsed.score;
           aiFeedback = parsed.feedback;
           aiCorrectAnswer = parsed.correctAnswer;
           status = "graded";
+        } catch {
+          aiFeedback = text;
+          status = "graded";
         }
-      } catch (e) {
-        console.error("AI grading failed:", e);
       }
     }
 

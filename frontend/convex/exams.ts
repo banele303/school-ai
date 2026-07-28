@@ -498,8 +498,8 @@ export const generateExam = action({
       templateUsed: args.templateUsed,
     });
 
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) return { examId, questions: [] };
+    const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
+    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 
     // Build question type mix
     const qMix =
@@ -652,11 +652,45 @@ RULES:
 11. Questions should be appropriate for ${args.difficulty} difficulty level.
 12. Use South African context and examples where relevant.`;
 
-    const openai = createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" });
-    const { text } = await generateText({
-      prompt,
-      model: openai.chat("deepseek-chat"),
-    });
+    let text = "";
+
+    if (apiKey) {
+      try {
+        const openai = createOpenAI({
+          apiKey,
+          baseURL: process.env.DEEPSEEK_API_KEY ? "https://api.deepseek.com/v1" : undefined,
+        });
+        const res = await generateText({
+          prompt,
+          model: openai.chat("deepseek-chat"),
+        });
+        text = res.text;
+      } catch (err) {
+        console.warn("Primary AI exam generation failed, trying Cloudflare Workers AI:", err);
+      }
+    }
+
+    if (!text) {
+      try {
+        const cfRes = await fetch(`${cfWorkerUrl}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+        if (cfRes.ok) {
+          const cfData: any = await cfRes.json();
+          text = cfData.response || "";
+        }
+      } catch (cfErr) {
+        console.error("Cloudflare Workers AI exam generation failed:", cfErr);
+      }
+    }
+
+    if (!text) {
+      return { examId, questions: [] };
+    }
 
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const questions = JSON.parse(cleanJson);
