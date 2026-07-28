@@ -321,7 +321,6 @@ export const removeOverride = mutation({
   },
 });
 
-export const generateTimetable = action({
 function parseAiJsonResponse(rawText: string): any {
   let clean = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
