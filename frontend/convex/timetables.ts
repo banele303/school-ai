@@ -322,6 +322,40 @@ export const removeOverride = mutation({
 });
 
 export const generateTimetable = action({
+function parseAiJsonResponse(rawText: string): any {
+  let clean = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+  const firstBrace = clean.search(/[\{\[]/);
+  const lastBraceObj = clean.lastIndexOf("}");
+  const lastBraceArr = clean.lastIndexOf("]");
+  const lastBrace = Math.max(lastBraceObj, lastBraceArr);
+
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    clean = clean.substring(firstBrace, lastBrace + 1);
+  }
+
+  try {
+    return JSON.parse(clean);
+  } catch {
+    // Attempt string repair for truncated JSON
+    let repaired = clean;
+    if ((repaired.match(/"/g) || []).length % 2 !== 0) {
+      repaired += '"';
+    }
+    if (repaired.startsWith("{") && !repaired.endsWith("}")) {
+      repaired += "]}";
+    } else if (repaired.startsWith("[") && !repaired.endsWith("]")) {
+      repaired += "]";
+    }
+    try {
+      return JSON.parse(repaired);
+    } catch {
+      throw new Error("AI response was incomplete or contained invalid JSON. Please try generating again.");
+    }
+  }
+}
+
+export const generateTimetable = action({
   args: {
     classId: v.id("classes"),
     academicYearId: v.id("academicYears"),
@@ -341,7 +375,7 @@ export const generateTimetable = action({
     const apiKey = process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 
     const prompt = `
-      You are an expert school scheduler. Generate a weekly timetable (Monday to Friday) for a South African school as a JSON object.
+      You are an expert school scheduler. Generate a concise weekly timetable (Monday to Friday) for a South African school.
       
       CONTEXT:
       - Class: ${context.className}
@@ -352,9 +386,9 @@ export const generateTimetable = action({
       STRICT RULES:
       1. Assign a Teacher to every Subject period.
       2. Ensure no teacher is double-booked across other existing timetables (if provided).
-      3. Output ONLY raw JSON matching this schema:
+      3. Output ONLY valid, raw JSON matching this schema exactly with no markdown fences:
          { "schedule": [ { "day": "Monday", "periods": [ { "subject": "ID", "teacher": "ID", "startTime": "HH:MM", "endTime": "HH:MM" } ] } ] }
-      4. No conversational text or markdown.
+      4. Do not include extra conversational text.
     `;
 
     let text = "";
@@ -397,8 +431,7 @@ export const generateTimetable = action({
       throw new Error("AI timetable generation service is currently unavailable. Please try again.");
     }
 
-    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const result = JSON.parse(cleanJson);
+    const result = parseAiJsonResponse(text);
     const schedule = result.schedule || result; // Handle both direct array or object with schedule key
 
     await ctx.runMutation(api.timetables.saveTimetable, {

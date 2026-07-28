@@ -75,7 +75,7 @@ app.post("/api/chat", async (c) => {
         },
         ...messages,
       ],
-      max_tokens: 1024,
+      max_tokens: 4096,
     });
 
     return c.json({ response: response.response });
