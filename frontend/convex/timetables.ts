@@ -321,7 +321,12 @@ export const removeOverride = mutation({
   },
 });
 
-function parseAiJsonResponse(rawText: string): any {
+function parseAiJsonResponse(rawInput: any): any {
+  if (typeof rawInput === "object" && rawInput !== null) {
+    return rawInput;
+  }
+
+  const rawText = String(rawInput || "");
   let clean = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
   const firstBrace = clean.search(/[\{\[]/);
