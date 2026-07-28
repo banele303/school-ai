@@ -90,7 +90,7 @@ export default function LearningPathsPage() {
             </CardContent>
           </Card>
 
-          {parsedPlan.focusAreas.map((area: any, idx: number) => (
+          {(parsedPlan?.focusAreas || []).map((area: any, idx: number) => (
             <Card key={idx} className="border-t-4 border-t-primary">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -102,7 +102,7 @@ export default function LearningPathsPage() {
               <CardContent>
                 <h4 className="font-medium text-sm mb-3">Recommended Activities:</h4>
                 <ul className="space-y-2">
-                  {area.activities.map((act: string, i: number) => (
+                  {(area?.activities || []).map((act: string, i: number) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
                       <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                       <span>{act}</span>
