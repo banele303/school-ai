@@ -84,9 +84,9 @@ export default function ParentPortal() {
             <CardTitle className="flex items-center gap-2"><GraduationCap className="h-5 w-5 text-primary" /> Recent Grades</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {(data as any).recentGrades.length === 0 ? (
+            {!((data as any)?.recentGrades?.length) ? (
               <p className="text-center py-6 text-muted-foreground">No recent grades found.</p>
-            ) : (data as any).recentGrades.map((item: any, i: number) => (
+            ) : ((data as any)?.recentGrades || []).map((item: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                 <div>
                   <p className="font-semibold">{item.subject}</p>
@@ -115,7 +115,7 @@ export default function ParentPortal() {
             <div className="pt-4 border-t">
               <h4 className="text-sm font-semibold mb-3">Recent Attendance</h4>
               <div className="flex gap-2">
-                {(data as any).attendanceHistory.slice(0, 5).map((att: any, i: number) => (
+                {((data as any)?.attendanceHistory || []).slice(0, 5).map((att: any, i: number) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2">
                     <span className="text-[10px] font-medium text-muted-foreground uppercase">{att.date.split("/").slice(0, 2).join("/")}</span>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${att.status === 'absent' ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/20 text-emerald-500'}`}>

@@ -58,11 +58,11 @@ interface Props {
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 const TimetableGrid = ({
-  schedule,
+  schedule = [],
   overrides = [],
   isLoading,
-  subjects,
-  teachers,
+  subjects = [],
+  teachers = [],
   onSaveSchedule,
   onSaveOverride,
   onRemoveOverride,

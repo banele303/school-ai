@@ -54,7 +54,7 @@ const UserTable = ({
   setIsFormOpen,
   pageNum,
   setPageNum,
-  users,
+  users = [],
   totalPages,
 }: Props) => {
   const updateUserMutation = useMutation(api.users.updateUser);
