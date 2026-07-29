@@ -5,12 +5,19 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 export const getAssignments = query({
   args: { classId: v.optional(v.id("classes")) },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const user = userId ? await ctx.db.get(userId) : null;
+
     let q = ctx.db.query("assignments");
     if (args.classId) {
       q = q.filter((q) => q.eq(q.field("class"), args.classId));
     }
-    return await q.collect();
-  },
+    const results = await q.collect();
+    
+    if (user?.role === "student" && user.studentSubjects && user.studentSubjects.length > 0) {
+      return results.filter(a => user.studentSubjects!.includes(a.subject));
+    }
+    return results;
 });
 
 export const createAssignment = mutation({
@@ -41,12 +48,19 @@ export const createAssignment = mutation({
 export const getMaterials = query({
   args: { subjectId: v.optional(v.id("subjects")) },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const user = userId ? await ctx.db.get(userId) : null;
+
     let q = ctx.db.query("materials");
     if (args.subjectId) {
       q = q.filter((q) => q.eq(q.field("subject"), args.subjectId));
     }
-    return await q.collect();
-  },
+    const results = await q.collect();
+    
+    if (user?.role === "student" && user.studentSubjects && user.studentSubjects.length > 0) {
+      return results.filter(m => user.studentSubjects!.includes(m.subject));
+    }
+    return results;
 });
 
 export const createMaterial = mutation({

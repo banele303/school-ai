@@ -180,7 +180,12 @@ export const getLiveClasses = query({
     if (user?.role === "student") {
       const studentClassId = user.studentClass;
       const studentGrade = await userPreferences_grade(userId, ctx);
+      const studentSubjects = user.studentSubjects || [];
       results = results.filter((c) => {
+        if (studentSubjects.length > 0 && !studentSubjects.includes(c.subject)) {
+          return false;
+        }
+
         // Enforce strict separation if a class is explicitly assigned
         if (c.class) {
           const isClassAssigned = c.class === studentClassId;
@@ -204,12 +209,17 @@ export const getLiveClasses = query({
           }
         }
         
-        // Filter by grade only if student's grade is resolved and targetGrades is specified
-        if (c.targetGrades && c.targetGrades.length > 0 && studentGrade !== undefined) {
+        // Filter by grade if targetGrades is specified
+        if (c.targetGrades && c.targetGrades.length > 0) {
           const isClassInvited = Boolean(studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false));
           const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
-          if (!c.targetGrades.includes(studentGrade) && !isClassInvited && !isUserInvited) {
-            return false;
+          
+          if (studentGrade === undefined) {
+             if (!isClassInvited && !isUserInvited) return false;
+          } else {
+             if (!c.targetGrades.includes(studentGrade) && !isClassInvited && !isUserInvited) {
+               return false;
+             }
           }
         }
         
@@ -469,12 +479,22 @@ export const getUpcomingClassesForStudent = query({
     const studentGrade = await userPreferences_grade(userId, ctx);
 
     const upcoming = allClasses.filter((c) => {
-      // Class is assigned to student's class
+      if (user.studentSubjects && user.studentSubjects.length > 0 && !user.studentSubjects.includes(c.subject)) {
+        return false;
+      }
+      
+      const isClassInvited = Boolean(studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false));
+      const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
+
+      // Class is assigned to student's class or invited
       if (c.class && c.class === studentClassId) return true;
+      if (isClassInvited || isUserInvited) return true;
+
       // No class restriction and grade matches or no grade restriction
       if (!c.class) {
         if (!c.targetGrades || c.targetGrades.length === 0) return true;
-        return studentGrade ? c.targetGrades.includes(studentGrade) : false;
+        if (studentGrade === undefined) return false;
+        return c.targetGrades.includes(studentGrade);
       }
       return false;
     });

@@ -117,6 +117,7 @@ export const updateUser = mutation({
     isActive: v.optional(v.boolean()),
     isApproved: v.optional(v.boolean()),
     studentClass: v.optional(v.id("classes")),
+    studentSubjects: v.optional(v.array(v.id("subjects"))),
     teacherSubject: v.optional(v.array(v.id("subjects"))),
   },
   handler: async (ctx, args) => {

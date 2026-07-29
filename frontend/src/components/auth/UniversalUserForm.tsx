@@ -135,7 +135,9 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
         initialData.teacherSubjects?.map((s) => s._id) ||
         (Array.isArray((initialData as any).teacherSubject)
           ? (initialData as any).teacherSubject
-          : []);
+          : (Array.isArray((initialData as any).studentSubjects)
+             ? (initialData as any).studentSubjects
+             : []));
 
       form.reset({
         name: initialData.name || "",
@@ -190,14 +192,19 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
           if (onSuccess) onSuccess();
         }
       } else if (type === "update" && initialData?._id) {
-        await updateConvexUser({
+        const updatePayload: any = {
           id: initialData._id as any,
           name: data.name,
           email: data.email,
           role: data.role as UserRole,
-          studentClass: cleanClassId as any,
-          teacherSubject: cleanSubjectIds as any,
-        });
+        };
+        if (data.role === "student") {
+          updatePayload.studentClass = cleanClassId as any;
+          updatePayload.studentSubjects = cleanSubjectIds as any;
+        } else if (data.role === "teacher") {
+          updatePayload.teacherSubject = cleanSubjectIds as any;
+        }
+        await updateConvexUser(updatePayload);
         toast.success("User updated successfully");
         if (onSuccess) onSuccess();
       }
@@ -240,7 +247,8 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   const pending = form.formState.isSubmitting;
   const showRoleSelector = !isLogin;
   const showClassSelector = !isLogin && selectedRole === "student";
-  const showSubjectSelector = !isLogin && selectedRole === "teacher";
+  // Admins can assign subjects to both teachers and students
+  const showSubjectSelector = !isLogin && (selectedRole === "teacher" || selectedRole === "student");
 
   return (
     <div className="space-y-6">
@@ -328,7 +336,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
             <CustomMultiSelect
               control={form.control}
               name="subjectIds"
-              label="Teaching Subjects"
+              label={selectedRole === "student" ? "Assigned Subjects" : "Teaching Subjects"}
               placeholder={loadingOptions ? "Loading subjects..." : "Select Subjects"}
               options={subjectOptions}
               disabled={loadingOptions || pending}

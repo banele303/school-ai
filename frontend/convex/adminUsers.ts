@@ -49,7 +49,8 @@ export const createUserAdmin = mutation({
       isActive: true,
       isApproved: true,
       studentClass: cleanClassId,
-      teacherSubject: cleanSubjectIds,
+      studentSubjects: args.role === "student" ? cleanSubjectIds : undefined,
+      teacherSubject: args.role === "teacher" ? cleanSubjectIds : undefined,
     });
 
     return { success: true, newUserId };
