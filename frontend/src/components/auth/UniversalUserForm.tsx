@@ -230,13 +230,11 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
         }))
       : [];
 
-  const roleOptions = role
-    ? [{ label: role, value: role }]
-    : [
-        { label: "Student", value: "student" },
-        { label: "Teacher", value: "teacher" },
-        { label: "Parent", value: "parent" },
-      ];
+  const roleOptions = [
+    { label: "Student", value: "student" },
+    { label: "Teacher", value: "teacher" },
+    { label: "Parent", value: "parent" },
+  ];
 
   const selectedRole = form.watch("role");
   const pending = form.formState.isSubmitting;
@@ -311,7 +309,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
               label="Role"
               placeholder="Select Role"
               options={roleOptions}
-              disabled={pending || Boolean(role)}
+              disabled={pending}
             />
           )}
 
