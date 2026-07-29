@@ -56,3 +56,26 @@ export const createUserAdmin = mutation({
     return { success: true, newUserId };
   },
 });
+export const cleanupOrphanedAuth = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    
+    const adminUser = await ctx.db.get(userId);
+    if (!adminUser || adminUser.role !== "admin") throw new Error("Unauthorized");
+
+    const authAccounts = await ctx.db.query("authAccounts").collect();
+    let deleted = 0;
+    
+    for (const account of authAccounts) {
+      const user = await ctx.db.get(account.userId as any);
+      if (!user) {
+        await ctx.db.delete(account._id);
+        deleted++;
+      }
+    }
+    
+    return { success: true, deletedOrphanedAccounts: deleted };
+  },
+});

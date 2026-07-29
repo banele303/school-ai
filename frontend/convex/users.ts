@@ -222,6 +222,24 @@ export const deleteUser = mutation({
       throw new Error("Unauthorized");
     }
 
+    const authAccounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) => q.eq("userId", args.id as any))
+      .collect();
+
+    for (const account of authAccounts) {
+      await ctx.db.delete(account._id);
+    }
+
+    const authSessions = await ctx.db
+      .query("authSessions")
+      .withIndex("userId", (q) => q.eq("userId", args.id as any))
+      .collect();
+
+    for (const session of authSessions) {
+      await ctx.db.delete(session._id);
+    }
+
     await ctx.db.delete(args.id);
     return { success: true };
   },
