@@ -21,6 +21,7 @@ export const getMe = query({
 
     const isAdminEmail = Boolean(user.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
     const effectiveRole = isAdminEmail ? "admin" : (user.role || "student");
+    const defaultApproved = effectiveRole === "admin" || effectiveRole === "parent";
 
     return {
       _id: user._id,
@@ -28,7 +29,7 @@ export const getMe = query({
       email: user.email,
       role: effectiveRole,
       isActive: user.isActive ?? true,
-      isApproved: isAdminEmail ? true : (user.isApproved ?? true),
+      isApproved: user.isApproved ?? defaultApproved,
       studentClass: user.studentClass,
       teacherSubject: user.teacherSubject,
     };
@@ -59,6 +60,7 @@ export const getUsers = query({
       allUsers.map(async (u) => {
         const isAdmin = Boolean(u.email && ADMIN_EMAILS.includes(u.email.toLowerCase()));
         const role = isAdmin ? "admin" : (u.role || "student");
+        const defaultApproved = role === "admin" || role === "parent";
 
         let studentClassDoc = null;
         if (u.studentClass) {
@@ -79,7 +81,7 @@ export const getUsers = query({
           email: u.email,
           role,
           isActive: u.isActive ?? true,
-          isApproved: isAdmin ? true : (u.isApproved ?? true),
+          isApproved: u.isApproved ?? defaultApproved,
           studentClass: studentClassDoc
             ? { _id: studentClassDoc._id, name: studentClassDoc.name }
             : u.studentClass,

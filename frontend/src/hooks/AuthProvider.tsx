@@ -36,9 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (convexUser) {
       const pendingRole = localStorage.getItem("pendingGoogleRole");
       if (pendingRole) {
-        if (convexUser.role !== pendingRole) {
-          updateMyProfile({ role: pendingRole as any }).catch(console.error);
-        }
+        updateMyProfile({ role: pendingRole as any }).catch(console.error);
         localStorage.removeItem("pendingGoogleRole");
       }
     }
