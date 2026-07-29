@@ -103,6 +103,44 @@ export const getUsers = query({
   },
 });
 
+export const completeOnboarding = mutation({
+  args: {
+    role: v.union(
+      v.literal("teacher"),
+      v.literal("student"),
+      v.literal("parent")
+    ),
+    classId: v.optional(v.id("classes")),
+    subjectIds: v.optional(v.array(v.id("subjects"))),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Unauthorized");
+    
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    if (user.onboardingCompleted) {
+      throw new Error("Onboarding already completed");
+    }
+
+    const cleanClassId = args.classId && args.classId.trim() !== "" ? args.classId : undefined;
+    const cleanSubjectIds = args.subjectIds && args.subjectIds.length > 0 ? args.subjectIds : undefined;
+
+    const isApproved = args.role === "parent"; // Teachers and students need admin approval
+
+    await ctx.db.patch(userId, {
+      role: args.role,
+      studentClass: args.role === "student" ? cleanClassId : undefined,
+      studentSubjects: args.role === "student" ? cleanSubjectIds : undefined,
+      teacherSubject: args.role === "teacher" ? cleanSubjectIds : undefined,
+      onboardingCompleted: true,
+      isApproved,
+    });
+    
+    return { success: true };
+  },
+});
+
 export const updateUser = mutation({
   args: {
     id: v.id("users"),

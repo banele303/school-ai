@@ -32,15 +32,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, [ensureMathsLiteracy]);
 
+  const completeOnboarding = useMutation(api.users.completeOnboarding);
+
   useEffect(() => {
-    if (convexUser) {
-      const pendingRole = localStorage.getItem("pendingGoogleRole");
-      if (pendingRole) {
-        updateMyProfile({ role: pendingRole as any }).catch(console.error);
-        localStorage.removeItem("pendingGoogleRole");
+    if (convexUser && convexUser.onboardingCompleted === false) {
+      const pendingDataStr = localStorage.getItem("pendingSignUpData");
+      if (pendingDataStr) {
+        try {
+          const pendingData = JSON.parse(pendingDataStr);
+          completeOnboarding({
+            role: pendingData.role,
+            classId: pendingData.classId || undefined,
+            subjectIds: pendingData.subjectIds && pendingData.subjectIds.length > 0 ? pendingData.subjectIds : undefined,
+          }).catch(console.error);
+        } catch (e) {
+          console.error("Failed to parse pendingSignUpData", e);
+        }
+        localStorage.removeItem("pendingSignUpData");
       }
     }
-  }, [convexUser, updateMyProfile]);
+  }, [convexUser, completeOnboarding]);
 
   return (
     <AuthContext.Provider

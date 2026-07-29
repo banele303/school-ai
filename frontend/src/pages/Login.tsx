@@ -1,4 +1,5 @@
 import UniversalUserForm from "@/components/auth/UniversalUserForm";
+import MultistepSignupForm from "@/components/auth/MultistepSignupForm";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import { SchoolBrand } from "@/components/brand/SchoolBrand";
 import { useAuth } from "@/hooks/AuthProvider";
@@ -37,7 +38,7 @@ const Login = () => {
             </div>
 
             {/* Form */}
-            <UniversalUserForm type={mode} />
+            {mode === "login" ? <UniversalUserForm type={mode} /> : <MultistepSignupForm />}
 
             {/* Toggle */}
             <div className="text-center text-sm">

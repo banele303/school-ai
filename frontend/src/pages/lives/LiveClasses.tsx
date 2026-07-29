@@ -302,9 +302,6 @@ export default function LiveClassesPage() {
         updateLiveClass={updateLiveClass}
         editingClass={editingClass}
       />
-        subjects={subjects}
-        createLiveClass={createLiveClass}
-      />
       <LessonRoomDialog lesson={selectedClass} onClose={() => setSelectedClass(null)} isTeacher={isTeacher} />
       <TeacherStudioDialog
         open={showStudio}

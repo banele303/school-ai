@@ -18,6 +18,7 @@ export const getAssignments = query({
       return results.filter(a => user.studentSubjects!.includes(a.subject));
     }
     return results;
+  },
 });
 
 export const createAssignment = mutation({
@@ -61,6 +62,7 @@ export const getMaterials = query({
       return results.filter(m => user.studentSubjects!.includes(m.subject));
     }
     return results;
+  },
 });
 
 export const createMaterial = mutation({

@@ -38,6 +38,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           ...(teacherSubject && teacherSubject.length > 0
             ? { teacherSubject: teacherSubject as any }
             : {}),
+          onboardingCompleted: true,
         };
       },
     }),
@@ -51,8 +52,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           name: googleProfile.name,
           image: googleProfile.picture,
           ...(isAdminEmail 
-            ? { role: "admin", isApproved: true, isActive: true } 
-            : { role: "student", isApproved: false, isActive: true }),
+            ? { role: "admin", isApproved: true, isActive: true, onboardingCompleted: true } 
+            : { role: "student", isApproved: false, isActive: true, onboardingCompleted: false }),
         };
       },
     }),
