@@ -37,17 +37,6 @@ const Login = () => {
             </div>
 
             {/* Form */}
-            <GoogleSignInButton />
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-background px-2 text-muted-foreground">
-                  {mode === "login" ? "or continue with email" : "or register with email"}
-                </span>
-              </div>
-            </div>
             <UniversalUserForm type={mode} />
 
             {/* Toggle */}

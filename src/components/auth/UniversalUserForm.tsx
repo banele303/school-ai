@@ -20,6 +20,8 @@ import { useQuery, useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
 
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+
 export type FormType = "login" | "create" | "update";
 interface Props {
   type: FormType;
@@ -276,9 +278,25 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   const showSubjectSelector = !isLogin && selectedRole === "teacher";
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <FieldGroup>
-        <div className="grid grid-cols-2 gap-4 w-full">
+    <div className="space-y-6">
+      {!isUpdate && (
+        <>
+          <GoogleSignInButton role={selectedRole} />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-background px-2 text-muted-foreground">
+                or continue with email
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FieldGroup>
+          <div className="grid grid-cols-2 gap-4 w-full">
           {!isLogin && (
             <CustomInput
               control={form.control}
@@ -369,6 +387,7 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
         </div>
       </FieldGroup>
     </form>
+    </div>
   );
 };
 

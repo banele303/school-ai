@@ -142,6 +142,16 @@ export const getLiveClasses = query({
       const studentClassId = user.studentClass;
       const studentGrade = await userPreferences_grade(userId, ctx);
       results = results.filter((c) => {
+        // Enforce strict separation if a class is explicitly assigned
+        if (c.class) {
+          const isClassAssigned = c.class === studentClassId;
+          const isClassInvited = Boolean(studentClassId && (c.invitedClasses?.includes(studentClassId) ?? false));
+          const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
+          if (!isClassAssigned && !isClassInvited && !isUserInvited) {
+            return false;
+          }
+        }
+
         if (c.accessMode === "school-only") {
           const isUserInvited = c.invitedUsers?.includes(userId) ?? false;
           const isClassAssigned = Boolean(c.class && c.class === studentClassId);

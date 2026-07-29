@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 
 // Force production Convex URL for Vercel builds
 process.env.VITE_CONVEX_URL = "https://fine-caiman-328.convex.cloud";
@@ -38,4 +39,12 @@ const result = spawnSync(command, {
   shell: true,
 });
 
+if (result.status === 0) {
+  if (fs.existsSync("frontend/dist")) {
+    fs.cpSync("frontend/dist", "dist", { recursive: true });
+    console.log("Copied frontend/dist -> dist for Vercel deployment.");
+  }
+}
+
 process.exit(result.status ?? 1);
+

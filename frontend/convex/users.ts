@@ -53,14 +53,9 @@ export const getUsers = query({
       throw new Error("Unauthorized");
     }
 
-    let usersQuery = ctx.db.query("users");
-    if (args.role) {
-      usersQuery = usersQuery.filter((q) => q.eq(q.field("role"), args.role));
-    }
+    const allUsers = await ctx.db.query("users").collect();
 
-    const allUsers = await usersQuery.collect();
-
-    return await Promise.all(
+    const processedUsers = await Promise.all(
       allUsers.map(async (u) => {
         const isAdmin = Boolean(u.email && ADMIN_EMAILS.includes(u.email.toLowerCase()));
         const role = isAdmin ? "admin" : (u.role || "student");
@@ -98,6 +93,11 @@ export const getUsers = query({
         };
       })
     );
+
+    if (args.role) {
+      return processedUsers.filter((u) => u.role === args.role);
+    }
+    return processedUsers;
   },
 });
 
@@ -281,11 +281,23 @@ export const getAnalyticsStats = query({
 export const updateMyProfile = mutation({
   args: {
     name: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("student"), v.literal("teacher"), v.literal("parent"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Unauthorized");
-    await ctx.db.patch(userId, { name: args.name });
+    
+    const user: any = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const patchData: any = {};
+    if (args.name !== undefined) patchData.name = args.name;
+    if (args.role !== undefined && user.role !== "admin") {
+      patchData.role = args.role;
+      patchData.isApproved = false; // Require approval on role change
+    }
+
+    await ctx.db.patch(userId, patchData);
     return { success: true };
   },
 });

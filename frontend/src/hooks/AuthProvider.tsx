@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const convexUser = useQuery(api.users.getMe);
   const currentYear = useQuery(api.academicYears.getCurrentAcademicYear);
   const ensureMathsLiteracy = useMutation(api.subjects.ensureMathsLiteracyExists);
+  const updateMyProfile = useMutation(api.users.updateMyProfile);
 
   // We consider loading to be true if the queries are still undefined
   const loading = convexUser === undefined || currentYear === undefined;
@@ -30,6 +31,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Failed to ensure Maths Literacy subject exists:", err);
     });
   }, [ensureMathsLiteracy]);
+
+  useEffect(() => {
+    if (convexUser) {
+      const pendingRole = localStorage.getItem("pendingGoogleRole");
+      if (pendingRole) {
+        if (convexUser.role !== pendingRole) {
+          updateMyProfile({ role: pendingRole as any }).catch(console.error);
+        }
+        localStorage.removeItem("pendingGoogleRole");
+      }
+    }
+  }, [convexUser, updateMyProfile]);
 
   return (
     <AuthContext.Provider

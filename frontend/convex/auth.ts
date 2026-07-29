@@ -50,7 +50,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           email,
           name: googleProfile.name,
           image: googleProfile.picture,
-          ...(isAdminEmail ? { role: "admin", isApproved: true, isActive: true } : {}),
+          ...(isAdminEmail 
+            ? { role: "admin", isApproved: true, isActive: true } 
+            : { role: "student", isApproved: false, isActive: true }),
         };
       },
     }),

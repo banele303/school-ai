@@ -1,11 +1,11 @@
-import React, { createContext, useContext } from "react";
-import { useQuery } from "convex/react";
+import React, { createContext, useContext, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 
 // 1. Create Context
 const AuthContext = createContext<{
-  user: any | null; // using any since type user might need to be synced with Convex
+  user: any | null;
   loading: boolean;
   year: any | null;
   signOut: () => void;
@@ -20,6 +20,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { signOut } = useAuthActions();
   const convexUser = useQuery(api.users.getMe);
   const currentYear = useQuery(api.academicYears.getCurrentAcademicYear);
+  const updateMyProfile = useMutation(api.users.updateMyProfile);
+
+  useEffect(() => {
+    if (convexUser) {
+      const pendingRole = localStorage.getItem("pendingGoogleRole");
+      if (pendingRole) {
+        if (convexUser.role !== pendingRole) {
+          updateMyProfile({ role: pendingRole as any }).catch(console.error);
+        }
+        localStorage.removeItem("pendingGoogleRole");
+      }
+    }
+  }, [convexUser, updateMyProfile]);
 
   // We consider loading to be true if the queries are still undefined
   const loading = convexUser === undefined || currentYear === undefined;

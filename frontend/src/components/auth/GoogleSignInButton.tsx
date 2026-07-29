@@ -2,13 +2,16 @@ import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { toast } from "sonner";
 
-const GoogleSignInButton = () => {
+const GoogleSignInButton = ({ role }: { role?: string }) => {
   const { signIn } = useAuthActions();
   const [pending, setPending] = useState(false);
 
   const handleGoogleSignIn = async () => {
     try {
       setPending(true);
+      if (role) {
+        localStorage.setItem("pendingGoogleRole", role);
+      }
       await signIn("google", { redirectTo: "/dashboard" });
     } catch (error: any) {
       console.error("Google sign-in error:", error);
