@@ -184,6 +184,9 @@ export default function LiveRoomPage() {
     return () => {
       if (whipPcRef.current) whipPcRef.current.close();
       if (studentPcRef.current) studentPcRef.current.close();
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
     };
   }, []);
 
@@ -964,121 +967,132 @@ export default function LiveRoomPage() {
   useEffect(() => {
     if (!webRtcSignals || webRtcSignals.length === 0 || !user?._id) return;
 
-    const processedIds: any[] = [];
+    const processSignals = async () => {
+      const processedIds: any[] = [];
+      const sortedSignals = [...webRtcSignals].sort((a: any, b: any) => {
+        if (a.signalType === "offer" && b.signalType !== "offer") return -1;
+        if (b.signalType === "offer" && a.signalType !== "offer") return 1;
+        if (a.signalType === "answer" && b.signalType === "candidate") return -1;
+        if (b.signalType === "answer" && a.signalType === "candidate") return 1;
+        return a.timestamp - b.timestamp;
+      });
 
-    webRtcSignals.forEach(async (sig: any) => {
-      processedIds.push(sig._id);
+      for (const sig of sortedSignals) {
+        processedIds.push(sig._id);
 
-      if (isCreator) {
-        // Teacher receives audio WebRTC offer or ICE candidate from speaking student
-        if (sig.signalType === "offer" && sig.sdp) {
-          const studentId = sig.sender;
-          console.log("Teacher receiving audio WebRTC offer from student:", studentId);
+        if (isCreator) {
+          // Teacher receives audio WebRTC offer or ICE candidate from speaking student
+          if (sig.signalType === "offer" && sig.sdp) {
+            const studentId = sig.sender;
+            console.log("Teacher receiving audio WebRTC offer from student:", studentId);
 
-          if (teacherPeerConnectionsRef.current.has(studentId)) {
-            teacherPeerConnectionsRef.current.get(studentId)?.close();
-          }
-
-          const pc = new RTCPeerConnection({
-            iceServers: [
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-            ]
-          });
-          teacherPeerConnectionsRef.current.set(studentId, pc);
-
-          try {
-            pc.addTransceiver("audio", { direction: "recvonly" });
-          } catch (e) {
-            console.warn("Could not add recvonly transceiver:", e);
-          }
-
-          pc.ontrack = (event) => {
-            console.log("Teacher received student audio track:", event.track.kind, studentId);
-            let audioEl = teacherAudioElementsRef.current.get(studentId);
-            if (!audioEl) {
-              audioEl = document.createElement("audio");
-              audioEl.autoplay = true;
-              audioEl.playsInline = true;
-              audioEl.style.display = "none";
-              document.body.appendChild(audioEl);
-              teacherAudioElementsRef.current.set(studentId, audioEl);
+            if (teacherPeerConnectionsRef.current.has(studentId)) {
+              teacherPeerConnectionsRef.current.get(studentId)?.close();
             }
 
-            const mediaStream = event.streams[0] || new MediaStream([event.track]);
-            audioEl.srcObject = mediaStream;
-            audioEl.volume = 1.0;
-            audioEl.muted = false;
+            const pc = new RTCPeerConnection({
+              iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
+              ]
+            });
+            teacherPeerConnectionsRef.current.set(studentId, pc);
 
-            const playAudio = () => {
-              audioEl?.play().catch((err) => {
-                console.warn("Failed to play student audio track automatically:", err);
-              });
+            try {
+              pc.addTransceiver("audio", { direction: "recvonly" });
+            } catch (e) {
+              console.warn("Could not add recvonly transceiver:", e);
+            }
+
+            pc.ontrack = (event) => {
+              console.log("Teacher received student audio track:", event.track.kind, studentId);
+              let audioEl = teacherAudioElementsRef.current.get(studentId);
+              if (!audioEl) {
+                audioEl = document.createElement("audio");
+                audioEl.autoplay = true;
+                audioEl.playsInline = true;
+                audioEl.style.display = "none";
+                document.body.appendChild(audioEl);
+                teacherAudioElementsRef.current.set(studentId, audioEl);
+              }
+
+              const mediaStream = event.streams[0] || new MediaStream([event.track]);
+              audioEl.srcObject = mediaStream;
+              audioEl.volume = 1.0;
+              audioEl.muted = false;
+
+              const playAudio = () => {
+                audioEl?.play().catch((err) => {
+                  console.warn("Failed to play student audio track automatically:", err);
+                });
+              };
+
+              playAudio();
+              window.addEventListener("click", playAudio, { once: true });
+              window.addEventListener("keydown", playAudio, { once: true });
+
+              setSpeakingStudents(prev => Array.from(new Set([...prev, studentId])));
+              toast.info("A student is speaking!");
             };
 
-            playAudio();
-            window.addEventListener("click", playAudio, { once: true });
-            window.addEventListener("keydown", playAudio, { once: true });
+            pc.onicecandidate = (e) => {
+              if (e.candidate) {
+                sendWebRtcSignal({
+                  liveClassId: targetClassId as any,
+                  targetUserId: studentId,
+                  signalType: "candidate",
+                  candidate: JSON.stringify(e.candidate)
+                }).catch(console.error);
+              }
+            };
 
-            setSpeakingStudents(prev => Array.from(new Set([...prev, studentId])));
-            toast.info("A student is speaking!");
-          };
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sig.sdp }));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
 
-          pc.onicecandidate = (e) => {
-            if (e.candidate) {
-              sendWebRtcSignal({
-                liveClassId: targetClassId as any,
-                targetUserId: studentId,
-                signalType: "candidate",
-                candidate: JSON.stringify(e.candidate)
-              }).catch(console.error);
+            await sendWebRtcSignal({
+              liveClassId: targetClassId as any,
+              targetUserId: studentId,
+              signalType: "answer",
+              sdp: answer.sdp
+            });
+          } else if (sig.signalType === "candidate" && sig.candidate) {
+            const pc = teacherPeerConnectionsRef.current.get(sig.sender);
+            if (pc) {
+              try {
+                const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
+                await pc.addIceCandidate(candidate);
+              } catch (e) {
+                console.warn("Failed to add ICE candidate:", e);
+              }
             }
-          };
-
-          await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sig.sdp }));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-
-          await sendWebRtcSignal({
-            liveClassId: targetClassId as any,
-            targetUserId: studentId,
-            signalType: "answer",
-            sdp: answer.sdp
-          });
-        } else if (sig.signalType === "candidate" && sig.candidate) {
-          const pc = teacherPeerConnectionsRef.current.get(sig.sender);
-          if (pc) {
+          }
+        } else {
+          // Student receiving WebRTC answer or candidate from teacher
+          if (sig.signalType === "answer" && sig.sdp && studentAudioPcRef.current) {
+            try {
+              await studentAudioPcRef.current.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sig.sdp }));
+              console.log("Student set remote description from teacher answer");
+            } catch (e) {
+              console.warn("Failed to set student remote description:", e);
+            }
+          } else if (sig.signalType === "candidate" && sig.candidate && studentAudioPcRef.current) {
             try {
               const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
-              await pc.addIceCandidate(candidate);
+              await studentAudioPcRef.current.addIceCandidate(candidate);
             } catch (e) {
-              console.warn("Failed to add ICE candidate:", e);
+              console.warn("Failed to add teacher ICE candidate:", e);
             }
-          }
-        }
-      } else {
-        // Student receiving WebRTC answer or candidate from teacher
-        if (sig.signalType === "answer" && sig.sdp && studentAudioPcRef.current) {
-          try {
-            await studentAudioPcRef.current.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sig.sdp }));
-            console.log("Student set remote description from teacher answer");
-          } catch (e) {
-            console.warn("Failed to set student remote description:", e);
-          }
-        } else if (sig.signalType === "candidate" && sig.candidate && studentAudioPcRef.current) {
-          try {
-            const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
-            await studentAudioPcRef.current.addIceCandidate(candidate);
-          } catch (e) {
-            console.warn("Failed to add teacher ICE candidate:", e);
           }
         }
       }
-    });
 
-    if (processedIds.length > 0) {
-      clearWebRtcSignals({ liveClassId: targetClassId as any, signalIds: processedIds }).catch(console.error);
-    }
+      if (processedIds.length > 0) {
+        clearWebRtcSignals({ liveClassId: targetClassId as any, signalIds: processedIds }).catch(console.error);
+      }
+    };
+
+    processSignals();
   }, [webRtcSignals, isCreator, targetClassId, user?._id]);
 
   // Clean up student local streams & teacher audio connections on unmount
@@ -1127,12 +1141,10 @@ export default function LiveRoomPage() {
     if (isCreator && !isBroadcasting && (selectedVideoDevice || selectedAudioDevice)) {
       startPreview();
     }
-    return () => {
-      if (isCreator && !isBroadcasting && localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [isCreator, selectedVideoDevice, selectedAudioDevice, isBroadcasting]);
+    // Removed cleanup that stops tracks on dependency change, 
+    // because startPreview already stops old tracks, and we 
+    // don't want to stop tracks when isBroadcasting becomes true.
+  }, [isCreator, selectedVideoDevice, selectedAudioDevice]);
 
   // Resolve recording URL dynamically if it points to live input manifest
   useEffect(() => {
