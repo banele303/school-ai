@@ -85,6 +85,45 @@ export const createLiveClass = mutation({
   },
 });
 
+// ─── UPDATE LIVE CLASS ──────────────────────────────────────────────────────
+
+export const updateLiveClass = mutation({
+  args: {
+    id: v.id("liveClasses"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    subject: v.optional(v.id("subjects")),
+    class: v.optional(v.id("classes")),
+    startTime: v.optional(v.number()),
+    endTime: v.optional(v.number()),
+    platform: v.optional(v.string()),
+    joinUrl: v.optional(v.string()),
+    accessMode: v.optional(v.union(
+      v.literal("school-only"),
+      v.literal("school-and-public"),
+      v.literal("public-support")
+    )),
+    targetGrades: v.optional(v.array(v.number())),
+    maxParticipants: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+
+    const user = await ctx.db.get(userId);
+    const targetClass = await ctx.db.get(args.id);
+    if (!targetClass) throw new Error("Live class not found");
+
+    if (user?.role !== "admin" && targetClass.teacher !== userId) {
+      throw new Error("Unauthorized to edit this class");
+    }
+
+    const { id, ...updates } = args;
+    await ctx.db.patch(id, updates);
+    return id;
+  },
+});
+
 // ─── GET LIVE CLASSES (with optional filters) ───────────────────────────────
 
 export const getLiveClasses = query({

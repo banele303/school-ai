@@ -36,6 +36,8 @@ import {
   Users,
   Video,
   Trash2,
+  Loader2,
+  Pencil
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -94,6 +96,7 @@ export default function LiveClassesPage() {
   const [selectedClass, setSelectedClass] = useState<any>(null);
   const [showStudio, setShowStudio] = useState(false);
   const [inviteClass, setInviteClass] = useState<any>(null);
+  const [editingClass, setEditingClass] = useState<any>(null);
 
   const liveClasses = useQuery(api.liveClasses.getLiveClasses, {});
   const teacherClasses = user?.role === "teacher" || user?.role === "admin"
@@ -102,6 +105,7 @@ export default function LiveClassesPage() {
   const subjects = useQuery(api.subjects.getSubjects);
 
   const createLiveClass = useMutation(api.liveClasses.createLiveClass);
+  const updateLiveClass = useMutation(api.liveClasses.updateLiveClass);
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
   const joinClass = useMutation(api.liveClasses.joinLiveClass);
   const deleteLiveClass = useMutation(api.liveClasses.deleteLiveClass);
@@ -242,6 +246,10 @@ export default function LiveClassesPage() {
                           setShowStudio(true);
                         }}
                         onInvite={() => setInviteClass(classItem)}
+                        onEdit={() => {
+                          setEditingClass(classItem);
+                          setShowCreateDialog(true);
+                        }}
                         onStatus={changeStatus}
                         onDelete={handleDeleteClass}
                       />
@@ -285,7 +293,15 @@ export default function LiveClassesPage() {
 
       <CreateClassDialog
         open={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
+        onClose={() => {
+          setShowCreateDialog(false);
+          setEditingClass(null);
+        }}
+        subjects={subjects}
+        createLiveClass={createLiveClass}
+        updateLiveClass={updateLiveClass}
+        editingClass={editingClass}
+      />
         subjects={subjects}
         createLiveClass={createLiveClass}
       />
@@ -321,7 +337,7 @@ function StudioPill({ icon: Icon, label }: any) {
   );
 }
 
-function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onInvite, onStatus, onDelete }: any) {
+function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStudio, onInvite, onEdit, onStatus, onDelete }: any) {
   const statusCfg = STATUS_CONFIG[classItem.status] || STATUS_CONFIG.scheduled;
   const StatusIcon = statusCfg.icon;
 
@@ -370,6 +386,11 @@ function LessonCard({ classItem, subjectName, isTeacher, isOwner, onOpen, onStud
               {classItem.status !== "live" && (
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => onStatus(classItem._id, "live")} title="Start live">
                   <Radio className="h-4 w-4 text-red-600 dark:text-red-400" />
+                </Button>
+              )}
+              {classItem.status === "scheduled" && onEdit && (
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={onEdit} title="Edit class">
+                  <Pencil className="h-4 w-4" />
                 </Button>
               )}
               {classItem.status === "live" && (
@@ -565,7 +586,7 @@ function TeacherStudioDialog({ open, lesson, onClose, onStatus }: any) {
   );
 }
 
-function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
+function CreateClassDialog({ open, onClose, subjects, createLiveClass, updateLiveClass, editingClass }: any) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [subjectId, setSubjectId] = useState("");
@@ -578,6 +599,40 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
   const [targetGrade, setTargetGrade] = useState("all");
+
+  useEffect(() => {
+    if (editingClass && open) {
+      setTitle(editingClass.title || "");
+      setDescription(editingClass.description || "");
+      setSubjectId(editingClass.subject || "");
+      if (editingClass.startTime) {
+        const dt = new Date(editingClass.startTime);
+        setDate(format(dt, "yyyy-MM-dd"));
+        setTime(format(dt, "HH:mm"));
+      }
+      setAccessMode(editingClass.accessMode || "school-and-public");
+      setPlatform(editingClass.platform || "native");
+      setJoinUrl(editingClass.joinUrl || "");
+      setMaxParticipants(editingClass.maxParticipants ? String(editingClass.maxParticipants) : "");
+      if (editingClass.targetGrades && editingClass.targetGrades.length > 0) {
+        setTargetGrade(String(editingClass.targetGrades[0]));
+      } else {
+        setTargetGrade("all");
+      }
+    } else if (!open) {
+      setTitle("");
+      setDescription("");
+      setSubjectId("");
+      setDate("");
+      setTime("");
+      setAccessMode("school-and-public");
+      setPlatform("native");
+      setJoinUrl("");
+      setMaxParticipants("");
+      setTargetGrade("all");
+      setResourceFile(null);
+    }
+  }, [editingClass, open]);
   const subjectOptions = Array.isArray(subjects) ? subjects : [];
   const subjectsLoading = subjects === undefined;
 
@@ -607,6 +662,23 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
 
     setCreating(true);
     try {
+      if (editingClass) {
+        await updateLiveClass({
+          id: editingClass._id,
+          title: trimmedTitle,
+          description: trimmedDescription,
+          subject: subjectId as any,
+          startTime,
+          platform,
+          joinUrl: trimmedJoinUrl,
+          accessMode: accessMode as any,
+          targetGrades: targetGrade === "all" ? [] : [parseInt(targetGrade)],
+          maxParticipants: maxParticipants ? parseInt(maxParticipants) : undefined,
+        });
+        toast.success("Live class updated successfully");
+        onClose();
+        return;
+      }
       let resourceUrl = "";
       if (resourceFile) {
         const upload = await uploadFileToR2(resourceFile, { title: trimmedTitle, description: trimmedDescription });
@@ -697,7 +769,7 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl w-full max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
         <DialogHeader className="p-6 sm:p-8 pb-4 border-b border-zinc-150 dark:border-zinc-800">
-          <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">Create Live Learning Session</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-white">{editingClass ? "Edit Live Learning Session" : "Create Live Learning Session"}</DialogTitle>
           <DialogDescription className="text-xs text-zinc-550 dark:text-zinc-400 mt-1">
             Fill in the details below to schedule a new live lesson and optionally provision streaming channels.
           </DialogDescription>
@@ -789,9 +861,15 @@ function CreateClassDialog({ open, onClose, subjects, createLiveClass }: any) {
             <div className="md:col-span-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-150 dark:border-zinc-800/80 p-3.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium leading-relaxed">
               💡 This creates an in-app lesson. Teachers can start the studio from the lesson card, learners join inside the app, and recordings/resources can be stored through Cloudflare.
             </div>
-            <Button className="md:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm h-11 rounded-xl shadow-lg mt-2" onClick={handleCreate} disabled={creating}>
-              {creating ? "Creating..." : "Create lesson"}
-            </Button>
+            <div className="flex items-center gap-3 pt-6 border-t border-zinc-150 dark:border-zinc-800 mt-6">
+              <Button variant="outline" onClick={onClose} disabled={creating} className="rounded-xl h-10 w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button onClick={handleCreate} disabled={creating} className="rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto gap-2">
+                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {editingClass ? "Save Changes" : "Create Session"}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
