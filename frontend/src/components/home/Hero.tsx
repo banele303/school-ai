@@ -34,7 +34,7 @@ const Hero = () => {
                 </span>
               </h1>
               <p className="text-xl text-gray-600 dark:text-gray-400 max-w-xl mt-4 leading-relaxed">
-                South Africa's most modern e-learning platform. Live classes, video lessons, AI tutor, and everything your school needs — built for <strong className="text-gray-900 dark:text-white">Limpopo</strong>, trusted by <strong className="text-gray-900 dark:text-white">schools nationwide</strong>.
+                South Africa's most modern e-learning platform. Live classes, video lessons, AI tutor, and everything your school needs — built for <strong className="text-gray-900 dark:text-white">Limpopo</strong>, trusted by <strong className="text-gray-900 dark:text-white">schools nationwide</strong> since 2017.
               </p>
             </div>
 

@@ -67,8 +67,8 @@ const Contact = () => {
                         <Phone className="w-5 h-5 text-[#dc2626]" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900 dark:text-white">Phone</p>
-                        <p className="text-gray-500 text-sm">+27 11 123 4567</p>
+                        <p className="font-medium text-gray-900 dark:text-white">Phone & WhatsApp</p>
+                        <p className="text-gray-500 text-sm">067 653 0791</p>
                         <p className="text-gray-500 text-sm">Mon–Fri, 8am–5pm SAST</p>
                       </div>
                     </div>
@@ -78,8 +78,8 @@ const Contact = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">Email</p>
-                        <p className="text-gray-500 text-sm">info@Vhembe Rising Star Academy.co.za</p>
-                        <p className="text-gray-500 text-sm">support@Vhembe Rising Star Academy.co.za</p>
+                        <p className="text-gray-500 text-sm">info@vhembersa.com</p>
+                        <p className="text-gray-500 text-sm">vhembersa.com</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-4">

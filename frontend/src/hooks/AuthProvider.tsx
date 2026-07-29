@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const completeOnboarding = useMutation(api.users.completeOnboarding);
 
   useEffect(() => {
-    if (convexUser && convexUser.onboardingCompleted === false) {
+    if (convexUser && (convexUser as any).onboardingCompleted === false) {
       const pendingDataStr = localStorage.getItem("pendingSignUpData");
       if (pendingDataStr) {
         try {

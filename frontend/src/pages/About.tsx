@@ -31,7 +31,7 @@ const About = () => {
                 About Vhembe Rising Star Academy
               </div>
               <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6 leading-tight">
-                Empowering South African Schools Since 2023
+                Empowering South African Schools Since 2017
               </h1>
               <p className="text-xl text-gray-600 dark:text-gray-400 leading-relaxed">
                 Vhembe Rising Star Academy was born from a simple observation: South African educators spend

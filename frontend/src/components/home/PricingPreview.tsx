@@ -3,68 +3,48 @@ import { Link } from "react-router";
 
 const plans = [
   {
-    name: "Starter",
-    price: "R 499",
-    period: "/ month",
-    tagline: "Perfect for small primary schools",
+    name: "Single Subject",
+    price: "R 250",
+    period: "/ subject",
+    tagline: "Choose any single subject and start learning today.",
     color: "border-gray-200 dark:border-gray-800",
     badge: null,
     features: [
-      "Up to 200 learners",
-      "5 staff accounts",
-      "Timetabling",
-      "Digital report cards",
-      "Parent portal",
-      "Email support",
+      "Access to 1 Subject",
+      "Live Classes",
+      "Video Library",
+      "Study Groups",
+      "Homework Checker",
+      "Resources Hub",
+      "Smart Timetable",
+      "Exams & Assessments",
+    ],
+    cta: "Start Learning",
+    ctaStyle:
+      "border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:border-[#dc2626] hover:text-[#dc2626]",
+    popular: false,
+  },
+  {
+    name: "Multi-Subject",
+    price: "R 200",
+    period: "/ subject",
+    tagline: "When you take 2 or more subjects.",
+    color: "border-[#dc2626]",
+    badge: "Quality Education Made Affordable",
+    features: [
+      "Access to 2 or more Subjects",
+      "Live Classes",
+      "Video Library",
+      "Study Groups",
+      "Homework Checker",
+      "Resources Hub",
+      "Smart Timetable",
+      "Exams & Assessments",
     ],
     cta: "Get Started",
     ctaStyle:
-      "border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:border-[#dc2626] hover:text-[#dc2626]",
-    popular: false,
-  },
-  {
-    name: "Professional",
-    price: "R 1 299",
-    period: "/ month",
-    tagline: "For growing primary & high schools",
-    color: "border-[#dc2626]",
-    badge: "Most Popular",
-    features: [
-      "Up to 1 000 learners",
-      "Unlimited staff accounts",
-      "Everything in Starter",
-      "AI Study Buddy",
-      "Grade Insights Analytics",
-      "SBA & NSC tracking",
-      "SMS & push notifications",
-      "Priority support",
-    ],
-    cta: "Start Free Trial",
-    ctaStyle:
       "bg-[#dc2626] text-black hover:bg-[#b91c1c] shadow-lg shadow-[#dc2626]/25",
     popular: true,
-  },
-  {
-    name: "District",
-    price: "Custom",
-    period: "",
-    tagline: "For circuits, districts & DoE",
-    color: "border-gray-200 dark:border-gray-800",
-    badge: null,
-    features: [
-      "Unlimited learners",
-      "Multi-school dashboard",
-      "Everything in Professional",
-      "District-wide analytics",
-      "Custom DBE reporting",
-      "Dedicated account manager",
-      "SLA & data governance",
-      "On-site training",
-    ],
-    cta: "Contact Us",
-    ctaStyle:
-      "border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:border-[#dc2626] hover:text-[#dc2626]",
-    popular: false,
   },
 ];
 
@@ -89,22 +69,11 @@ const PricingPreview = () => {
             include free onboarding support.
           </p>
 
-          {/* Toggle placeholder (visual only) */}
-          <div className="inline-flex items-center gap-1 p-1 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl mt-4">
-            <button className="px-5 py-2 rounded-lg bg-white dark:bg-[#2a2a2a] text-gray-900 dark:text-white font-semibold text-sm shadow-sm">
-              Monthly
-            </button>
-            <button className="px-5 py-2 rounded-lg text-gray-500 dark:text-gray-400 font-semibold text-sm hover:text-gray-900 dark:hover:text-white transition-colors">
-              Annual{" "}
-              <span className="text-[#dc2626] text-xs font-bold ml-1">
-                Save 20%
-              </span>
-            </button>
-          </div>
+
         </div>
 
         {/* Plans */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-8 items-stretch">
           {plans.map((plan, idx) => (
             <div
               key={idx}

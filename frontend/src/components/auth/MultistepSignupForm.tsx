@@ -41,7 +41,7 @@ type FormValues = z.infer<ReturnType<typeof createSchema>>;
 export default function MultistepSignupForm() {
   const [step, setStep] = useState(1);
   const { signIn } = useAuthActions();
-  const convexClasses = useQuery(api.classes.getClasses);
+  const convexClasses = useQuery(api.classes.getClasses, { academicYear: undefined });
   const convexSubjects = useQuery(api.subjects.getSubjects);
 
   const classes = Array.isArray(convexClasses) ? convexClasses : [];

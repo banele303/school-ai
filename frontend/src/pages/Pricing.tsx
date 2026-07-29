@@ -5,58 +5,42 @@ import { Check, Star, GraduationCap, Building2, School } from "lucide-react";
 
 const plans = [
   {
-    name: "Starter",
+    name: "Single Subject",
     icon: School,
-    price: "Free",
-    period: "forever",
-    desc: "Perfect for small schools getting started with digital management.",
+    price: "R 250",
+    period: "/subject",
+    desc: "Choose any single subject and start learning today.",
     features: [
-      "Up to 100 learners",
-      "Basic learner profiles",
-      "Timetable management",
-      "Attendance tracking",
-      "Email support",
+      "Access to 1 Subject",
+      "Live Classes",
+      "Video Library",
+      "Study Groups",
+      "Homework Checker",
+      "Resources Hub",
+      "Smart Timetable",
+      "Exams & Assessments",
+    ],
+    cta: "Start Learning",
+    popular: false,
+  },
+  {
+    name: "Multi-Subject",
+    icon: GraduationCap,
+    price: "R 200",
+    period: "/subject",
+    desc: "When you take 2 or more subjects.",
+    features: [
+      "Access to 2 or more Subjects",
+      "Live Classes",
+      "Video Library",
+      "Study Groups",
+      "Homework Checker",
+      "Resources Hub",
+      "Smart Timetable",
+      "Exams & Assessments",
     ],
     cta: "Get Started",
-    popular: false,
-  },
-  {
-    name: "Professional",
-    icon: GraduationCap,
-    price: "R 2,500",
-    period: "/month",
-    desc: "For growing schools that need full LMS and assessment capabilities.",
-    features: [
-      "Up to 1,000 learners",
-      "Everything in Starter",
-      "Exam & assessment builder",
-      "Assignment management",
-      "Parent portal",
-      "AI Study Buddy (500 queries/mo)",
-      "Report card generation",
-      "Priority support",
-    ],
-    cta: "Start Free Trial",
     popular: true,
-  },
-  {
-    name: "Enterprise",
-    icon: Building2,
-    price: "Custom",
-    period: "pricing",
-    desc: "For large schools, districts, and government deployments.",
-    features: [
-      "Unlimited learners",
-      "Everything in Professional",
-      "AI Study Buddy (unlimited)",
-      "Custom integrations",
-      "SITA procurement ready",
-      "Dedicated account manager",
-      "On-premise deployment option",
-      "SLA guarantee",
-    ],
-    cta: "Contact Sales",
-    popular: false,
   },
 ];
 
@@ -72,19 +56,18 @@ const Pricing = () => {
               Pricing
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              Simple, Transparent Pricing
+              Quality Education Made Affordable!
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              No hidden fees. No per-learner charges. Every plan includes our core
-              school management features. Start free, upgrade when you're ready.
+              Affordable. Accessible. Impactful. Built for modern schools, designed for success.
             </p>
           </div>
         </section>
 
         {/* Plans */}
         <section className="py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-3 gap-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid md:grid-cols-2 gap-8">
               {plans.map((plan) => (
                 <div
                   key={plan.name}
