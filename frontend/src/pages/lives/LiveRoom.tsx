@@ -121,8 +121,12 @@ export default function LiveRoomPage() {
 
   // Student Microphone WebRTC Audio Signaling Refs
   const studentAudioPcRef = useRef<RTCPeerConnection | null>(null);
-  const teacherAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const studentCandidateQueueRef = useRef<any[]>([]);
+
+  // Teacher refs
   const teacherPeerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const teacherCandidateQueuesRef = useRef<Map<string, any[]>>(new Map());
+  const teacherAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // Mobile Audio Constraints Helper
   const getMobileAudioConstraints = (selectedDeviceId?: string): MediaTrackConstraints | boolean => {
@@ -998,12 +1002,6 @@ export default function LiveRoomPage() {
             });
             teacherPeerConnectionsRef.current.set(studentId, pc);
 
-            try {
-              pc.addTransceiver("audio", { direction: "recvonly" });
-            } catch (e) {
-              console.warn("Could not add recvonly transceiver:", e);
-            }
-
             pc.ontrack = (event) => {
               console.log("Teacher received student audio track:", event.track.kind, studentId);
               let audioEl = teacherAudioElementsRef.current.get(studentId);
@@ -1047,6 +1045,18 @@ export default function LiveRoomPage() {
             };
 
             await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sig.sdp }));
+            
+            // Process any queued candidates for this student
+            const queuedCandidates = teacherCandidateQueuesRef.current.get(studentId) || [];
+            for (const c of queuedCandidates) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(c));
+              } catch (e) {
+                console.warn("Failed to add queued ICE candidate:", e);
+              }
+            }
+            teacherCandidateQueuesRef.current.delete(studentId);
+
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
@@ -1057,14 +1067,19 @@ export default function LiveRoomPage() {
               sdp: answer.sdp
             });
           } else if (sig.signalType === "candidate" && sig.candidate) {
+            const candidateData = JSON.parse(sig.candidate);
             const pc = teacherPeerConnectionsRef.current.get(sig.sender);
-            if (pc) {
+            if (pc && pc.remoteDescription) {
               try {
-                const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
-                await pc.addIceCandidate(candidate);
+                await pc.addIceCandidate(new RTCIceCandidate(candidateData));
               } catch (e) {
                 console.warn("Failed to add ICE candidate:", e);
               }
+            } else {
+              // Queue the candidate until the offer arrives and is set
+              const queue = teacherCandidateQueuesRef.current.get(sig.sender) || [];
+              queue.push(candidateData);
+              teacherCandidateQueuesRef.current.set(sig.sender, queue);
             }
           }
         } else {
@@ -1073,15 +1088,29 @@ export default function LiveRoomPage() {
             try {
               await studentAudioPcRef.current.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sig.sdp }));
               console.log("Student set remote description from teacher answer");
+              
+              // Process queued candidates
+              for (const c of studentCandidateQueueRef.current) {
+                try {
+                  await studentAudioPcRef.current.addIceCandidate(new RTCIceCandidate(c));
+                } catch (e) {
+                  console.warn("Failed to add queued teacher ICE candidate:", e);
+                }
+              }
+              studentCandidateQueueRef.current = [];
             } catch (e) {
               console.warn("Failed to set student remote description:", e);
             }
           } else if (sig.signalType === "candidate" && sig.candidate && studentAudioPcRef.current) {
-            try {
-              const candidate = new RTCIceCandidate(JSON.parse(sig.candidate));
-              await studentAudioPcRef.current.addIceCandidate(candidate);
-            } catch (e) {
-              console.warn("Failed to add teacher ICE candidate:", e);
+            const candidateData = JSON.parse(sig.candidate);
+            if (studentAudioPcRef.current.remoteDescription) {
+              try {
+                await studentAudioPcRef.current.addIceCandidate(new RTCIceCandidate(candidateData));
+              } catch (e) {
+                console.warn("Failed to add teacher ICE candidate:", e);
+              }
+            } else {
+              studentCandidateQueueRef.current.push(candidateData);
             }
           }
         }
