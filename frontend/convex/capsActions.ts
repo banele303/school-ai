@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { userPreferences_grade } from "./liveClasses";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -58,17 +59,30 @@ export const getPastPapers = query({
     year: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    let results = [];
     if (args.grade !== undefined && args.subjectId !== undefined) {
-      return await ctx.db.query("pastPapers")
+      results = await ctx.db.query("pastPapers")
         .withIndex("by_grade_subject", (q) => q.eq("grade", args.grade!).eq("subject", args.subjectId!))
         .collect();
-    }
-    if (args.year !== undefined) {
-      return await ctx.db.query("pastPapers")
+    } else if (args.year !== undefined) {
+      results = await ctx.db.query("pastPapers")
         .withIndex("by_year", (q) => q.eq("year", args.year!))
         .collect();
+    } else {
+      results = await ctx.db.query("pastPapers").collect();
     }
-    return await ctx.db.query("pastPapers").collect();
+
+    const userId = await getAuthUserId(ctx);
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      if (user?.role === "student") {
+        const studentGrade = await userPreferences_grade(userId, ctx);
+        if (studentGrade === undefined) return [];
+        results = results.filter(r => r.grade === studentGrade);
+      }
+    }
+    
+    return results;
   },
 });
 
@@ -130,17 +144,30 @@ export const getStudyResources = query({
     resourceType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    let results = [];
     if (args.grade !== undefined && args.subjectId !== undefined) {
-      return await ctx.db.query("studyResources")
+      results = await ctx.db.query("studyResources")
         .withIndex("by_grade_subject", (q) => q.eq("grade", args.grade!).eq("subject", args.subjectId!))
         .collect();
-    }
-    if (args.resourceType !== undefined) {
-      return await ctx.db.query("studyResources")
+    } else if (args.resourceType !== undefined) {
+      results = await ctx.db.query("studyResources")
         .withIndex("by_type", (q) => q.eq("resourceType", args.resourceType!))
         .collect();
+    } else {
+      results = await ctx.db.query("studyResources").collect();
     }
-    return await ctx.db.query("studyResources").collect();
+
+    const userId = await getAuthUserId(ctx);
+    if (userId) {
+      const user = await ctx.db.get(userId);
+      if (user?.role === "student") {
+        const studentGrade = await userPreferences_grade(userId, ctx);
+        if (studentGrade === undefined) return [];
+        results = results.filter(r => r.grade === studentGrade);
+      }
+    }
+    
+    return results;
   },
 });
 

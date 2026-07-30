@@ -505,7 +505,7 @@ export const getUpcomingClassesForStudent = query({
 });
 
 // Helper to get student grade from userPreferences or user's assigned class name
-async function userPreferences_grade(
+export async function userPreferences_grade(
   userId: any,
   ctx: any
 ): Promise<number | undefined> {
