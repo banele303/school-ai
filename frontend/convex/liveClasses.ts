@@ -521,7 +521,7 @@ async function userPreferences_grade(
   if (user?.studentClass) {
     const classDoc = await ctx.db.get(user.studentClass);
     if (classDoc?.name) {
-      const match = classDoc.name.match(/\b(1[0-2]|[1-9])\b/);
+      const match = classDoc.name.match(/\b(1[0-2]|[1-9])(?:[a-zA-Z])?(?:\b|\s|$)/);
       if (match) {
         return parseInt(match[1], 10);
       }
