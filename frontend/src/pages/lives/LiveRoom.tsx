@@ -2493,11 +2493,12 @@ export default function LiveRoomPage() {
         </div>
 
         {/* Center Column: Control Circle Buttons */}
-        <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
-          
-          {/* Mute Mic (Broadcaster or Student) */}
-          <Button
-            variant="ghost"
+        {classItem?.status !== "ended" ? (
+          <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
+            
+            {/* Mute Mic (Broadcaster or Student) */}
+            <Button
+              variant="ghost"
             size="icon"
             className={cn(
               "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
@@ -2659,9 +2660,20 @@ export default function LiveRoomPage() {
               </div>
             )}
           </div>
+        ) : (
+          <div className="flex-1" />
+        )}
 
-          {/* Red Hang Up / End Class Button */}
-          {isModerator ? (
+          {/* Red Hang Up / End Class / Leave Class Button */}
+          {classItem?.status === "ended" ? (
+            <Button
+              className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-full px-4 md:px-6 py-2 h-10 md:h-12 gap-1.5 md:gap-2 font-semibold shadow-lg shrink-0"
+              onClick={() => navigate("/lives")}
+            >
+              <LogOut className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden sm:inline">Leave Class</span>
+            </Button>
+          ) : isModerator ? (
             <Button
               className="bg-red-600 hover:bg-red-750 text-white rounded-full px-3 md:px-5 py-2 h-10 md:h-12 gap-1.5 md:gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
               onClick={handleEndStream}
