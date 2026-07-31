@@ -1752,6 +1752,22 @@ export default function LiveRoomPage() {
                   )}
                 />
                 
+                {/* Mute / Camera Off Overlays */}
+                <div className="absolute top-4 right-4 md:top-6 md:right-6 flex flex-col gap-2 md:gap-3 z-20">
+                  <div className={cn(
+                    "p-2 md:p-2.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    isMuted ? "bg-red-600/90 text-white" : "bg-zinc-900/60 text-green-400 border border-white/10"
+                  )} title={isMuted ? "Microphone is muted" : "Microphone is active"}>
+                    {isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+                  </div>
+
+                  <div className={cn(
+                    "p-2 md:p-2.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    isVideoOff ? "bg-red-600/90 text-white" : "bg-zinc-900/60 text-green-400 border border-white/10"
+                  )} title={isVideoOff ? "Camera is off" : "Camera is active"}>
+                    {isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+                  </div>
+                </div>
                 {/* Local status labels */}
                 <div className="absolute bottom-6 left-6 flex gap-2 z-10">
                   <Badge className="bg-zinc-950/80 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
