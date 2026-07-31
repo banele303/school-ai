@@ -14,6 +14,9 @@ export const createUserAdmin = mutation({
     ),
     classId: v.optional(v.id("classes")),
     subjectIds: v.optional(v.array(v.id("subjects"))),
+    linkedStudents: v.optional(v.array(v.id("users"))),
+    assignedTeachers: v.optional(v.array(v.id("users"))),
+    assignedStudents: v.optional(v.array(v.id("users"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -51,6 +54,9 @@ export const createUserAdmin = mutation({
       studentClass: cleanClassId,
       studentSubjects: args.role === "student" ? cleanSubjectIds : undefined,
       teacherSubject: args.role === "teacher" ? cleanSubjectIds : undefined,
+      linkedStudents: args.linkedStudents,
+      assignedTeachers: args.assignedTeachers,
+      assignedStudents: args.assignedStudents,
     });
 
     return { success: true, newUserId };

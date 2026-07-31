@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/hooks/AuthProvider";
 import Hls from "hls.js";
 import InviteDialog from "./InviteDialog";
-import { createStreamLiveInput, getLiveInputRecordings } from "@/lib/cloudflareWorker";
+import { createStreamLiveInput, getLiveInputRecordings, createStreamDirectUpload, uploadVideoToStream } from "@/lib/cloudflareWorker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +91,7 @@ export default function LiveRoomPage() {
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [playerVolume, setPlayerVolume] = useState(0.8);
   const [streamActive, setStreamActive] = useState(false);
+  const [isUploadingRecording, setIsUploadingRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [devices, setDevices] = useState<{ video: MediaDeviceInfo[]; audio: MediaDeviceInfo[] }>({ video: [], audio: [] });
   const [selectedVideoDevice, setSelectedVideoDevice] = useState("");
@@ -118,6 +119,8 @@ export default function LiveRoomPage() {
   const whepTimeoutRef = useRef<any>(null);
   const whipResourceUrlRef = useRef<string | null>(null);
   const whepResourceUrlRef = useRef<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   // WebRTC Audio Mesh Refs
   const mySendPeersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -1235,6 +1238,20 @@ export default function LiveRoomPage() {
       if (whipUrl && localStreamRef.current) {
         await publishWhip(localStreamRef.current, whipUrl);
         toast.success("Stream published successfully to Cloudflare via WebRTC!");
+
+        try {
+          recordedChunksRef.current = [];
+          const recorder = new MediaRecorder(localStreamRef.current, { mimeType: 'video/webm' });
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              recordedChunksRef.current.push(e.data);
+            }
+          };
+          recorder.start(5000);
+          mediaRecorderRef.current = recorder;
+        } catch (e) {
+          console.warn("Failed to start local recording:", e);
+        }
       } else if (rtmpsUrl && streamKey) {
         toast.success("Class is live. Start sending video from OBS to Cloudflare.");
       } else {
@@ -1255,6 +1272,40 @@ export default function LiveRoomPage() {
         whipPcRef.current.close();
         whipPcRef.current = null;
       }
+      
+      let uploadedRecordingUrl = classItem?.playbackUrl;
+
+      // Handle local recording upload
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        setIsUploadingRecording(true);
+        toast.info("Uploading class recording. Please don't close this tab...");
+        
+        mediaRecorderRef.current.stop();
+        
+        // Wait a brief moment for final chunks
+        await new Promise(r => setTimeout(r, 500));
+        
+        if (recordedChunksRef.current.length > 0) {
+          try {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const file = new File([blob], `${classItem?.title || 'Live Class'} Recording.webm`, { type: 'video/webm' });
+            
+            const { uid, uploadURL } = await createStreamDirectUpload({
+              name: `${classItem?.title || 'Live Class'} Recording`,
+              creator: user?._id
+            });
+            
+            await uploadVideoToStream(uploadURL, file);
+            uploadedRecordingUrl = `https://iframe.videodelivery.net/${uid}`;
+            toast.success("Recording uploaded successfully!");
+          } catch (uploadErr) {
+            console.error("Recording upload failed:", uploadErr);
+            toast.error("Failed to upload recording, but class was ended.");
+          }
+        }
+        setIsUploadingRecording(false);
+      }
+
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
@@ -1263,12 +1314,13 @@ export default function LiveRoomPage() {
       await updateStatus({
         liveClassId: targetClassId as any,
         status: "ended",
-        recordingUrl: classItem?.playbackUrl, // default to live link which Cloudflare automatically transcodes to recording
+        recordingUrl: uploadedRecordingUrl,
       });
 
       toast.success("Stream ended. Class recorded successfully.");
       navigate("/lives");
     } catch (err: any) {
+      setIsUploadingRecording(false);
       toast.error(`Error ending stream: ${err.message}`);
     }
   };
@@ -1502,7 +1554,7 @@ export default function LiveRoomPage() {
 
   if (liveClasses === undefined) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center h-screen bg-zinc-950 text-white font-sans">
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[100dvh] md:h-[100dvh] bg-zinc-950 text-white font-sans">
         <Clock className="h-10 w-10 text-indigo-500 mb-4 animate-spin" />
         <h3 className="text-lg font-semibold">Loading classroom...</h3>
         <p className="text-xs text-zinc-505 mt-1">Connecting to database</p>
@@ -1528,7 +1580,7 @@ export default function LiveRoomPage() {
 
   if (needsApproval) {
     return (
-      <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans overflow-hidden">
+      <div className="flex flex-col min-h-[100dvh] md:h-[100dvh] bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans md:overflow-hidden">
         <header className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md z-10 shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-950 dark:text-zinc-400 dark:hover:text-white" onClick={() => navigate("/lives")}>
@@ -1575,12 +1627,12 @@ export default function LiveRoomPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
+    <div className="flex flex-col min-h-[100dvh] md:h-[100dvh] bg-zinc-950 text-zinc-100 font-sans md:overflow-hidden">
       
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 flex flex-col md:flex-row relative md:overflow-hidden">
         
         {/* Left Side: Video Viewport */}
-        <section className="flex-1 flex flex-col bg-zinc-950 p-4 md:p-6 overflow-hidden justify-center items-center relative">
+        <section className="flex-1 min-h-[300px] flex flex-col bg-zinc-950 p-4 md:p-6 justify-center items-center relative md:overflow-hidden">
           
           {/* Top-Left Floating Room Info Badge */}
           <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 flex items-center gap-2 md:gap-3">
@@ -2334,7 +2386,7 @@ export default function LiveRoomPage() {
       </div>
 
       {/* ── BOTTOM CONTROL BAR (GOOGLE MEET/TEAMS STYLE) ── */}
-      <footer className="h-16 md:h-20 bg-zinc-955 flex items-center justify-between px-3 md:px-6 border-t border-zinc-900 z-30 shrink-0 select-none">
+      <footer className="sticky bottom-0 left-0 right-0 h-16 md:h-20 bg-zinc-955 flex items-center justify-between px-3 md:px-6 border-t border-zinc-900 z-30 shrink-0 select-none">
         
         {/* Left Column: Room clock and code */}
         <div className="hidden lg:flex items-center gap-4 text-sm font-medium text-zinc-400 min-w-[180px]">
@@ -2344,7 +2396,7 @@ export default function LiveRoomPage() {
         </div>
 
         {/* Center Column: Control Circle Buttons */}
-        <div className="flex items-center gap-1.5 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-center">
+        <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
           
           {/* Mute Mic (Broadcaster or Student) */}
           <Button
@@ -2516,9 +2568,16 @@ export default function LiveRoomPage() {
             <Button
               className="bg-red-600 hover:bg-red-750 text-white rounded-full px-3 md:px-5 py-2 h-10 md:h-12 gap-1.5 md:gap-2 border border-red-500/20 font-semibold shadow-lg shadow-red-600/10 shrink-0"
               onClick={handleEndStream}
+              disabled={isUploadingRecording}
             >
-              <PhoneOff className="h-4 w-4 md:h-5 md:w-5" />
-              <span className="hidden sm:inline">End Class</span>
+              {isUploadingRecording ? (
+                <Clock className="h-4 w-4 md:h-5 md:w-5 animate-spin" />
+              ) : (
+                <PhoneOff className="h-4 w-4 md:h-5 md:w-5" />
+              )}
+              <span className="hidden sm:inline">
+                {isUploadingRecording ? "Uploading..." : "End Class"}
+              </span>
             </Button>
           ) : (
             <Button
@@ -2634,6 +2693,15 @@ export default function LiveRoomPage() {
       </footer>
 
       {isTeacher && <InviteDialog open={showInvite} onClose={() => setShowInvite(false)} liveClass={classItem} />}
+
+      {/* Uploading Overlay */}
+      {isUploadingRecording && (
+        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center flex-col text-white">
+          <Clock className="w-16 h-16 text-indigo-500 animate-spin mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Saving Recording...</h2>
+          <p className="text-zinc-400 max-w-sm text-center">Please do not close this tab while your class recording is being uploaded to the cloud.</p>
+        </div>
+      )}
     </div>
   );
 }

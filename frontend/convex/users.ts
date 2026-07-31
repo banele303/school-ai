@@ -92,6 +92,9 @@ export const getUsers = query({
             code: s.code,
             grade: s.grade,
           })),
+          linkedStudents: u.linkedStudents || [],
+          assignedTeachers: u.assignedTeachers || [],
+          assignedStudents: u.assignedStudents || [],
         };
       })
     );
@@ -157,6 +160,9 @@ export const updateUser = mutation({
     studentClass: v.optional(v.id("classes")),
     studentSubjects: v.optional(v.array(v.id("subjects"))),
     teacherSubject: v.optional(v.array(v.id("subjects"))),
+    linkedStudents: v.optional(v.array(v.id("users"))),
+    assignedTeachers: v.optional(v.array(v.id("users"))),
+    assignedStudents: v.optional(v.array(v.id("users"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -177,7 +183,7 @@ export const updateUser = mutation({
     const targetUser = await ctx.db.get(args.id);
     if (!targetUser) throw new Error("User not found");
 
-    const { id, studentClass, teacherSubject, ...updates } = args;
+    const { id, studentClass, teacherSubject, linkedStudents, assignedTeachers, assignedStudents, ...updates } = args;
 
     const cleanStudentClass = studentClass && (studentClass as string).trim() !== "" ? studentClass : undefined;
     const cleanTeacherSubject = teacherSubject && teacherSubject.length > 0 ? teacherSubject : undefined;
@@ -188,6 +194,15 @@ export const updateUser = mutation({
     }
     if (teacherSubject !== undefined) {
       patchData.teacherSubject = cleanTeacherSubject;
+    }
+    if (linkedStudents !== undefined) {
+      patchData.linkedStudents = linkedStudents;
+    }
+    if (assignedTeachers !== undefined) {
+      patchData.assignedTeachers = assignedTeachers;
+    }
+    if (assignedStudents !== undefined) {
+      patchData.assignedStudents = assignedStudents;
     }
 
     await ctx.db.patch(id, patchData);
@@ -236,6 +251,71 @@ export const updateUser = mutation({
           const currentTeachers = sub.teacher || [];
           if (!currentTeachers.includes(id as any)) {
             await ctx.db.patch(sub._id, { teacher: [...currentTeachers, id as any] });
+          }
+        }
+      }
+    }
+
+    // Bidirectional sync for user links
+    if (linkedStudents !== undefined) {
+      // Parents linking to students (Parent -> Student)
+      const oldLinks: string[] = targetUser.linkedStudents || [];
+      const newLinks: string[] = linkedStudents;
+      
+      const removed = oldLinks.filter(sId => !newLinks.includes(sId));
+      const added = newLinks.filter(sId => !oldLinks.includes(sId));
+      
+      // Update parents array in student if it exists (not strictly required if we just query, but good for completeness if we add assignedParents later)
+      // Actually we don't have assignedParents, we just use linkedStudents on Parent.
+    }
+
+    if (assignedTeachers !== undefined) {
+      // Students linking to teachers
+      const oldTeachers: string[] = targetUser.assignedTeachers || [];
+      const newTeachers: string[] = assignedTeachers;
+      
+      const removed = oldTeachers.filter(tId => !newTeachers.includes(tId));
+      const added = newTeachers.filter(tId => !oldTeachers.includes(tId));
+      
+      for (const tId of removed) {
+        const teacher: any = await ctx.db.get(tId as any);
+        if (teacher) {
+          const currentStudents = teacher.assignedStudents || [];
+          await ctx.db.patch(teacher._id, { assignedStudents: currentStudents.filter((s: any) => s !== id) });
+        }
+      }
+      for (const tId of added) {
+        const teacher: any = await ctx.db.get(tId as any);
+        if (teacher) {
+          const currentStudents = teacher.assignedStudents || [];
+          if (!currentStudents.includes(id)) {
+            await ctx.db.patch(teacher._id, { assignedStudents: [...currentStudents, id] });
+          }
+        }
+      }
+    }
+
+    if (assignedStudents !== undefined) {
+      // Teachers linking to students
+      const oldStudents: string[] = targetUser.assignedStudents || [];
+      const newStudents: string[] = assignedStudents;
+      
+      const removed = oldStudents.filter(sId => !newStudents.includes(sId));
+      const added = newStudents.filter(sId => !oldStudents.includes(sId));
+      
+      for (const sId of removed) {
+        const student: any = await ctx.db.get(sId as any);
+        if (student) {
+          const currentTeachers = student.assignedTeachers || [];
+          await ctx.db.patch(student._id, { assignedTeachers: currentTeachers.filter((t: any) => t !== id) });
+        }
+      }
+      for (const sId of added) {
+        const student: any = await ctx.db.get(sId as any);
+        if (student) {
+          const currentTeachers = student.assignedTeachers || [];
+          if (!currentTeachers.includes(id)) {
+            await ctx.db.patch(student._id, { assignedTeachers: [...currentTeachers, id] });
           }
         }
       }

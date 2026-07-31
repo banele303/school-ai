@@ -28,7 +28,10 @@ export default defineSchema({
     studentClass: v.optional(v.id("classes")),
     studentSubjects: v.optional(v.array(v.id("subjects"))),
     teacherSubject: v.optional(v.array(v.id("subjects"))),
-    linkedStudent: v.optional(v.id("users")), // for parents
+    linkedStudent: v.optional(v.id("users")), // legacy
+    linkedStudents: v.optional(v.array(v.id("users"))), // for parents linking to children
+    assignedTeachers: v.optional(v.array(v.id("users"))), // for students
+    assignedStudents: v.optional(v.array(v.id("users"))), // for teachers
     bio: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()),
   }).index("email", ["email"]),

@@ -39,6 +39,9 @@ const createSchema = (type: FormType) => {
           : z.string().min(2, "Name is required"),
       classId: z.string().optional(),
       subjectIds: z.array(z.string()).optional(),
+      linkedStudents: z.array(z.string()).optional(),
+      assignedTeachers: z.array(z.string()).optional(),
+      assignedStudents: z.array(z.string()).optional(),
       email: z.string().email("Invalid email address"),
       role: z.string().optional(),
       password:
@@ -89,6 +92,9 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
       password: "",
       classId: undefined,
       subjectIds: [],
+      linkedStudents: [],
+      assignedTeachers: [],
+      assignedStudents: [],
     },
   });
 
@@ -100,6 +106,14 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   const convexSubjects = useQuery(
     api.subjects.getSubjects,
     shouldFetch ? {} : "skip"
+  );
+  const convexStudents = useQuery(
+    api.users.getUsers,
+    shouldFetch ? { role: "student" } : "skip"
+  );
+  const convexTeachers = useQuery(
+    api.users.getUsers,
+    shouldFetch ? { role: "teacher" } : "skip"
   );
   const { signIn } = useAuthActions();
   const createAdminUser = useMutation(api.adminUsers.createUserAdmin);
@@ -187,6 +201,9 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
             role: (data.role || role || "student") as UserRole,
             classId: cleanClassId as any,
             subjectIds: cleanSubjectIds as any,
+            linkedStudents: data.linkedStudents as any,
+            assignedTeachers: data.assignedTeachers as any,
+            assignedStudents: data.assignedStudents as any,
           });
           toast.success("User created successfully.");
           if (onSuccess) onSuccess();
@@ -201,8 +218,12 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
         if (data.role === "student") {
           updatePayload.studentClass = cleanClassId as any;
           updatePayload.studentSubjects = cleanSubjectIds as any;
+          updatePayload.assignedTeachers = data.assignedTeachers as any;
         } else if (data.role === "teacher") {
           updatePayload.teacherSubject = cleanSubjectIds as any;
+          updatePayload.assignedStudents = data.assignedStudents as any;
+        } else if (data.role === "parent") {
+          updatePayload.linkedStudents = data.linkedStudents as any;
         }
         await updateConvexUser(updatePayload);
         toast.success("User updated successfully");
@@ -237,6 +258,16 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
         }))
       : [];
 
+  const studentOptions = 
+    Array.isArray(convexStudents) && convexStudents.length > 0
+      ? convexStudents.map((s) => ({ label: `${s.name} (${s.email})`, value: s._id }))
+      : [];
+
+  const teacherOptions = 
+    Array.isArray(convexTeachers) && convexTeachers.length > 0
+      ? convexTeachers.map((t) => ({ label: `${t.name} (${t.email})`, value: t._id }))
+      : [];
+
   const roleOptions = [
     { label: "Student", value: "student" },
     { label: "Teacher", value: "teacher" },
@@ -247,8 +278,10 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
   const pending = form.formState.isSubmitting;
   const showRoleSelector = !isLogin;
   const showClassSelector = !isLogin && selectedRole === "student";
-  // Admins can assign subjects to both teachers and students
   const showSubjectSelector = !isLogin && (selectedRole === "teacher" || selectedRole === "student");
+  const showLinkedStudents = !isLogin && selectedRole === "parent";
+  const showAssignedTeachers = !isLogin && selectedRole === "student";
+  const showAssignedStudents = !isLogin && selectedRole === "teacher";
 
   return (
     <div className="space-y-6">
@@ -340,6 +373,39 @@ const UniversalUserForm = ({ type, initialData, onSuccess, role }: Props) => {
               placeholder={loadingOptions ? "Loading subjects..." : "Select Subjects"}
               options={subjectOptions}
               disabled={loadingOptions || pending}
+            />
+          )}
+
+          {showLinkedStudents && (
+            <CustomMultiSelect
+              control={form.control}
+              name="linkedStudents"
+              label="Linked Children (Students)"
+              placeholder={convexStudents === undefined ? "Loading..." : "Select Students"}
+              options={studentOptions}
+              disabled={convexStudents === undefined || pending}
+            />
+          )}
+
+          {showAssignedTeachers && (
+            <CustomMultiSelect
+              control={form.control}
+              name="assignedTeachers"
+              label="Assigned Teachers (1-on-1)"
+              placeholder={convexTeachers === undefined ? "Loading..." : "Select Teachers"}
+              options={teacherOptions}
+              disabled={convexTeachers === undefined || pending}
+            />
+          )}
+
+          {showAssignedStudents && (
+            <CustomMultiSelect
+              control={form.control}
+              name="assignedStudents"
+              label="Assigned Students (1-on-1)"
+              placeholder={convexStudents === undefined ? "Loading..." : "Select Students"}
+              options={studentOptions}
+              disabled={convexStudents === undefined || pending}
             />
           )}
         </div>

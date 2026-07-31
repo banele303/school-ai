@@ -78,6 +78,12 @@ export default function VideoLibraryPage() {
 
   const handlePlayVideo = async (video: any) => {
     if (video.videoType === "cloudflare-live") {
+      if (video.recordingUrl) {
+        setNowPlaying({ ...video, videoType: "cloudflare", videoUrl: video.recordingUrl });
+        void incrementView({ videoId: video._id });
+        return;
+      }
+
       setResolvingVideoId(video._id);
       try {
         const recordings = await getLiveInputRecordings(video.streamInputId);
@@ -85,6 +91,7 @@ export default function VideoLibraryPage() {
         
         if (readyRecording) {
           setNowPlaying({ ...video, videoType: "cloudflare", videoUrl: readyRecording.iframeUrl });
+          void incrementView({ videoId: video._id });
         } else if (recordings && recordings.length > 0) {
           toast.info("Recording is still processing. Please check back later.");
         } else {

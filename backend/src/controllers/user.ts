@@ -16,6 +16,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role,
       studentClass,
       teacherSubject,
+      parents,
+      children,
+      assignedTeachers,
+      assignedStudents,
       isActive,
     } = req.body;
 
@@ -35,6 +39,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role,
       studentClass,
       teacherSubject,
+      parents,
+      children,
+      assignedTeachers,
+      assignedStudents,
       isActive,
     });
 
@@ -55,6 +63,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         isActive: newUser.isActive,
         studentClass: newUser.studentClass,
         teacherSubject: newUser.teacherSubject,
+        parents: newUser.parents,
+        children: newUser.children,
+        assignedTeachers: newUser.assignedTeachers,
+        assignedStudents: newUser.assignedStudents,
         message: "User registered successfully",
       });
     } else {
@@ -100,6 +112,10 @@ export const updateUser = async (req: Request, res: Response) => {
         req.body.isActive !== undefined ? req.body.isActive : user.isActive;
       user.studentClass = req.body.studentClass || user.studentClass;
       user.teacherSubject = req.body.teacherSubject || user.teacherSubject;
+      user.parents = req.body.parents || user.parents;
+      user.children = req.body.children || user.children;
+      user.assignedTeachers = req.body.assignedTeachers || user.assignedTeachers;
+      user.assignedStudents = req.body.assignedStudents || user.assignedStudents;
       if (req.body.password) {
         user.password = req.body.password;
       }
@@ -124,6 +140,10 @@ export const updateUser = async (req: Request, res: Response) => {
         isActive: updatedUser.isActive,
         studentClass: updatedUser.studentClass,
         teacherSubject: updatedUser.teacherSubject,
+        parents: updatedUser.parents,
+        children: updatedUser.children,
+        assignedTeachers: updatedUser.assignedTeachers,
+        assignedStudents: updatedUser.assignedStudents,
         message: "User updated successfully",
       });
     } else {
