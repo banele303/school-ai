@@ -994,27 +994,42 @@ export const getLiveClassParticipants = query({
             });
           }
         }
-        return participants;
+      }
+    } else {
+      // Fallback: if no class assigned, just return the active ones in the room
+      for (const record of attendance) {
+        if (record.leftAt !== undefined) continue;
+        const student = await ctx.db.get(record.student);
+        if (student) {
+          participants.push({
+            studentId: student._id,
+            name: student.name || student.email || "Student",
+            email: student.email || "",
+            isOnline: true,
+            isMuted: record.isMuted ?? false,
+            isCameraBlocked: record.isCameraBlocked ?? false,
+            canShareScreen: record.canShareScreen ?? false,
+            requestedScreenShare: record.requestedScreenShare ?? false,
+          });
+        }
       }
     }
 
-    // Fallback: if no class assigned, just return the active ones in the room
-    for (const record of attendance) {
-      if (record.leftAt !== undefined) continue;
-      const student = await ctx.db.get(record.student);
-      if (student) {
-        participants.push({
-          studentId: student._id,
-          name: student.name || student.email || "Student",
-          email: student.email || "",
-          isOnline: true,
-          isMuted: record.isMuted ?? false,
-          isCameraBlocked: record.isCameraBlocked ?? false,
-          canShareScreen: record.canShareScreen ?? false,
-          requestedScreenShare: record.requestedScreenShare ?? false,
-        });
-      }
+    // Ensure the teacher is in the participants list so they receive WebRTC audio offers
+    const teacherDoc = await ctx.db.get(liveClass.teacher);
+    if (teacherDoc && !participants.find((p) => p.studentId === teacherDoc._id)) {
+      participants.push({
+        studentId: teacherDoc._id,
+        name: teacherDoc.name || teacherDoc.email || "Teacher",
+        email: teacherDoc.email || "",
+        isOnline: liveClass.status === "live",
+        isMuted: false,
+        isCameraBlocked: false,
+        canShareScreen: true,
+        requestedScreenShare: false,
+      });
     }
+
     return participants;
   },
 });
