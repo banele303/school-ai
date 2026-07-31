@@ -2489,12 +2489,12 @@ export default function LiveRoomPage() {
         </div>
 
         {/* Center Column: Control Circle Buttons */}
-        {classItem?.status !== "ended" ? (
-          <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
-            
-            {/* Mute Mic (Broadcaster or Student) */}
-            <Button
-              variant="ghost"
+        <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
+          {classItem?.status !== "ended" && (
+            <>
+              {/* Mute Mic (Broadcaster or Student) */}
+              <Button
+                variant="ghost"
             size="icon"
             className={cn(
               "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
@@ -2656,8 +2656,7 @@ export default function LiveRoomPage() {
               </div>
             )}
           </div>
-        ) : (
-          <div className="flex-1" />
+          </>
         )}
 
           {/* Red Hang Up / End Class / Leave Class Button */}
