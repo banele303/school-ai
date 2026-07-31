@@ -1961,16 +1961,39 @@ export default function LiveRoomPage() {
               </div>
             )}
 
-            {/* Small floating video for student's local webcam feed if camera is on */}
-            {!isCreator && !myBlockCameraStatus && (
-              <div className="absolute bottom-4 right-4 w-28 h-20 md:w-36 md:h-24 rounded-xl border border-zinc-800 overflow-hidden shadow-xl z-30 bg-zinc-950">
-                <video
-                  ref={studentLocalVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
+            {/* Small floating video for student's local webcam feed */}
+            {!isCreator && (
+              <div className="absolute bottom-4 right-4 w-28 h-20 md:w-36 md:h-24 rounded-xl border border-zinc-800 overflow-hidden shadow-xl z-30 bg-zinc-950 flex items-center justify-center">
+                {!myBlockCameraStatus ? (
+                  <video
+                    ref={studentLocalVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                ) : (
+                  <div className="text-zinc-500 flex flex-col items-center">
+                    <VideoOff className="h-6 w-6 md:h-8 md:w-8 mb-1 opacity-50" />
+                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-50">Camera Off</span>
+                  </div>
+                )}
+                
+                {/* Status Overlays inside the mini video box */}
+                <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 flex gap-1 md:gap-1.5">
+                  <div className={cn(
+                    "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    myMuteStatus ? "bg-red-600/90 text-white" : "bg-zinc-900/60 text-green-400 border border-white/10"
+                  )} title={myMuteStatus ? "Microphone is muted" : "Microphone is active"}>
+                    {myMuteStatus ? <MicOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <Mic className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                  </div>
+                  <div className={cn(
+                    "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    myBlockCameraStatus ? "bg-red-600/90 text-white" : "bg-zinc-900/60 text-green-400 border border-white/10"
+                  )} title={myBlockCameraStatus ? "Camera is off" : "Camera is active"}>
+                    {myBlockCameraStatus ? <VideoOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <VideoIcon className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                  </div>
+                </div>
               </div>
             )}
 
