@@ -1241,7 +1241,12 @@ export default function LiveRoomPage() {
 
         try {
           recordedChunksRef.current = [];
-          const recorder = new MediaRecorder(localStreamRef.current, { mimeType: 'video/webm' });
+          let options;
+          if (typeof MediaRecorder.isTypeSupported === 'function') {
+            if (MediaRecorder.isTypeSupported('video/webm')) options = { mimeType: 'video/webm' };
+            else if (MediaRecorder.isTypeSupported('video/mp4')) options = { mimeType: 'video/mp4' };
+          }
+          const recorder = new MediaRecorder(localStreamRef.current, options);
           recorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
               recordedChunksRef.current.push(e.data);
@@ -1280,15 +1285,23 @@ export default function LiveRoomPage() {
         setIsUploadingRecording(true);
         toast.info("Uploading class recording. Please don't close this tab...");
         
-        mediaRecorderRef.current.stop();
+        await new Promise<void>((resolve) => {
+          if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.onstop = () => resolve();
+            mediaRecorderRef.current.stop();
+          } else {
+            resolve();
+          }
+          // Fallback timeout in case onstop doesn't fire
+          setTimeout(resolve, 1500);
+        });
         
-        // Wait a brief moment for final chunks
-        await new Promise(r => setTimeout(r, 500));
-        
-        if (recordedChunksRef.current.length > 0) {
+        if (recordedChunksRef.current.length > 0 && mediaRecorderRef.current) {
           try {
-            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-            const file = new File([blob], `${classItem?.title || 'Live Class'} Recording.webm`, { type: 'video/webm' });
+            const mimeType = mediaRecorderRef.current.mimeType || 'video/webm';
+            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+            const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+            const file = new File([blob], `${classItem?.title || 'Live Class'} Recording.${ext}`, { type: mimeType });
             
             const { uid, uploadURL } = await createStreamDirectUpload({
               name: `${classItem?.title || 'Live Class'} Recording`,
