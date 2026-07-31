@@ -1339,22 +1339,67 @@ export default function LiveRoomPage() {
   };
 
   // Toggle local Audio/Video trackers (Teacher)
-  const toggleMute = () => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+  const toggleMute = async () => {
+    if (isMuted) {
+      try {
+        const constraints = { audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true };
+        const stream = await getUserMediaSafe(constraints);
+        const newTrack = stream.getAudioTracks()[0];
+        if (localStreamRef.current) {
+          localStreamRef.current.getAudioTracks().forEach(t => {
+            t.stop();
+            localStreamRef.current?.removeTrack(t);
+          });
+          localStreamRef.current.addTrack(newTrack);
+        } else {
+          localStreamRef.current = new MediaStream([newTrack]);
+        }
+        if (whipPcRef.current) {
+          const sender = whipPcRef.current.getSenders().find(s => s.track?.kind === 'audio');
+          if (sender) sender.replaceTrack(newTrack);
+        }
+        setIsMuted(false);
+      } catch (err: any) {
+        toast.error(`Mic error: ${err.message}`);
+      }
+    } else {
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach(t => t.stop());
+        setIsMuted(true);
       }
     }
   };
 
-  const toggleVideo = () => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
+  const toggleVideo = async () => {
+    if (isVideoOff) {
+      try {
+        const constraints = { video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true };
+        const stream = await getUserMediaSafe(constraints);
+        const newTrack = stream.getVideoTracks()[0];
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach(t => {
+            t.stop();
+            localStreamRef.current?.removeTrack(t);
+          });
+          localStreamRef.current.addTrack(newTrack);
+        } else {
+          localStreamRef.current = new MediaStream([newTrack]);
+        }
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+        if (whipPcRef.current) {
+          const sender = whipPcRef.current.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) sender.replaceTrack(newTrack);
+        }
+        setIsVideoOff(false);
+      } catch (err: any) {
+        toast.error(`Camera error: ${err.message}`);
+      }
+    } else {
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach(t => t.stop());
+        setIsVideoOff(true);
       }
     }
   };
