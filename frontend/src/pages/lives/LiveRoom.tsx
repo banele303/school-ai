@@ -16,7 +16,7 @@ import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, PhoneOff, 
   Send, Users, MessageSquare, Settings, Volume2, VolumeX, 
   Clock, ArrowLeft, AlertCircle, Play, CheckCircle, Hand,
-  Presentation, Smile, Subtitles
+  Presentation, Smile, Subtitles, LogOut
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
