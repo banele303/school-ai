@@ -1779,9 +1779,19 @@ export default function LiveRoomPage() {
                     />
                   )
                 ) : (
-                  <div className="text-center text-zinc-300 p-6 font-medium">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-450">Recording is being processed. Please check back shortly.</p>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/80 text-center p-6 backdrop-blur-sm z-30">
+                  <div className="bg-zinc-800/80 p-4 rounded-full mb-4 ring-4 ring-zinc-800/40 shadow-xl">
+                    <Clock className="w-8 h-8 text-sky-400 animate-pulse" />
                   </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Class has ended</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-450">
+                    {!classItem?.recordingUrl 
+                      ? "No recording is available for this class."
+                      : resolvingRecording 
+                        ? "Recording is being processed. Please check back shortly." 
+                        : "Recording could not be found."}
+                  </p>
+                </div>
                 )}
               </div>
             ) : (isCreator || isScreenSharing) ? (
@@ -1799,17 +1809,19 @@ export default function LiveRoomPage() {
                 
                 {/* Mute / Camera Off Overlays */}
                 <div className="absolute top-4 right-4 md:top-6 md:right-6 flex flex-col gap-2 md:gap-3 z-20">
-                  {isMuted && (
-                    <div className="p-2 md:p-2.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center bg-red-600/90 text-white" title="Microphone is muted">
-                      <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" />
-                    </div>
-                  )}
+                  <div className={cn(
+                    "p-2 md:p-2.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    isMuted ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
+                  )} title={isMuted ? "Microphone is muted" : "Microphone is active"}>
+                    {isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+                  </div>
 
-                  {isVideoOff && (
-                    <div className="p-2 md:p-2.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center bg-red-600/90 text-white" title="Camera is off">
-                      <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" />
-                    </div>
-                  )}
+                  <div className={cn(
+                    "p-2 md:p-2.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    isVideoOff ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
+                  )} title={isVideoOff ? "Camera is off" : "Camera is active"}>
+                    {isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
+                  </div>
                 </div>
                 {/* Local status labels */}
                 <div className="absolute bottom-6 left-6 flex gap-2 z-10">
@@ -1979,16 +1991,18 @@ export default function LiveRoomPage() {
                 
                 {/* Status Overlays inside the mini video box */}
                 <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 flex gap-1 md:gap-1.5 z-40">
-                  {myMuteStatus && (
-                    <div className="p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center bg-red-600/90 text-white" title="Microphone is muted">
-                      <MicOff className="h-3 w-3 md:h-3.5 md:w-3.5" />
-                    </div>
-                  )}
-                  {myBlockCameraStatus && (
-                    <div className="p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center bg-red-600/90 text-white" title="Camera is off">
-                      <VideoOff className="h-3 w-3 md:h-3.5 md:w-3.5" />
-                    </div>
-                  )}
+                  <div className={cn(
+                    "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    myMuteStatus ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
+                  )} title={myMuteStatus ? "Microphone is muted" : "Microphone is active"}>
+                    {myMuteStatus ? <MicOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <Mic className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                  </div>
+                  <div className={cn(
+                    "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
+                    myBlockCameraStatus ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
+                  )} title={myBlockCameraStatus ? "Camera is off" : "Camera is active"}>
+                    {myBlockCameraStatus ? <VideoOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <VideoIcon className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                  </div>
                 </div>
               </div>
             )}
@@ -2490,8 +2504,7 @@ export default function LiveRoomPage() {
 
         {/* Center Column: Control Circle Buttons */}
         <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
-          {classItem?.status !== "ended" && (
-            <>
+
               {/* Mute Mic (Broadcaster or Student) */}
               <Button
                 variant="ghost"
@@ -2656,8 +2669,6 @@ export default function LiveRoomPage() {
               </div>
             )}
           </div>
-          </>
-        )}
 
           {/* Red Hang Up / End Class / Leave Class Button */}
           {classItem?.status === "ended" ? (
