@@ -96,7 +96,7 @@ export default function LiveRoomPage() {
   const [devices, setDevices] = useState<{ video: MediaDeviceInfo[]; audio: MediaDeviceInfo[] }>({ video: [], audio: [] });
   const [selectedVideoDevice, setSelectedVideoDevice] = useState("");
   const [selectedAudioDevice, setSelectedAudioDevice] = useState("");
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(typeof window !== "undefined" ? window.innerWidth >= 768 : true);
   const [showReactionsMenu, setShowReactionsMenu] = useState(false);
   const [timeStr, setTimeStr] = useState("");
   const [isCcEnabled, setIsCcEnabled] = useState(false);
@@ -1690,7 +1690,7 @@ export default function LiveRoomPage() {
       <div className="flex-1 flex flex-col md:flex-row relative md:overflow-hidden">
         
         {/* Left Side: Video Viewport */}
-        <section className="flex-1 min-h-[300px] flex flex-col bg-zinc-950 p-4 md:p-6 justify-center items-center relative md:overflow-hidden">
+        <section className="flex-1 min-h-[40vh] md:min-h-[300px] flex flex-col bg-black md:bg-zinc-950 p-0 sm:p-2 md:p-6 justify-center items-center relative md:overflow-hidden">
           
           {/* Top-Left Floating Room Info Badge */}
           <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 flex items-center gap-2 md:gap-3">
@@ -1719,7 +1719,7 @@ export default function LiveRoomPage() {
           </div>
 
           {/* Video Arena Viewport */}
-          <div className="w-full h-full rounded-2xl overflow-hidden bg-zinc-900/60 border border-zinc-900 relative shadow-2xl group flex items-center justify-center">
+          <div className="w-full h-full sm:rounded-2xl overflow-hidden bg-black sm:bg-zinc-900/60 sm:border border-zinc-900 relative shadow-2xl group flex items-center justify-center">
             
             {/* Muted or Camera Blocked Alert overlay */}
             {(myMuteStatus || myBlockCameraStatus) && (
