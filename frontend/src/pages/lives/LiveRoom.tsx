@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -48,7 +48,6 @@ export default function LiveRoomPage() {
   const updateStatus = useMutation(api.liveClasses.updateLiveClassStatus);
   const sendReaction = useMutation(api.liveClasses.sendReaction);
   const recentReactions = useQuery(api.liveClasses.getRecentReactions, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
-  // getReactionStats query is currently unused in the UI
 
   const approvalStatus = useQuery(api.liveClasses.getApprovalStatus, targetClassId ? { liveClassId: targetClassId as any } : "skip");
   const pendingApprovals = useQuery(api.liveClasses.getPendingApprovals, targetClassId ? { liveClassId: targetClassId as any } : "skip") || [];
@@ -105,12 +104,17 @@ export default function LiveRoomPage() {
   const [resolvingRecording, setResolvingRecording] = useState(false);
   const [speakingStudents, setSpeakingStudents] = useState<string[]>([]);
 
+  // ── FIX: Separate local state for student mic/video so icon updates immediately ──
+  const [studentMicOn, setStudentMicOn] = useState(false);
+  const [studentVideoOn, setStudentVideoOn] = useState(false);
+
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const studentStreamRef = useRef<MediaStream | null>(null);
+  const studentAudioStreamRef = useRef<MediaStream | null>(null);
+  const studentVideoStreamRef = useRef<MediaStream | null>(null);
   const studentLocalVideoRef = useRef<HTMLVideoElement>(null);
   const prevRaisedCountRef = useRef(0);
   const hlsPlayerRef = useRef<Hls | null>(null);
@@ -128,6 +132,12 @@ export default function LiveRoomPage() {
   const candidateQueuesRef = useRef<Map<string, any[]>>(new Map());
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const processedSignalIdsRef = useRef<Set<string>>(new Set());
+
+  // ── Keep a ref to classItem for use in cleanup callbacks ──
+  const classItemRef = useRef<any>(null);
+  useEffect(() => {
+    classItemRef.current = classItem;
+  }, [classItem]);
 
   // Mobile Audio Constraints Helper
   const getMobileAudioConstraints = (selectedDeviceId?: string): MediaTrackConstraints | boolean => {
@@ -362,7 +372,8 @@ export default function LiveRoomPage() {
       if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
         console.warn("Student WHEP connection disconnected/failed, retrying in 2s...");
         setTimeout(() => {
-          if (studentPcRef.current === pc && classItem && classItem.status === "live") {
+          const ci = classItemRef.current;
+          if (studentPcRef.current === pc && ci && ci.status === "live") {
             setupStudentPlayer();
           }
         }, 2000);
@@ -499,6 +510,9 @@ export default function LiveRoomPage() {
       joinLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
 
       const handleUnload = () => {
+        // ── FIX: Stop student media on page unload to prevent dangling tracks ──
+        stopStudentAudioInternal();
+        stopStudentVideoInternal();
         leaveLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
       };
       window.addEventListener("beforeunload", handleUnload);
@@ -626,30 +640,31 @@ export default function LiveRoomPage() {
   // Setup Student Video Player (Cloudflare WHEP WebRTC or HLS playback)
   const setupStudentPlayer = async () => {
     teardownStudentPlayer();
-    if (!remoteVideoRef.current || !classItem) return;
+    if (!remoteVideoRef.current || !classItemRef.current) return;
+    const ci = classItemRef.current;
 
-    if (classItem.whepUrl) {
+    if (ci.whepUrl) {
       try {
-        await playWhep(classItem.whepUrl);
+        await playWhep(ci.whepUrl);
         toast.success("Connected to live classroom WebRTC stream.");
         return;
       } catch (err: any) {
         console.error("WHEP playback failed, trying HLS fallback:", err);
         // Try HLS fallback temporarily
-        if (classItem.playbackUrl) {
-          playHls(classItem.playbackUrl);
+        if (ci.playbackUrl) {
+          playHls(ci.playbackUrl);
         }
         // Always schedule background WebRTC reconnect when WHEP fails
         if (whepTimeoutRef.current) clearTimeout(whepTimeoutRef.current);
         whepTimeoutRef.current = setTimeout(() => {
-          retryWhepInBackground(classItem.whepUrl!);
+          retryWhepInBackground(ci.whepUrl!);
         }, 3000);
         return;
       }
     }
 
-    if (classItem.playbackUrl) {
-      playHls(classItem.playbackUrl);
+    if (ci.playbackUrl) {
+      playHls(ci.playbackUrl);
       return;
     }
 
@@ -659,7 +674,8 @@ export default function LiveRoomPage() {
 
   // Reconnect WHEP client in the background without interrupting HLS playback
   const retryWhepInBackground = async (whepUrl: string) => {
-    if (!classItem || classItem.status !== "live") return;
+    const ci = classItemRef.current;
+    if (!ci || ci.status !== "live") return;
 
     console.log("Attempting background WHEP reconnection...");
     const pc = new RTCPeerConnection({
@@ -844,128 +860,191 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Student specific media track setup with Mobile Audio Optimization & WebRTC Signal Exchange
-  const startStudentMedia = async (needAudio: boolean, needVideo: boolean) => {
-    try {
-      const deviceList = await navigator.mediaDevices.enumerateDevices();
-      const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
-      const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
+  // ── FIX: Internal stop helpers that don't touch server state ──
 
-      const audioConstraints = getMobileAudioConstraints(selectedAudioDevice);
-      const constraints: MediaStreamConstraints = {
-        audio: needAudio && hasAudioInput ? audioConstraints : false,
-        video: needVideo && hasVideoInput ? (selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true) : false,
-      };
-
-      if (!constraints.audio && !constraints.video) {
-        stopStudentAudio();
-        stopStudentVideoOnly();
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      studentStreamRef.current = stream;
-
-      if (studentLocalVideoRef.current) {
-        studentLocalVideoRef.current.srcObject = stream;
-      }
-
-      // If student is unmuting microphone and broadcasting audio, set up WebRTC connections
-      if (needAudio && !isCreator) {
-        const audioTrack = stream.getAudioTracks()[0];
-        if (audioTrack) {
-          mySendPeersRef.current.forEach(pc => pc.close());
-          mySendPeersRef.current.clear();
-
-          for (const p of participants) {
-            const targetId = p.studentId || p.userId;
-            if (!targetId || targetId === user?._id) continue;
-
-            const pc = new RTCPeerConnection({
-              iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-              ]
-            });
-            mySendPeersRef.current.set(targetId, pc);
-
-            pc.addTrack(audioTrack, stream);
-
-            pc.onicecandidate = (event) => {
-              if (event.candidate) {
-                sendWebRtcSignal({
-                  liveClassId: targetClassId as any,
-                  targetUserId: targetId,
-                  signalType: "candidate",
-                  candidate: JSON.stringify(event.candidate),
-                }).catch(console.error);
-              }
-            };
-
-            pc.createOffer().then(offer => {
-              pc.setLocalDescription(offer).then(() => {
-                sendWebRtcSignal({
-                  liveClassId: targetClassId as any,
-                  targetUserId: targetId,
-                  signalType: "offer",
-                  sdp: offer.sdp,
-                }).catch(console.error);
-              });
-            });
-          }
-          console.log("Sent WebRTC audio offers to participants.");
-        }
-      }
-    } catch (err: any) {
-      console.error("Student media capture failed:", err);
-      toast.error(`Media capture failed: ${err.message}`);
-    }
-  };
-
-  const stopStudentAudio = () => {
-    if (studentStreamRef.current) {
-      studentStreamRef.current.getAudioTracks().forEach(t => t.stop());
+  const stopStudentAudioInternal = useCallback(() => {
+    if (studentAudioStreamRef.current) {
+      studentAudioStreamRef.current.getAudioTracks().forEach(t => t.stop());
+      studentAudioStreamRef.current = null;
     }
     mySendPeersRef.current.forEach(pc => pc.close());
     mySendPeersRef.current.clear();
-  };
+  }, []);
 
-  const stopStudentVideoOnly = () => {
-    if (studentStreamRef.current) {
-      studentStreamRef.current.getVideoTracks().forEach(t => t.stop());
+  const stopStudentVideoInternal = useCallback(() => {
+    if (studentVideoStreamRef.current) {
+      studentVideoStreamRef.current.getVideoTracks().forEach(t => t.stop());
+      studentVideoStreamRef.current = null;
     }
     if (studentLocalVideoRef.current) {
       studentLocalVideoRef.current.srcObject = null;
     }
-  };
+  }, []);
 
-  const toggleStudentMic = async () => {
-    if (!targetClassId || !user?._id) return;
-    try {
-      const res = await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
-      if (!res.isMuted) {
-        await startStudentMedia(true, !myBlockCameraStatus);
-      } else {
-        stopStudentAudio();
+  // ── FIX: Build a list of target user IDs that includes the teacher ──
+  const getAudioTargetIds = useCallback(() => {
+    const ids: string[] = [];
+    // Add all online participants (other students)
+    for (const p of participants) {
+      const pid = (p as any).studentId || (p as any).userId;
+      if (pid && pid !== user?._id) {
+        ids.push(pid);
       }
-      toast.success(res.isMuted ? "Microphone muted" : "Microphone unmuted");
+    }
+    // ── KEY FIX: Also send to the teacher/creator so they can hear students ──
+    const teacherId = classItemRef.current?.teacher;
+    if (teacherId && teacherId !== user?._id && !ids.includes(teacherId)) {
+      ids.push(teacherId);
+    }
+    return ids;
+  }, [participants, user?._id]);
+
+  // ── FIX: Student audio-only start (independent from video) ──
+  const startStudentAudio = async () => {
+    try {
+      const deviceList = await navigator.mediaDevices.enumerateDevices();
+      const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
+      if (!hasAudioInput) throw new Error("No microphone found.");
+
+      const audioConstraints = getMobileAudioConstraints(selectedAudioDevice);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+      studentAudioStreamRef.current = stream;
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (!audioTrack) throw new Error("Failed to capture audio track.");
+
+      // Close any existing send peers
+      mySendPeersRef.current.forEach(pc => pc.close());
+      mySendPeersRef.current.clear();
+
+      const targetIds = getAudioTargetIds();
+      console.log("Starting audio send peers to:", targetIds);
+
+      for (const targetId of targetIds) {
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+          ]
+        });
+        mySendPeersRef.current.set(targetId, pc);
+
+        pc.addTrack(audioTrack, stream);
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            sendWebRtcSignal({
+              liveClassId: targetClassId as any,
+              targetUserId: targetId as any,
+              signalType: "candidate",
+              candidate: JSON.stringify(event.candidate),
+            }).catch(console.error);
+          }
+        };
+
+        pc.createOffer().then(offer => {
+          pc.setLocalDescription(offer).then(() => {
+            sendWebRtcSignal({
+              liveClassId: targetClassId as any,
+              targetUserId: targetId as any,
+              signalType: "offer",
+              sdp: offer.sdp,
+            }).catch(console.error);
+          });
+        });
+      }
+      console.log(`Sent WebRTC audio offers to ${targetIds.length} targets (including teacher).`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to toggle microphone.");
+      console.error("Student audio capture failed:", err);
+      throw err;
     }
   };
 
+  // ── FIX: Student video-only start (independent from audio) ──
+  const startStudentVideo = async () => {
+    try {
+      const deviceList = await navigator.mediaDevices.enumerateDevices();
+      const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
+      if (!hasVideoInput) throw new Error("No camera found.");
+
+      const videoConstraint = selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: false });
+      studentVideoStreamRef.current = stream;
+
+      if (studentLocalVideoRef.current) {
+        // Combine with existing audio if mic is on
+        if (studentAudioStreamRef.current) {
+          const combined = new MediaStream([
+            ...stream.getVideoTracks(),
+            ...studentAudioStreamRef.current.getAudioTracks()
+          ]);
+          studentLocalVideoRef.current.srcObject = combined;
+        } else {
+          studentLocalVideoRef.current.srcObject = stream;
+        }
+      }
+    } catch (err: any) {
+      console.error("Student video capture failed:", err);
+      throw err;
+    }
+  };
+
+  // ── FIX: Toggle student mic - purely audio, doesn't touch video ──
+  const toggleStudentMic = async () => {
+    if (!targetClassId || !user?._id) return;
+    try {
+      // Optimistically update the icon immediately
+      const nextMicOn = !studentMicOn;
+
+      if (nextMicOn) {
+        // Start audio first, then update server
+        await startStudentAudio();
+        setStudentMicOn(true);
+        // Tell server we're unmuted
+        await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
+        toast.success("Microphone unmuted");
+      } else {
+        // Stop audio immediately, icon updates right away
+        stopStudentAudioInternal();
+        setStudentMicOn(false);
+        // Tell server we're muted
+        await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
+        toast.success("Microphone muted");
+      }
+    } catch (err: any) {
+      // Revert optimistic update on failure
+      console.error("Mic toggle failed:", err);
+      toast.error(err.message || "Failed to toggle microphone.");
+      // Re-sync with actual stream state
+      setStudentMicOn(!!studentAudioStreamRef.current?.getAudioTracks().some(t => t.readyState === "live"));
+    }
+  };
+
+  // ── FIX: Toggle student video - purely video, doesn't touch audio ──
   const toggleStudentVideo = async () => {
     if (!targetClassId || !user?._id) return;
     try {
-      const res = await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
-      if (!res.isCameraBlocked) {
-        await startStudentMedia(!myMuteStatus, true);
+      const nextVideoOn = !studentVideoOn;
+
+      if (nextVideoOn) {
+        // Start video first, then update server
+        await startStudentVideo();
+        setStudentVideoOn(true);
+        // Tell server camera is enabled
+        await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
+        toast.success("Camera turned on");
       } else {
-        stopStudentVideoOnly();
+        // Stop video immediately
+        stopStudentVideoInternal();
+        setStudentVideoOn(false);
+        // Tell server camera is blocked
+        await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
+        toast.success("Camera turned off");
       }
-      toast.success(res.isCameraBlocked ? "Camera turned off" : "Camera turned on");
     } catch (err: any) {
+      console.error("Video toggle failed:", err);
       toast.error(err.message || "Failed to toggle camera.");
+      setStudentVideoOn(!!studentVideoStreamRef.current?.getVideoTracks().some(t => t.readyState === "live"));
     }
   };
 
@@ -1011,7 +1090,6 @@ export default function LiveRoomPage() {
             if (!audioEl) {
               audioEl = document.createElement("audio");
               audioEl.autoplay = true;
-              audioEl.playsInline = true;
               audioEl.style.display = "none";
               document.body.appendChild(audioEl);
               audioElementsRef.current.set(senderId, audioEl);
@@ -1108,15 +1186,11 @@ export default function LiveRoomPage() {
     processSignals();
   }, [webRtcSignals, isCreator, targetClassId, user?._id]);
 
-  // Clean up student local streams & teacher audio connections on unmount
+  // ── FIX: Clean up student local streams & teacher audio connections on unmount ──
   useEffect(() => {
     return () => {
-      if (studentStreamRef.current) {
-        studentStreamRef.current.getTracks().forEach(t => t.stop());
-        studentStreamRef.current = null;
-      }
-      mySendPeersRef.current.forEach(pc => pc.close());
-      mySendPeersRef.current.clear();
+      stopStudentAudioInternal();
+      stopStudentVideoInternal();
       myRecvPeersRef.current.forEach(pc => pc.close());
       myRecvPeersRef.current.clear();
       audioElementsRef.current.forEach(el => el.remove());
@@ -1152,9 +1226,6 @@ export default function LiveRoomPage() {
     if (isCreator && !isBroadcasting && (selectedVideoDevice || selectedAudioDevice)) {
       startPreview();
     }
-    // Removed cleanup that stops tracks on dependency change, 
-    // because startPreview already stops old tracks, and we 
-    // don't want to stop tracks when isBroadcasting becomes true.
   }, [isCreator, selectedVideoDevice, selectedAudioDevice]);
 
   // Resolve recording URL dynamically if it points to live input manifest
@@ -1684,6 +1755,10 @@ export default function LiveRoomPage() {
     );
   }
 
+  // ── Determine student mic/video icon state (local state takes priority for instant feedback) ──
+  const studentMicActive = studentMicOn;
+  const studentVideoActive = studentVideoOn;
+
   return (
     <div className="flex flex-col min-h-[100dvh] md:h-[100dvh] bg-zinc-950 text-zinc-100 font-sans md:overflow-hidden">
       
@@ -1974,7 +2049,7 @@ export default function LiveRoomPage() {
             {/* Small floating video for student's local webcam feed */}
             {!isCreator && (
               <div className="absolute bottom-4 right-4 w-28 h-20 md:w-36 md:h-24 rounded-xl border border-zinc-800 overflow-hidden shadow-xl z-30 bg-zinc-950 flex items-center justify-center">
-                {!myBlockCameraStatus ? (
+                {studentVideoActive && !myBlockCameraStatus ? (
                   <video
                     ref={studentLocalVideoRef}
                     autoPlay
@@ -1991,17 +2066,18 @@ export default function LiveRoomPage() {
                 
                 {/* Status Overlays inside the mini video box */}
                 <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 flex gap-1 md:gap-1.5 z-40">
+                  {/* ── FIX: Use local studentMicActive state for instant icon feedback ── */}
                   <div className={cn(
                     "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
-                    myMuteStatus ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
-                  )} title={myMuteStatus ? "Microphone is muted" : "Microphone is active"}>
-                    {myMuteStatus ? <MicOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <Mic className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                    (!studentMicActive || myMuteStatus) ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
+                  )} title={(!studentMicActive || myMuteStatus) ? "Microphone is muted" : "Microphone is active"}>
+                    {(!studentMicActive || myMuteStatus) ? <MicOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <Mic className="h-3 w-3 md:h-3.5 md:w-3.5" />}
                   </div>
                   <div className={cn(
                     "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
-                    myBlockCameraStatus ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
-                  )} title={myBlockCameraStatus ? "Camera is off" : "Camera is active"}>
-                    {myBlockCameraStatus ? <VideoOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <VideoIcon className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                    (!studentVideoActive || myBlockCameraStatus) ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
+                  )} title={(!studentVideoActive || myBlockCameraStatus) ? "Camera is off" : "Camera is active"}>
+                    {(!studentVideoActive || myBlockCameraStatus) ? <VideoOff className="h-3 w-3 md:h-3.5 md:w-3.5" /> : <VideoIcon className="h-3 w-3 md:h-3.5 md:w-3.5" />}
                   </div>
                 </div>
               </div>
@@ -2505,38 +2581,72 @@ export default function LiveRoomPage() {
         {/* Center Column: Control Circle Buttons */}
         <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
 
-              {/* Mute Mic (Broadcaster or Student) */}
+              {/* ── FIX: Mute Mic — uses local studentMicActive state for instant icon update ── */}
               <Button
                 variant="ghost"
             size="icon"
             className={cn(
               "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
-              (isCreator ? isMuted : myMuteStatus)
-                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
-                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              isCreator
+                ? (isMuted
+                    ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700")
+                : (!studentMicActive || myMuteStatus
+                    ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700")
             )}
             onClick={isCreator ? toggleMute : toggleStudentMic}
-            title={(isCreator ? isMuted : myMuteStatus) ? "Unmute Mic" : "Mute Mic"}
+            title={
+              isCreator
+                ? (isMuted ? "Unmute Mic" : "Mute Mic")
+                : (!studentMicActive || myMuteStatus ? "Unmute Mic" : "Mute Mic")
+            }
           >
-            {(isCreator ? isMuted : myMuteStatus) ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />}
-            {(isCreator ? isMuted : myMuteStatus) && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
+            {/* ── FIX: Icon changes immediately via local state, not waiting for server ── */}
+            {isCreator
+              ? (isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />)
+              : (!studentMicActive || myMuteStatus
+                  ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" />
+                  : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />
+                )
+            }
+            {/* Red dot indicator when muted */}
+            {(isCreator ? isMuted : (!studentMicActive || myMuteStatus)) && (
+              <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />
+            )}
           </Button>
 
-          {/* Video Camera (Broadcaster or Student) */}
+          {/* ── FIX: Video Camera — uses local studentVideoActive state for instant icon update ── */}
           <Button
             variant="ghost"
             size="icon"
             className={cn(
               "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all relative shrink-0",
-              (isCreator ? isVideoOff : myBlockCameraStatus)
-                ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30" 
-                : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
+              isCreator
+                ? (isVideoOff
+                    ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700")
+                : (!studentVideoActive || myBlockCameraStatus
+                    ? "bg-red-500/20 border-red-500 text-red-505 hover:bg-red-500/30"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700")
             )}
             onClick={isCreator ? toggleVideo : toggleStudentVideo}
-            title={(isCreator ? isVideoOff : myBlockCameraStatus) ? "Turn On Camera" : "Turn Off Camera"}
+            title={
+              isCreator
+                ? (isVideoOff ? "Turn On Camera" : "Turn Off Camera")
+                : (!studentVideoActive || myBlockCameraStatus ? "Turn On Camera" : "Turn Off Camera")
+            }
           >
-            {(isCreator ? isVideoOff : myBlockCameraStatus) ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />}
-            {(isCreator ? isVideoOff : myBlockCameraStatus) && <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />}
+            {isCreator
+              ? (isVideoOff ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />)
+              : (!studentVideoActive || myBlockCameraStatus
+                  ? <VideoOff className="h-4.5 w-4.5 md:h-5 md:w-5" />
+                  : <VideoIcon className="h-4.5 w-4.5 md:h-5 md:w-5" />
+                )
+            }
+            {(isCreator ? isVideoOff : (!studentVideoActive || myBlockCameraStatus)) && (
+              <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />
+            )}
           </Button>
 
           {/* Screen Share (Broadcaster or permitted student) */}
