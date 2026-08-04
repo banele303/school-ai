@@ -104,9 +104,12 @@ export default function LiveRoomPage() {
   const [resolvingRecording, setResolvingRecording] = useState(false);
   const [speakingStudents, setSpeakingStudents] = useState<string[]>([]);
 
-  // ── FIX: Separate local state for student mic/video so icon updates immediately ──
+  // ── Separate local state for student mic/video ──
   const [studentMicOn, setStudentMicOn] = useState(false);
   const [studentVideoOn, setStudentVideoOn] = useState(false);
+
+  // ── Remote student video streams state (rendered in floating vertical list on large devices) ──
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -133,7 +136,6 @@ export default function LiveRoomPage() {
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const processedSignalIdsRef = useRef<Set<string>>(new Set());
 
-  // ── Keep a ref to classItem for use in cleanup callbacks ──
   const classItemRef = useRef<any>(null);
   useEffect(() => {
     classItemRef.current = classItem;
@@ -510,7 +512,6 @@ export default function LiveRoomPage() {
       joinLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
 
       const handleUnload = () => {
-        // ── FIX: Stop student media on page unload to prevent dangling tracks ──
         stopStudentAudioInternal();
         stopStudentVideoInternal();
         leaveLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
@@ -668,7 +669,6 @@ export default function LiveRoomPage() {
       return;
     }
 
-    // No mock fallback. If both whepUrl and playbackUrl are falsy, the UI will display a friendly placeholder.
     console.warn("No whepUrl or playbackUrl available for this live class.");
   };
 
@@ -860,20 +860,16 @@ export default function LiveRoomPage() {
     }
   };
 
-  // ── FIX: Internal stop helpers that don't touch server state ──
-
   const stopStudentAudioInternal = useCallback(() => {
     if (studentAudioStreamRef.current) {
-      studentAudioStreamRef.current.getAudioTracks().forEach(t => t.stop());
+      studentAudioStreamRef.current.getTracks().forEach(t => t.stop());
       studentAudioStreamRef.current = null;
     }
-    mySendPeersRef.current.forEach(pc => pc.close());
-    mySendPeersRef.current.clear();
   }, []);
 
   const stopStudentVideoInternal = useCallback(() => {
     if (studentVideoStreamRef.current) {
-      studentVideoStreamRef.current.getVideoTracks().forEach(t => t.stop());
+      studentVideoStreamRef.current.getTracks().forEach(t => t.stop());
       studentVideoStreamRef.current = null;
     }
     if (studentLocalVideoRef.current) {
@@ -881,17 +877,14 @@ export default function LiveRoomPage() {
     }
   }, []);
 
-  // ── FIX: Build a list of target user IDs that includes the teacher ──
   const getAudioTargetIds = useCallback(() => {
     const ids: string[] = [];
-    // Add all online participants (other students)
     for (const p of participants) {
       const pid = (p as any).studentId || (p as any).userId;
       if (pid && pid !== user?._id) {
         ids.push(pid);
       }
     }
-    // ── KEY FIX: Also send to the teacher/creator so they can hear students ──
     const teacherId = classItemRef.current?.teacher;
     if (teacherId && teacherId !== user?._id && !ids.includes(teacherId)) {
       ids.push(teacherId);
@@ -899,156 +892,191 @@ export default function LiveRoomPage() {
     return ids;
   }, [participants, user?._id]);
 
-  // ── FIX: Student audio-only start (independent from video) ──
-  const startStudentAudio = async () => {
+  // ── FIX: Unified function to capture and update student audio/video streams dynamically to peer connections ──
+  const updateStudentMediaStream = async (micTargetState: boolean, videoTargetState: boolean) => {
     try {
-      const deviceList = await navigator.mediaDevices.enumerateDevices();
-      const hasAudioInput = deviceList.some(d => d.kind === "audioinput");
-      if (!hasAudioInput) throw new Error("No microphone found.");
+      // 1. Manage Audio input stream
+      if (micTargetState && !myMuteStatus) {
+        if (!studentAudioStreamRef.current) {
+          const audioConstraints = getMobileAudioConstraints(selectedAudioDevice);
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+          studentAudioStreamRef.current = stream;
+        }
+      } else {
+        stopStudentAudioInternal();
+      }
 
-      const audioConstraints = getMobileAudioConstraints(selectedAudioDevice);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
-      studentAudioStreamRef.current = stream;
+      // 2. Manage Video input stream
+      if (videoTargetState && !myBlockCameraStatus) {
+        if (!studentVideoStreamRef.current) {
+          const videoConstraint = selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true;
+          const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: false });
+          studentVideoStreamRef.current = stream;
+        }
+      } else {
+        stopStudentVideoInternal();
+      }
 
-      const audioTrack = stream.getAudioTracks()[0];
-      if (!audioTrack) throw new Error("Failed to capture audio track.");
+      // 3. Update local viewport preview feed
+      if (studentLocalVideoRef.current) {
+        const tracks: MediaStreamTrack[] = [];
+        if (studentVideoStreamRef.current && !myBlockCameraStatus) {
+          tracks.push(...studentVideoStreamRef.current.getVideoTracks());
+        }
+        if (studentAudioStreamRef.current && !myMuteStatus) {
+          tracks.push(...studentAudioStreamRef.current.getAudioTracks());
+        }
+        if (tracks.length > 0) {
+          studentLocalVideoRef.current.srcObject = new MediaStream(tracks);
+        } else {
+          studentLocalVideoRef.current.srcObject = null;
+        }
+      }
 
-      // Close any existing send peers
-      mySendPeersRef.current.forEach(pc => pc.close());
-      mySendPeersRef.current.clear();
-
+      // 4. Distribute tracks via signaling channels
       const targetIds = getAudioTargetIds();
-      console.log("Starting audio send peers to:", targetIds);
+      const hasTracks = (!!studentAudioStreamRef.current && !myMuteStatus) || 
+                        (!!studentVideoStreamRef.current && !myBlockCameraStatus);
+
+      if (!hasTracks) {
+        mySendPeersRef.current.forEach(pc => pc.close());
+        mySendPeersRef.current.clear();
+        return;
+      }
 
       for (const targetId of targetIds) {
-        const pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-          ]
-        });
-        mySendPeersRef.current.set(targetId, pc);
+        let pc = mySendPeersRef.current.get(targetId);
+        let pcNeedsOffer = false;
 
-        pc.addTrack(audioTrack, stream);
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate) {
-            sendWebRtcSignal({
-              liveClassId: targetClassId as any,
-              targetUserId: targetId as any,
-              signalType: "candidate",
-              candidate: JSON.stringify(event.candidate),
-            }).catch(console.error);
-          }
-        };
-
-        pc.createOffer().then(offer => {
-          pc.setLocalDescription(offer).then(() => {
-            sendWebRtcSignal({
-              liveClassId: targetClassId as any,
-              targetUserId: targetId as any,
-              signalType: "offer",
-              sdp: offer.sdp,
-            }).catch(console.error);
+        if (!pc || pc.connectionState === "closed" || pc.connectionState === "failed") {
+          pc = new RTCPeerConnection({
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+            ]
           });
-        });
-      }
-      console.log(`Sent WebRTC audio offers to ${targetIds.length} targets (including teacher).`);
-    } catch (err: any) {
-      console.error("Student audio capture failed:", err);
-      throw err;
-    }
-  };
+          mySendPeersRef.current.set(targetId, pc);
+          pcNeedsOffer = true;
 
-  // ── FIX: Student video-only start (independent from audio) ──
-  const startStudentVideo = async () => {
-    try {
-      const deviceList = await navigator.mediaDevices.enumerateDevices();
-      const hasVideoInput = deviceList.some(d => d.kind === "videoinput");
-      if (!hasVideoInput) throw new Error("No camera found.");
+          pc.onicecandidate = (event) => {
+            if (event.candidate) {
+              sendWebRtcSignal({
+                liveClassId: targetClassId as any,
+                targetUserId: targetId as any,
+                signalType: "candidate",
+                candidate: JSON.stringify(event.candidate),
+              }).catch(console.error);
+            }
+          };
+        }
 
-      const videoConstraint = selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true;
-      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: false });
-      studentVideoStreamRef.current = stream;
+        // Sync Audio Track
+        const audioTrack = (!myMuteStatus && studentAudioStreamRef.current) 
+          ? studentAudioStreamRef.current.getAudioTracks()[0] 
+          : null;
+        const audioSender = pc.getSenders().find(s => s.track?.kind === "audio");
+        if (audioTrack) {
+          if (!audioSender) {
+            pc.addTrack(audioTrack, studentAudioStreamRef.current!);
+            pcNeedsOffer = true;
+          } else if (audioSender.track !== audioTrack) {
+            audioSender.replaceTrack(audioTrack);
+          }
+        } else if (audioSender) {
+          try { pc.removeTrack(audioSender); } catch {}
+          pcNeedsOffer = true;
+        }
 
-      if (studentLocalVideoRef.current) {
-        // Combine with existing audio if mic is on
-        if (studentAudioStreamRef.current) {
-          const combined = new MediaStream([
-            ...stream.getVideoTracks(),
-            ...studentAudioStreamRef.current.getAudioTracks()
-          ]);
-          studentLocalVideoRef.current.srcObject = combined;
-        } else {
-          studentLocalVideoRef.current.srcObject = stream;
+        // Sync Video Track (So other users actually see student's video)
+        const videoTrack = (!myBlockCameraStatus && studentVideoStreamRef.current) 
+          ? studentVideoStreamRef.current.getVideoTracks()[0] 
+          : null;
+        const videoSender = pc.getSenders().find(s => s.track?.kind === "video");
+        if (videoTrack) {
+          if (!videoSender) {
+            pc.addTrack(videoTrack, studentVideoStreamRef.current!);
+            pcNeedsOffer = true;
+          } else if (videoSender.track !== videoTrack) {
+            videoSender.replaceTrack(videoTrack);
+          }
+        } else if (videoSender) {
+          try { pc.removeTrack(videoSender); } catch {}
+          pcNeedsOffer = true;
+        }
+
+        if (pcNeedsOffer) {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await sendWebRtcSignal({
+            liveClassId: targetClassId as any,
+            targetUserId: targetId as any,
+            signalType: "offer",
+            sdp: offer.sdp,
+          });
         }
       }
     } catch (err: any) {
-      console.error("Student video capture failed:", err);
+      console.error("Failed to update student media stream:", err);
       throw err;
     }
   };
 
-  // ── FIX: Toggle student mic - purely audio, doesn't touch video ──
+  // Toggle student mic (independent client toggle)
   const toggleStudentMic = async () => {
     if (!targetClassId || !user?._id) return;
+    if (myMuteStatus) {
+      toast.error("You are muted by the teacher.");
+      return;
+    }
     try {
-      // Optimistically update the icon immediately
       const nextMicOn = !studentMicOn;
-
-      if (nextMicOn) {
-        // Start audio first, then update server
-        await startStudentAudio();
-        setStudentMicOn(true);
-        // Tell server we're unmuted
-        await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
-        toast.success("Microphone unmuted");
-      } else {
-        // Stop audio immediately, icon updates right away
-        stopStudentAudioInternal();
-        setStudentMicOn(false);
-        // Tell server we're muted
-        await toggleMuteStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
-        toast.success("Microphone muted");
-      }
+      await updateStudentMediaStream(nextMicOn, studentVideoOn);
+      setStudentMicOn(nextMicOn);
+      toast.success(nextMicOn ? "Microphone unmuted" : "Microphone muted");
     } catch (err: any) {
-      // Revert optimistic update on failure
-      console.error("Mic toggle failed:", err);
       toast.error(err.message || "Failed to toggle microphone.");
-      // Re-sync with actual stream state
-      setStudentMicOn(!!studentAudioStreamRef.current?.getAudioTracks().some(t => t.readyState === "live"));
     }
   };
 
-  // ── FIX: Toggle student video - purely video, doesn't touch audio ──
+  // Toggle student video (independent client toggle)
   const toggleStudentVideo = async () => {
     if (!targetClassId || !user?._id) return;
+    if (myBlockCameraStatus) {
+      toast.error("Your camera is blocked by the teacher.");
+      return;
+    }
     try {
       const nextVideoOn = !studentVideoOn;
-
-      if (nextVideoOn) {
-        // Start video first, then update server
-        await startStudentVideo();
-        setStudentVideoOn(true);
-        // Tell server camera is enabled
-        await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
-        toast.success("Camera turned on");
-      } else {
-        // Stop video immediately
-        stopStudentVideoInternal();
-        setStudentVideoOn(false);
-        // Tell server camera is blocked
-        await toggleBlockCameraStudentMutation({ liveClassId: targetClassId as any, studentId: user._id as any });
-        toast.success("Camera turned off");
-      }
+      await updateStudentMediaStream(studentMicOn, nextVideoOn);
+      setStudentVideoOn(nextVideoOn);
+      toast.success(nextVideoOn ? "Camera turned on" : "Camera turned off");
     } catch (err: any) {
-      console.error("Video toggle failed:", err);
       toast.error(err.message || "Failed to toggle camera.");
-      setStudentVideoOn(!!studentVideoStreamRef.current?.getVideoTracks().some(t => t.readyState === "live"));
     }
   };
 
-  // Process incoming WebRTC audio signaling messages for active student speakers
+  // ── Automatically mute/disable local media if teacher overrides via Convex ──
+  useEffect(() => {
+    if (!isCreator && myMuteStatus && studentMicOn) {
+      console.log("Teacher muted us. Stopping local mic track.");
+      updateStudentMediaStream(false, studentVideoOn).then(() => {
+        setStudentMicOn(false);
+        toast.warning("You have been muted by the teacher.");
+      }).catch(console.error);
+    }
+  }, [myMuteStatus, isCreator, studentMicOn, studentVideoOn]);
+
+  useEffect(() => {
+    if (!isCreator && myBlockCameraStatus && studentVideoOn) {
+      console.log("Teacher blocked our camera. Stopping local video track.");
+      updateStudentMediaStream(studentMicOn, false).then(() => {
+        setStudentVideoOn(false);
+        toast.warning("Your camera was turned off by the teacher.");
+      }).catch(console.error);
+    }
+  }, [myBlockCameraStatus, isCreator, studentMicOn, studentVideoOn]);
+
+  // Process incoming WebRTC signaling messages
   useEffect(() => {
     if (!webRtcSignals || webRtcSignals.length === 0 || !user?._id) return;
 
@@ -1070,7 +1098,7 @@ export default function LiveRoomPage() {
         const senderId = sig.sender;
 
         if (sig.signalType === "offer" && sig.sdp) {
-          console.log("Receiving audio WebRTC offer from:", senderId);
+          console.log("Receiving WebRTC offer from:", senderId);
 
           if (myRecvPeersRef.current.has(senderId)) {
             myRecvPeersRef.current.get(senderId)?.close();
@@ -1085,33 +1113,45 @@ export default function LiveRoomPage() {
           myRecvPeersRef.current.set(senderId, pc);
 
           pc.ontrack = (event) => {
-            console.log("Received audio track from:", senderId);
-            let audioEl = audioElementsRef.current.get(senderId);
-            if (!audioEl) {
-              audioEl = document.createElement("audio");
-              audioEl.autoplay = true;
-              audioEl.style.display = "none";
-              document.body.appendChild(audioEl);
-              audioElementsRef.current.set(senderId, audioEl);
-            }
+            console.log("Received remote student track from:", senderId, event.track.kind);
+            
+            if (event.track.kind === "audio") {
+              let audioEl = audioElementsRef.current.get(senderId);
+              if (!audioEl) {
+                audioEl = document.createElement("audio");
+                audioEl.autoplay = true;
+                audioEl.style.display = "none";
+                document.body.appendChild(audioEl);
+                audioElementsRef.current.set(senderId, audioEl);
+              }
 
-            const mediaStream = event.streams[0] || new MediaStream([event.track]);
-            audioEl.srcObject = mediaStream;
-            audioEl.volume = 1.0;
-            audioEl.muted = false;
+              const mediaStream = event.streams[0] || new MediaStream([event.track]);
+              audioEl.srcObject = mediaStream;
+              audioEl.volume = 1.0;
+              audioEl.muted = false;
 
-            const playAudio = () => {
-              audioEl?.play().catch((err) => {
-                console.warn("Failed to play audio track automatically:", err);
+              const playAudio = () => {
+                audioEl?.play().catch((err) => {
+                  console.warn("Failed to play audio track automatically:", err);
+                });
+              };
+
+              playAudio();
+              window.addEventListener("click", playAudio, { once: true });
+              window.addEventListener("keydown", playAudio, { once: true });
+
+              setSpeakingStudents(prev => Array.from(new Set([...prev, senderId])));
+              if (isCreator) toast.info("A student is speaking!");
+            } 
+            else if (event.track.kind === "video") {
+              // Store remote video stream in state so we can render it in a grid!
+              const stream = event.streams[0] || new MediaStream([event.track]);
+              setRemoteStreams(prev => {
+                const next = new Map(prev);
+                next.set(senderId, stream);
+                return next;
               });
-            };
-
-            playAudio();
-            window.addEventListener("click", playAudio, { once: true });
-            window.addEventListener("keydown", playAudio, { once: true });
-
-            setSpeakingStudents(prev => Array.from(new Set([...prev, senderId])));
-            if (isCreator) toast.info("A student is speaking!");
+            }
           };
 
           pc.onicecandidate = (e) => {
@@ -1186,11 +1226,29 @@ export default function LiveRoomPage() {
     processSignals();
   }, [webRtcSignals, isCreator, targetClassId, user?._id]);
 
-  // ── FIX: Clean up student local streams & teacher audio connections on unmount ──
+  // Clean up remote streams of students who went offline or left
+  useEffect(() => {
+    setRemoteStreams(prev => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const studentId of next.keys()) {
+        const p = participants.find(part => part.studentId === studentId);
+        if (!p || !p.isOnline || p.isCameraBlocked) {
+          next.delete(studentId);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [participants]);
+
+  // Clean up student local streams & teacher audio connections on unmount
   useEffect(() => {
     return () => {
       stopStudentAudioInternal();
       stopStudentVideoInternal();
+      mySendPeersRef.current.forEach(pc => pc.close());
+      mySendPeersRef.current.clear();
       myRecvPeersRef.current.forEach(pc => pc.close());
       myRecvPeersRef.current.clear();
       audioElementsRef.current.forEach(el => el.remove());
@@ -1363,7 +1421,6 @@ export default function LiveRoomPage() {
           } else {
             resolve();
           }
-          // Fallback timeout in case onstop doesn't fire
           setTimeout(resolve, 1500);
         });
         
@@ -1436,8 +1493,8 @@ export default function LiveRoomPage() {
     } else {
       if (localStreamRef.current) {
         localStreamRef.current.getAudioTracks().forEach(t => t.stop());
-        setIsMuted(true);
       }
+      setIsMuted(true);
     }
   };
 
@@ -1470,8 +1527,8 @@ export default function LiveRoomPage() {
     } else {
       if (localStreamRef.current) {
         localStreamRef.current.getVideoTracks().forEach(t => t.stop());
-        setIsVideoOff(true);
       }
+      setIsVideoOff(true);
     }
   };
 
@@ -1520,7 +1577,6 @@ export default function LiveRoomPage() {
           }
           toast.info("Switched stream back to webcam feed.");
         } else {
-          // For student, just switch back to viewing mode
           toast.info("Stopped screen sharing.");
         }
       } else {
@@ -1529,7 +1585,7 @@ export default function LiveRoomPage() {
           teardownStudentPlayer();
         }
 
-        // Capture screen share with optimized quality constraints
+        // Capture screen share
         const screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: {
             width: { ideal: 1920, max: 3840 },
@@ -1553,7 +1609,6 @@ export default function LiveRoomPage() {
 
         let combinedStream: MediaStream;
         if (isCreator) {
-          // Preserve the teacher's mic track
           const micAudioTrack = localStreamRef.current?.getAudioTracks()[0];
           const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
           if (micAudioTrack) {
@@ -1563,7 +1618,6 @@ export default function LiveRoomPage() {
           }
           combinedStream = new MediaStream(combinedTracks);
 
-          // Update local stream ref with screen video while keeping mic active
           if (localStreamRef.current) {
             localStreamRef.current.getVideoTracks().forEach(t => {
               t.stop();
@@ -1572,7 +1626,6 @@ export default function LiveRoomPage() {
             localStreamRef.current.addTrack(screenVideoTrack);
           }
         } else {
-          // For student screen sharing, just use screen video and screen audio
           const combinedTracks: MediaStreamTrack[] = [screenVideoTrack];
           if (screenAudioTrack) {
             combinedTracks.push(screenAudioTrack);
@@ -1585,7 +1638,6 @@ export default function LiveRoomPage() {
           localVideoRef.current.srcObject = screenStream;
         }
 
-        // Publish stream
         if (classItem.whipUrl) {
           await publishWhip(combinedStream, classItem.whipUrl);
           await updateStreamTimestamp({ liveClassId: targetClassId as any }).catch(console.error);
@@ -1605,7 +1657,6 @@ export default function LiveRoomPage() {
           }
 
           if (isCreator) {
-            // Switch back to webcam and mic
             const constraints = {
               video: selectedVideoDevice ? { deviceId: { exact: selectedVideoDevice } } : true,
               audio: selectedAudioDevice ? { deviceId: { exact: selectedAudioDevice } } : true,
@@ -1704,15 +1755,14 @@ export default function LiveRoomPage() {
     );
   }
 
-  // Waiting Room Logic
   const needsApproval = !isTeacher && approvalStatus?.status !== "approved";
 
   if (needsApproval) {
     return (
       <div className="flex flex-col min-h-[100dvh] md:h-[100dvh] bg-slate-50 text-slate-950 dark:bg-zinc-950 dark:text-zinc-100 font-sans md:overflow-hidden">
-        <header className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md z-10 shrink-0 dark:border-zinc-900 dark:bg-zinc-950/80">
+        <header className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md z-10 shrink-0 dark:border-zinc-900 dark:bg-zinc-955/80">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-950 dark:text-zinc-400 dark:hover:text-white" onClick={() => navigate("/lives")}>
+            <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-955 dark:text-zinc-400 dark:hover:text-white" onClick={() => navigate("/lives")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
@@ -1755,7 +1805,6 @@ export default function LiveRoomPage() {
     );
   }
 
-  // ── Determine student mic/video icon state (local state takes priority for instant feedback) ──
   const studentMicActive = studentMicOn;
   const studentVideoActive = studentVideoOn;
 
@@ -1765,13 +1814,13 @@ export default function LiveRoomPage() {
       <div className="flex-1 flex flex-col md:flex-row relative md:overflow-hidden">
         
         {/* Left Side: Video Viewport */}
-        <section className="flex-1 min-h-[40vh] md:min-h-[300px] flex flex-col bg-black md:bg-zinc-950 p-0 sm:p-2 md:p-6 justify-center items-center relative md:overflow-hidden">
+        <section className="flex-1 min-h-[40vh] md:min-h-[300px] flex flex-col bg-black md:bg-zinc-955 p-0 sm:p-2 md:p-6 justify-center items-center relative md:overflow-hidden">
           
           {/* Top-Left Floating Room Info Badge */}
           <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 flex items-center gap-2 md:gap-3">
             <div className="text-xs font-semibold text-white/90 tracking-wide px-3.5 py-2 rounded-full bg-zinc-900/80 backdrop-blur border border-zinc-800 flex items-center gap-2 shadow-lg">
               <span className="text-zinc-200">{timeStr}</span>
-              <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
               <span className="text-zinc-300 font-mono tracking-wider">{getRoomCode()}</span>
             </div>
             {classItem.status === "live" && (
@@ -1827,13 +1876,38 @@ export default function LiveRoomPage() {
               ))}
             </div>
 
+            {/* ── FIX: Floating Grid overlay for remote student video feeds on large devices ── */}
+            {remoteStreams.size > 0 && (
+              <div className="absolute right-4 top-20 bottom-20 w-44 flex flex-col gap-3.5 z-30 overflow-y-auto no-scrollbar pointer-events-auto bg-black/30 p-2 rounded-2xl backdrop-blur-sm border border-zinc-800/40">
+                {Array.from(remoteStreams.entries()).map(([studentId, stream]) => {
+                  const p = participants.find(part => part.studentId === studentId);
+                  const name = p?.name || "Student";
+                  return (
+                    <div key={studentId} className="w-full aspect-video rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-2xl relative">
+                      <video
+                        ref={(el) => {
+                          if (el && el.srcObject !== stream) el.srcObject = stream;
+                        }}
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-cover scale-x-[-1]"
+                      />
+                      <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-semibold text-white max-w-[85%] truncate">
+                        {name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* 1. REPLAY OR LIVE/PREVIEW VIEW */}
             {classItem.status === "ended" && classItem.recordingUrl ? (
               <div className="w-full h-full relative bg-black flex items-center justify-center">
                 {resolvingRecording ? (
                   <div className="text-center text-zinc-300 p-6">
                     <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Loading replay recording...</p>
+                    <p className="text-xs text-zinc-505">Loading replay recording...</p>
                   </div>
                 ) : resolvedRecordingUrl ? (
                   resolvedRecordingUrl.includes("iframe.videodelivery.net") || resolvedRecordingUrl.includes("videodelivery.net") ? (
@@ -1859,7 +1933,7 @@ export default function LiveRoomPage() {
                     <Clock className="w-8 h-8 text-sky-400 animate-pulse" />
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2">Class has ended</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-450">
+                  <p className="text-xs text-zinc-505">
                     {!classItem?.recordingUrl 
                       ? "No recording is available for this class."
                       : resolvingRecording 
@@ -1910,7 +1984,7 @@ export default function LiveRoomPage() {
                   )}
                 </div>
 
-                {/* If not broadcasting yet, show a big "Start Live Class" overlay in the middle */}
+                {/* If not broadcasting yet, show a big "Start Live Class" overlay */}
                 {isCreator && !isBroadcasting && (
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 z-10 transition-all">
                     <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-505 mb-2">
@@ -1919,11 +1993,11 @@ export default function LiveRoomPage() {
                     <div className="text-center">
                       <h4 className="text-lg font-bold text-white">Start Your Live Class</h4>
                       <p className="text-sm text-zinc-400 max-w-sm mt-1 px-4">
-                        Configure your camera/microphone and click "Go Live" below to start streaming to your students.
+                        Configure your camera/microphone and click "Go Live" below to start streaming.
                       </p>
                     </div>
                     <Button 
-                      className="bg-red-650 hover:bg-red-700 text-white rounded-xl px-6 py-2.5 h-11 gap-2 font-bold shadow-lg shadow-red-600/20 active:scale-95 transition-all mt-2"
+                      className="bg-red-650 hover:bg-red-750 text-white rounded-xl px-6 py-2.5 h-11 gap-2 font-bold shadow-lg shadow-red-600/20 active:scale-95 transition-all mt-2"
                       onClick={handleGoLive}
                     >
                       <Play className="h-4.5 w-4.5 fill-current" />
@@ -1946,7 +2020,7 @@ export default function LiveRoomPage() {
 
                     {/* Custom student overlays */}
                     <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6 flex gap-2">
-                      <Badge className="bg-zinc-950/85 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
+                      <Badge className="bg-zinc-955/85 backdrop-blur border border-zinc-800 text-zinc-300 font-normal">
                         Stream: Cloudflare Live (Sub-second WebRTC)
                       </Badge>
                     </div>
@@ -1955,14 +2029,14 @@ export default function LiveRoomPage() {
                     {isAudioMuted && (
                       <button
                         onClick={() => setIsAudioMuted(false)}
-                        className="absolute top-4 right-4 z-20 bg-red-650 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg active:scale-95 transition-all cursor-pointer animate-pulse"
+                        className="absolute top-4 right-4 z-20 bg-red-650 hover:bg-red-750 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg active:scale-95 transition-all cursor-pointer animate-pulse"
                       >
                         <VolumeX className="h-4 w-4" />
                         <span>Tap to unmute</span>
                       </button>
                     )}
 
-                    {/* Custom Player Controls (bottom bar visible on hover) */}
+                    {/* Custom Player Controls */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-955/90 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-15">
                       <div className="flex items-center gap-3">
                         <Button 
@@ -1985,7 +2059,7 @@ export default function LiveRoomPage() {
                             if (remoteVideoRef.current) remoteVideoRef.current.volume = val;
                             if (val > 0 && isAudioMuted) setIsAudioMuted(false);
                           }}
-                          className="w-20 h-1 rounded bg-zinc-700 accent-red-600 outline-none cursor-pointer"
+                          className="w-20 h-1 rounded bg-zinc-700 accent-red-605 outline-none cursor-pointer"
                         />
                       </div>
 
@@ -2005,11 +2079,6 @@ export default function LiveRoomPage() {
                     <p className="text-sm text-zinc-500 max-w-sm mt-1">
                       The class is live, but the video broadcast feed is not configured.
                     </p>
-                    {isTeacher && (
-                      <p className="text-xs text-amber-500/80 max-w-xs mt-4 bg-amber-500/5 border border-amber-500/10 px-4 py-2.5 rounded-xl">
-                        Tip: Ensure <strong>CLOUDFLARE_API_TOKEN</strong> is set in your Cloudflare Worker secrets.
-                      </p>
-                    )}
                   </div>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#201d16] via-[#16140f] to-[#0c0a07] p-6 text-center select-none">
@@ -2022,14 +2091,14 @@ export default function LiveRoomPage() {
                       <>
                         <h4 className="text-lg font-bold text-zinc-300">This class has ended</h4>
                         <p className="text-sm text-zinc-550 max-w-sm mt-1">
-                          You can find the recording in the Live Classes directory once it finishes processing.
+                          You can find the recording in the Live Classes directory.
                         </p>
                       </>
                     ) : (
                       <>
                         <h4 className="text-lg font-bold text-zinc-305">Waiting for teacher to start stream</h4>
                         <p className="text-sm text-zinc-500 max-w-sm mt-1">
-                          This class is scheduled. As soon as the teacher starts broadcasting, your player will connect automatically with sub-second WebRTC latency.
+                          The player will connect automatically with sub-second WebRTC latency once the teacher goes live.
                         </p>
                       </>
                     )}
@@ -2042,7 +2111,7 @@ export default function LiveRoomPage() {
             {isCcEnabled && (
               <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-xl border border-zinc-800 text-center max-w-xl text-sm font-light tracking-wide backdrop-blur z-20">
                 <span className="text-zinc-400 font-semibold uppercase text-[10px] block mb-1">Live Transcription</span>
-                "Welcome class! Today we're going to dive into advanced coding techniques and look at the structure of our application..."
+                "Welcome class! Today we're going to dive into advanced coding techniques..."
               </div>
             )}
 
@@ -2066,7 +2135,6 @@ export default function LiveRoomPage() {
                 
                 {/* Status Overlays inside the mini video box */}
                 <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 flex gap-1 md:gap-1.5 z-40">
-                  {/* ── FIX: Use local studentMicActive state for instant icon feedback ── */}
                   <div className={cn(
                     "p-1 md:p-1.5 rounded-full shadow-lg backdrop-blur-sm transition-all flex items-center justify-center",
                     (!studentMicActive || myMuteStatus) ? "bg-red-600/90 text-white" : "bg-emerald-500/80 text-white"
@@ -2085,7 +2153,7 @@ export default function LiveRoomPage() {
 
           </div>
 
-          {/* Teacher Device Settings Drawer overlay (shows if toggled) */}
+          {/* Teacher Device Settings Drawer overlay */}
           {isCreator && showSettings && (
             <Card className="w-full max-w-lg mt-4 bg-zinc-900 border-zinc-800 text-zinc-205 shadow-2xl z-20">
               <CardContent className="p-4 grid md:grid-cols-2 gap-4">
@@ -2105,7 +2173,7 @@ export default function LiveRoomPage() {
                 <div>
                   <Label className="text-xs text-zinc-400">Select Microphone</Label>
                   <Select value={selectedAudioDevice} onValueChange={setSelectedAudioDevice}>
-                    <SelectTrigger className="bg-zinc-950 border-zinc-800 mt-1 h-9 text-zinc-200">
+                    <SelectTrigger className="bg-zinc-955 border-zinc-800 mt-1 h-9 text-zinc-200">
                       <SelectValue placeholder="Default microphone" />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-950 border-zinc-805 text-zinc-200">
@@ -2172,7 +2240,7 @@ export default function LiveRoomPage() {
                   onClick={() => setActiveTab("waiting")}
                 >
                   Waiting ({pendingApprovals.length})
-                  {activeTab === "waiting" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
+                  {activeTab === "waiting" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-505" />}
                 </button>
               )}
             </div>
@@ -2209,9 +2277,9 @@ export default function LiveRoomPage() {
                               className={cn(
                                 "px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words shadow-sm transition-transform duration-200 scale-95 origin-bottom",
                                 isMe
-                                  ? "bg-red-600 text-white rounded-tr-none hover:bg-red-700"
+                                  ? "bg-red-600 text-white rounded-tr-none hover:bg-red-750"
                                   : isTeacherRole
-                                  ? "bg-zinc-805 border border-red-950/30 text-zinc-100 rounded-tl-none"
+                                  ? "bg-zinc-805 border border-red-955/30 text-zinc-100 rounded-tl-none"
                                   : "bg-zinc-900 border border-zinc-850 text-zinc-200 rounded-tl-none"
                               )}
                             >
@@ -2339,7 +2407,7 @@ export default function LiveRoomPage() {
                       {!isModerator && (
                         <Button 
                           variant="ghost" 
-                          className="h-6 px-2 text-[10px] font-semibold text-red-500 hover:text-red-400 hover:bg-zinc-800 rounded-md"
+                          className="h-6 px-2 text-[10px] font-semibold text-red-500 hover:text-red-404 hover:bg-zinc-800 rounded-md"
                           onClick={() => setShowRosterForStudent(!showRosterForStudent)}
                         >
                           {showRosterForStudent ? "Hide" : "View"}
@@ -2533,7 +2601,7 @@ export default function LiveRoomPage() {
                     pendingApprovals.map((req: any) => (
                       <div key={req._id} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-sm">
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <div className="h-8 w-8 rounded-full bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400 font-bold shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-indigo-955 border border-indigo-800 flex items-center justify-center text-indigo-400 font-bold shrink-0">
                             {req.studentName.charAt(0).toUpperCase()}
                           </div>
                           <p className="text-sm font-semibold text-zinc-200 truncate">
@@ -2544,7 +2612,7 @@ export default function LiveRoomPage() {
                           <Button 
                             variant="outline" 
                             size="icon" 
-                            className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-950/20 border-zinc-800"
+                            className="h-8 w-8 text-green-500 hover:text-green-404 hover:bg-green-950/20 border-zinc-800"
                             onClick={() => approveStudentMutation({ approvalId: req._id, status: "approved" })}
                           >
                             <CheckCircle className="h-4 w-4" />
@@ -2581,7 +2649,7 @@ export default function LiveRoomPage() {
         {/* Center Column: Control Circle Buttons */}
         <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-1 flex-1 md:flex-initial justify-start sm:justify-center px-1">
 
-              {/* ── FIX: Mute Mic — uses local studentMicActive state for instant icon update ── */}
+              {/* Mute Mic (Broadcaster or Student) */}
               <Button
                 variant="ghost"
             size="icon"
@@ -2602,7 +2670,6 @@ export default function LiveRoomPage() {
                 : (!studentMicActive || myMuteStatus ? "Unmute Mic" : "Mute Mic")
             }
           >
-            {/* ── FIX: Icon changes immediately via local state, not waiting for server ── */}
             {isCreator
               ? (isMuted ? <MicOff className="h-4.5 w-4.5 md:h-5 md:w-5" /> : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />)
               : (!studentMicActive || myMuteStatus
@@ -2610,13 +2677,12 @@ export default function LiveRoomPage() {
                   : <Mic className="h-4.5 w-4.5 md:h-5 md:w-5" />
                 )
             }
-            {/* Red dot indicator when muted */}
             {(isCreator ? isMuted : (!studentMicActive || myMuteStatus)) && (
               <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-yellow-500 border border-zinc-950" />
             )}
           </Button>
 
-          {/* ── FIX: Video Camera — uses local studentVideoActive state for instant icon update ── */}
+          {/* Video Camera (Broadcaster or Student) */}
           <Button
             variant="ghost"
             size="icon"
@@ -2667,7 +2733,7 @@ export default function LiveRoomPage() {
             </Button>
           )}
 
-          {/* Request Screen Share Button (Student who does not have permission yet) */}
+          {/* Request Screen Share Button */}
           {!isModerator && !myCanShareScreen && (
             <Button
               variant="ghost"
@@ -2675,8 +2741,8 @@ export default function LiveRoomPage() {
               className={cn(
                 "h-10 w-10 md:h-12 md:w-12 rounded-full border transition-all shrink-0 relative",
                 myRequestedScreenShare
-                  ? "bg-amber-500/20 border-amber-500 text-amber-500 animate-pulse" 
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 hover:border-zinc-700"
+                  ? "bg-amber-500/20 border-amber-500 text-amber-550 animate-pulse" 
+                  : "bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-700"
               )}
               onClick={async () => {
                 if (myRequestedScreenShare) return;
@@ -2687,7 +2753,7 @@ export default function LiveRoomPage() {
                   toast.error(err.message || "Failed to request screen share.");
                 }
               }}
-              title={myRequestedScreenShare ? "Screen Share Requested (Awaiting Teacher Approval)" : "Request to Share Screen"}
+              title={myRequestedScreenShare ? "Screen Share Requested (Awaiting Approval)" : "Request to Share Screen"}
             >
               <Monitor className="h-4.5 w-4.5 md:h-5 md:w-5" />
               {myRequestedScreenShare && (
@@ -2696,7 +2762,7 @@ export default function LiveRoomPage() {
             </Button>
           )}
 
-          {/* Whiteboard Button (Opens whiteboard in a new tab) */}
+          {/* Whiteboard Button */}
           <Button
             variant="ghost"
             size="icon"
@@ -2877,14 +2943,14 @@ export default function LiveRoomPage() {
             >
               <Clock className="h-4.5 w-4.5 md:h-5 md:w-5" />
               {pendingApprovals.length > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-indigo-600 text-[8px] font-bold text-white rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-indigo-650 text-[8px] font-bold text-white rounded-full flex items-center justify-center animate-pulse border border-zinc-950">
                   {pendingApprovals.length}
                 </span>
               )}
             </Button>
           )}
 
-          {/* Host Device Settings (Teacher only) */}
+          {/* Host Device Settings */}
           {isCreator && (
             <Button
               variant="ghost"
@@ -2900,7 +2966,7 @@ export default function LiveRoomPage() {
             </Button>
           )}
 
-          {/* Invite dialog button (Teacher only) */}
+          {/* Invite dialog button */}
           {isTeacher && (
             <Button
               variant="ghost"
@@ -2921,7 +2987,7 @@ export default function LiveRoomPage() {
 
       {/* Uploading Overlay */}
       {isUploadingRecording && (
-        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center flex-col text-white">
+        <div className="fixed inset-0 bg-zinc-955/80 backdrop-blur-sm z-50 flex items-center justify-center flex-col text-white">
           <Clock className="w-16 h-16 text-indigo-500 animate-spin mb-4" />
           <h2 className="text-2xl font-bold mb-2">Saving Recording...</h2>
           <p className="text-zinc-400 max-w-sm text-center">Please do not close this tab while your class recording is being uploaded to the cloud.</p>
