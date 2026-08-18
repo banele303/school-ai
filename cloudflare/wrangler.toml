@@ -16,11 +16,35 @@ index_name = "edunexus-materials"
 [ai]
 binding = "AI"
 
-# Environment Variables
+# Environment Variables (non-secret, safe to commit)
 [vars]
 CONVEX_URL = ""
 R2_PUBLIC_URL = "https://pub-edunexus.r2.dev"
 
-# Secrets to set via CLI:
-# wrangler secret put GEMINI_API_KEY
-# wrangler secret put GEMINI_SA_JSON
+# ─────────────────────────────────────────────────────────────────────────────
+# Secrets — set via Wrangler CLI (NEVER commit these):
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# AI:
+#   wrangler secret put GEMINI_API_KEY
+#   wrangler secret put GEMINI_SA_JSON
+#
+# Cloudflare Stream (for live WHIP/WHEP broadcasting):
+#   wrangler secret put CF_ACCOUNT_ID       ← Your Cloudflare Account ID
+#   wrangler secret put CF_STREAM_TOKEN     ← API Token with Stream:Edit permission
+#
+# Cloudflare TURN (for reliable WebRTC across all networks — fixes "can't hear" bug):
+#   wrangler secret put TURN_KEY_ID         ← From dash.cloudflare.com → Realtime → TURN
+#   wrangler secret put TURN_KEY_API_TOKEN  ← API token for that TURN key
+#
+# Cloudflare Calls SFU (optional - for multi-party SFU instead of mesh):
+#   wrangler secret put CALLS_APP_ID        ← From dash.cloudflare.com → Calls
+#   wrangler secret put CALLS_APP_SECRET    ← App secret for that Calls app
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# How to find your Cloudflare Account ID:
+#   1. Go to dash.cloudflare.com
+#   2. Click any domain or go to "Workers & Pages"
+#   3. Scroll down the right sidebar — your Account ID is there
+# ─────────────────────────────────────────────────────────────────────────────
+

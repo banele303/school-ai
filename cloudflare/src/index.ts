@@ -9,6 +9,15 @@ export interface Env {
   GEMINI_API_KEY?: string;
   GEMINI_SA_JSON?: string;
   R2_PUBLIC_URL?: string;
+  // ─── Cloudflare Account & Stream ───────────────────────────────
+  CF_ACCOUNT_ID?: string;
+  CF_STREAM_TOKEN?: string;
+  // ─── Cloudflare Calls SFU ───────────────────────────────────────
+  CALLS_APP_ID?: string;
+  CALLS_APP_SECRET?: string;
+  // ─── Cloudflare TURN ────────────────────────────────────────────
+  TURN_KEY_ID?: string;
+  TURN_KEY_API_TOKEN?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -575,6 +584,360 @@ app.post("/api/vector/query", async (c) => {
     });
 
     return c.json({ matches: results.matches });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE TURN CREDENTIALS ────────────────────────────────
+// Proxies TURN credential generation so API keys never reach browser.
+// Frontend calls this on every room join to get short-lived ICE credentials.
+app.post("/api/turn/credentials", async (c) => {
+  const turnKeyId = c.env.TURN_KEY_ID;
+  const turnToken = c.env.TURN_KEY_API_TOKEN;
+
+  if (!turnKeyId || !turnToken) {
+    // Return free public TURN/STUN fallback when CF TURN is not configured
+    return c.json({
+      iceServers: [
+        { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+        {
+          urls: [
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turns:openrelay.metered.ca:443",
+          ],
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+      ],
+      _source: "public_fallback",
+    });
+  }
+
+  try {
+    const res = await fetch(
+      `https://rtc.live.cloudflare.com/v1/turn/keys/${turnKeyId}/credentials/generate-ice-servers`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${turnToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ttl: 86400 }),
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("TURN credential generation failed:", errText);
+      // Fall back to public TURN on error
+      return c.json({
+        iceServers: [
+          { urls: ["stun:stun.l.google.com:19302"] },
+          {
+            urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+        ],
+        _source: "public_fallback_on_error",
+      });
+    }
+
+    const data = await res.json() as any;
+    return c.json({ ...data, _source: "cloudflare_turn" });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE STREAM: CREATE LIVE INPUT (WHIP/WHEP) ──────────
+// Creates a Cloudflare Stream Live Input. Returns WHIP, WHEP, playback URLs.
+// The teacher uses WHIP to broadcast; students use WHEP to receive.
+app.post("/api/live/create-input", async (c) => {
+  const accountId = c.env.CF_ACCOUNT_ID;
+  const streamToken = c.env.CF_STREAM_TOKEN;
+
+  if (!accountId || !streamToken) {
+    return c.json({
+      error: "Cloudflare Stream not configured. Set CF_ACCOUNT_ID and CF_STREAM_TOKEN secrets.",
+      _unconfigured: true,
+    }, 503);
+  }
+
+  try {
+    const { title, preferLowLatency } = await c.req.json() as any;
+
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/live_inputs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${streamToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          meta: { name: title || "EduNexus Live Class" },
+          recording: { mode: "automatic", requireSignedURLs: false },
+          preferLowLatency: preferLowLatency ?? true,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const errData = await res.json() as any;
+      console.error("Cloudflare Stream live input creation failed:", errData);
+      return c.json({ error: errData?.errors?.[0]?.message || "Failed to create live input" }, res.status as any);
+    }
+
+    const data = await res.json() as any;
+    const result = data.result;
+
+    return c.json({
+      uid: result.uid,
+      rtmpsUrl: result.rtmps?.url,
+      streamKey: result.rtmps?.streamKey,
+      srtUrl: result.srt?.url,
+      srtStreamId: result.srt?.streamId,
+      srtPassphrase: result.srt?.passphrase,
+      whipUrl: result.webRTC?.url,
+      whepUrl: result.webRTCPlayback?.url,
+      playbackUrl: result.playback?.hls,
+      iframeUrl: result.playback?.iframe,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE STREAM: GET LIVE INPUT RECORDINGS ───────────────
+app.get("/api/live/input/:uid/recordings", async (c) => {
+  const accountId = c.env.CF_ACCOUNT_ID;
+  const streamToken = c.env.CF_STREAM_TOKEN;
+
+  if (!accountId || !streamToken) {
+    return c.json([], 200); // Return empty instead of erroring
+  }
+
+  try {
+    const uid = c.req.param("uid");
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/live_inputs/${uid}/videos`,
+      {
+        headers: { Authorization: `Bearer ${streamToken}` },
+      }
+    );
+
+    if (!res.ok) {
+      return c.json([], 200);
+    }
+
+    const data = await res.json() as any;
+    const videos = (data.result || []).map((v: any) => ({
+      uid: v.uid,
+      status: v.status?.state,
+      duration: v.duration,
+      playbackUrl: v.playback?.hls,
+      iframeUrl: v.playback?.iframe,
+      thumbnail: v.thumbnail,
+      created: v.created,
+    }));
+    return c.json(videos);
+  } catch (error: any) {
+    return c.json([], 200);
+  }
+});
+
+// ─── CLOUDFLARE STREAM: DIRECT UPLOAD (for video files) ────────
+app.post("/api/stream/direct-upload", async (c) => {
+  const accountId = c.env.CF_ACCOUNT_ID;
+  const streamToken = c.env.CF_STREAM_TOKEN;
+
+  if (!accountId || !streamToken) {
+    return c.json({ error: "Cloudflare Stream not configured" }, 503);
+  }
+
+  try {
+    const { name, creator, maxDurationSeconds } = await c.req.json() as any;
+
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/direct_upload`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${streamToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          maxDurationSeconds: maxDurationSeconds ?? 3600,
+          meta: { name: name || "EduNexus Video" },
+          creator: creator || undefined,
+          requireSignedURLs: false,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const errData = await res.json() as any;
+      return c.json({ error: errData?.errors?.[0]?.message || "Failed to create upload" }, res.status as any);
+    }
+
+    const data = await res.json() as any;
+    return c.json({
+      uid: data.result?.uid,
+      uploadURL: data.result?.uploadURL,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE CALLS SFU: CREATE SESSION ───────────────────────
+// Each participant needs their own Session (= RTCPeerConnection on the SFU).
+app.post("/api/calls/session", async (c) => {
+  const appId = c.env.CALLS_APP_ID;
+  const appSecret = c.env.CALLS_APP_SECRET;
+
+  if (!appId || !appSecret) {
+    return c.json({ error: "Cloudflare Calls not configured. Set CALLS_APP_ID and CALLS_APP_SECRET." }, 503);
+  }
+
+  try {
+    const res = await fetch(
+      `https://rtc.live.cloudflare.com/v1/apps/${appId}/sessions/new`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${appSecret}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = await res.json() as any;
+    return c.json(data);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE CALLS SFU: PUSH LOCAL TRACKS ────────────────────
+// Called after teacher/student has a MediaStream and SDP offer ready.
+app.post("/api/calls/tracks/push", async (c) => {
+  const appId = c.env.CALLS_APP_ID;
+  const appSecret = c.env.CALLS_APP_SECRET;
+
+  if (!appId || !appSecret) return c.json({ error: "Calls not configured" }, 503);
+
+  try {
+    const { sessionId, sdp, tracks } = await c.req.json() as any;
+
+    const res = await fetch(
+      `https://rtc.live.cloudflare.com/v1/apps/${appId}/sessions/${sessionId}/tracks/new`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${appSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionDescription: { type: "offer", sdp },
+          tracks: tracks.map((t: any) => ({ location: "local", mid: t.mid, trackName: t.trackName })),
+        }),
+      }
+    );
+
+    const data = await res.json() as any;
+    return c.json(data);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE CALLS SFU: PULL REMOTE TRACKS ───────────────────
+// Called when a participant wants to receive another participant's audio/video.
+app.post("/api/calls/tracks/pull", async (c) => {
+  const appId = c.env.CALLS_APP_ID;
+  const appSecret = c.env.CALLS_APP_SECRET;
+
+  if (!appId || !appSecret) return c.json({ error: "Calls not configured" }, 503);
+
+  try {
+    const { mySessionId, remoteTracks } = await c.req.json() as any;
+    // remoteTracks: [{ sessionId, trackName }]
+
+    const res = await fetch(
+      `https://rtc.live.cloudflare.com/v1/apps/${appId}/sessions/${mySessionId}/tracks/new`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${appSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tracks: remoteTracks.map((t: any) => ({
+            location: "remote",
+            sessionId: t.sessionId,
+            trackName: t.trackName,
+          })),
+        }),
+      }
+    );
+
+    const data = await res.json() as any;
+    return c.json(data);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE CALLS SFU: RENEGOTIATE ──────────────────────────
+// Required after pulling remote tracks when requiresImmediateRenegotiation=true.
+app.post("/api/calls/renegotiate", async (c) => {
+  const appId = c.env.CALLS_APP_ID;
+  const appSecret = c.env.CALLS_APP_SECRET;
+
+  if (!appId || !appSecret) return c.json({ error: "Calls not configured" }, 503);
+
+  try {
+    const { sessionId, sdp } = await c.req.json() as any;
+
+    const res = await fetch(
+      `https://rtc.live.cloudflare.com/v1/apps/${appId}/sessions/${sessionId}/renegotiate`,
+      {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${appSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionDescription: { type: "answer", sdp } }),
+      }
+    );
+
+    const data = await res.json() as any;
+    return c.json(data);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ─── CLOUDFLARE CALLS SFU: CLOSE TRACKS (force-mute) ────────────
+// Teacher calls this to forcefully remove a student's audio track from the SFU.
+app.post("/api/calls/tracks/close", async (c) => {
+  const appId = c.env.CALLS_APP_ID;
+  const appSecret = c.env.CALLS_APP_SECRET;
+
+  if (!appId || !appSecret) return c.json({ error: "Calls not configured" }, 503);
+
+  try {
+    const { sessionId, tracks, sdp } = await c.req.json() as any;
+
+    const res = await fetch(
+      `https://rtc.live.cloudflare.com/v1/apps/${appId}/sessions/${sessionId}/tracks/close`,
+      {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${appSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tracks,
+          sessionDescription: sdp ? { type: "offer", sdp } : undefined,
+        }),
+      }
+    );
+
+    const data = await res.json() as any;
+    return c.json(data);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

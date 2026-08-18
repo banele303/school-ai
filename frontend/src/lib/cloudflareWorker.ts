@@ -1,6 +1,57 @@
 export const CLOUDFLARE_WORKER_URL =
   import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://edunexus-ai.edusqwizooor.workers.dev";
 
+// ─── TURN / ICE Server Credentials ──────────────────────────────────────────
+// Fetches short-lived TURN credentials from the worker (never exposes API keys).
+// Call this once per room join and cache the result for the session lifetime.
+// Falls back to public TURN servers if Cloudflare TURN is not configured.
+export interface TurnCredentials {
+  iceServers: RTCIceServer[];
+  _source?: string;
+}
+
+let _cachedTurnCredentials: TurnCredentials | null = null;
+let _turnCredentialsFetchTime = 0;
+const TURN_CACHE_DURATION_MS = 4 * 60 * 60 * 1000; // 4 hours (ttl is 24h)
+
+export async function getTurnCredentials(): Promise<TurnCredentials> {
+  const now = Date.now();
+  // Return cached credentials if still fresh
+  if (_cachedTurnCredentials && now - _turnCredentialsFetchTime < TURN_CACHE_DURATION_MS) {
+    return _cachedTurnCredentials;
+  }
+
+  try {
+    const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/turn/credentials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!res.ok) throw new Error(`TURN credential fetch failed: ${res.status}`);
+
+    const data: TurnCredentials = await res.json();
+    _cachedTurnCredentials = data;
+    _turnCredentialsFetchTime = now;
+    console.log(`[TURN] Credentials loaded from: ${data._source ?? "unknown"}`);
+    return data;
+  } catch (err) {
+    console.warn("[TURN] Failed to fetch credentials, using Google STUN only:", err);
+    // Minimal fallback — still better than nothing
+    return {
+      iceServers: [
+        { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+      ],
+      _source: "fallback_stun_only",
+    };
+  }
+}
+
+export function clearTurnCache() {
+  _cachedTurnCredentials = null;
+  _turnCredentialsFetchTime = 0;
+}
+
+
 export interface UploadResult {
   fileUrl: string;
   objectKey: string;

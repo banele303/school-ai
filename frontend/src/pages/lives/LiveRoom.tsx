@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@/hooks/AuthProvider";
 import Hls from "hls.js";
 import InviteDialog from "./InviteDialog";
-import { createStreamLiveInput, getLiveInputRecordings, createStreamDirectUpload, uploadVideoToStream } from "@/lib/cloudflareWorker";
+import { createStreamLiveInput, getLiveInputRecordings, createStreamDirectUpload, uploadVideoToStream, getTurnCredentials, clearTurnCache } from "@/lib/cloudflareWorker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -136,6 +136,11 @@ export default function LiveRoomPage() {
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const processedSignalIdsRef = useRef<Set<string>>(new Set());
 
+  // TURN / ICE server credentials ref — populated on mount, used in ALL RTCPeerConnections
+  const iceServersRef = useRef<RTCIceServer[]>([
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  ]);
+
   const classItemRef = useRef<any>(null);
   useEffect(() => {
     classItemRef.current = classItem;
@@ -156,6 +161,20 @@ export default function LiveRoomPage() {
     return base;
   };
 
+  // Fetch TURN credentials on mount — critical for cross-network connectivity
+  useEffect(() => {
+    getTurnCredentials().then((creds) => {
+      iceServersRef.current = creds.iceServers;
+      console.log("[LiveRoom] TURN credentials ready, ICE servers:", creds.iceServers.length, "| source:", creds._source);
+    }).catch((err) => {
+      console.warn("[LiveRoom] TURN credential fetch failed, falling back to STUN only:", err);
+    });
+
+    return () => {
+      clearTurnCache();
+    };
+  }, []);
+
   // Mobile Browser AudioContext Gesture Unlocker (iOS Safari / Chrome Mobile)
   useEffect(() => {
     const unlockAudio = () => {
@@ -170,6 +189,12 @@ export default function LiveRoomPage() {
       } catch (e) {
         console.warn("AudioContext unlock failed:", e);
       }
+      // Also try playing all pending audio elements
+      audioElementsRef.current.forEach((el) => {
+        if (el.paused) {
+          el.play().catch(() => {});
+        }
+      });
     };
 
     window.addEventListener("touchstart", unlockAudio, { once: true });
@@ -268,18 +293,14 @@ export default function LiveRoomPage() {
     }
   };
 
-  // WebRTC WHIP publisher (Teacher)
+  // WebRTC WHIP publisher (Teacher) — uses TURN for cross-network reliability
   const publishWhip = async (stream: MediaStream, whipUrl: string) => {
     if (whipPcRef.current) {
       whipPcRef.current.close();
     }
 
     const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302"
-        }
-      ]
+      iceServers: iceServersRef.current,
     });
     whipPcRef.current = pc;
 
@@ -352,18 +373,14 @@ export default function LiveRoomPage() {
     }));
   };
 
-  // WebRTC WHEP subscriber (Student)
+  // WebRTC WHEP subscriber (Student) — uses TURN for cross-network reliability
   const playWhep = async (whepUrl: string) => {
     if (studentPcRef.current) {
       studentPcRef.current.close();
     }
 
     const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302"
-        }
-      ]
+      iceServers: iceServersRef.current,
     });
     studentPcRef.current = pc;
 
@@ -679,11 +696,7 @@ export default function LiveRoomPage() {
 
     console.log("Attempting background WHEP reconnection...");
     const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302"
-        }
-      ]
+      iceServers: iceServersRef.current,
     });
 
     let isConnected = false;
@@ -950,10 +963,7 @@ export default function LiveRoomPage() {
 
         if (!pc || pc.connectionState === "closed" || pc.connectionState === "failed") {
           pc = new RTCPeerConnection({
-            iceServers: [
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-            ]
+            iceServers: iceServersRef.current,
           });
           mySendPeersRef.current.set(targetId, pc);
           pcNeedsOffer = true;
@@ -1105,10 +1115,7 @@ export default function LiveRoomPage() {
           }
 
           const pc = new RTCPeerConnection({
-            iceServers: [
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-            ]
+            iceServers: iceServersRef.current,
           });
           myRecvPeersRef.current.set(senderId, pc);
 
@@ -1120,7 +1127,9 @@ export default function LiveRoomPage() {
               if (!audioEl) {
                 audioEl = document.createElement("audio");
                 audioEl.autoplay = true;
+                audioEl.playsInline = true;
                 audioEl.style.display = "none";
+                // Must be in DOM for iOS Safari to play
                 document.body.appendChild(audioEl);
                 audioElementsRef.current.set(senderId, audioEl);
               }
@@ -1130,15 +1139,27 @@ export default function LiveRoomPage() {
               audioEl.volume = 1.0;
               audioEl.muted = false;
 
-              const playAudio = () => {
-                audioEl?.play().catch((err) => {
-                  console.warn("Failed to play audio track automatically:", err);
-                });
+              const playAudio = async () => {
+                if (!audioEl) return;
+                try {
+                  await audioEl.play();
+                } catch (err: any) {
+                  if (err?.name === "NotAllowedError") {
+                    // Autoplay blocked — retry on next user gesture
+                    const retryOnGesture = () => {
+                      audioEl?.play().catch(() => {});
+                      window.removeEventListener("click", retryOnGesture);
+                      window.removeEventListener("touchstart", retryOnGesture);
+                    };
+                    window.addEventListener("click", retryOnGesture, { once: true });
+                    window.addEventListener("touchstart", retryOnGesture, { once: true });
+                  } else if (err?.name !== "AbortError") {
+                    console.warn("Failed to play audio track automatically:", err);
+                  }
+                }
               };
 
               playAudio();
-              window.addEventListener("click", playAudio, { once: true });
-              window.addEventListener("keydown", playAudio, { once: true });
 
               setSpeakingStudents(prev => Array.from(new Set([...prev, senderId])));
               if (isCreator) toast.info("A student is speaking!");
