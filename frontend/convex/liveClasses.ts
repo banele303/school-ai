@@ -408,11 +408,6 @@ export const joinLiveClass = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
-    const user = await ctx.db.get(userId);
-    if (user?.role !== "student") {
-      throw new Error("Only students can join live classes");
-    }
-
     const liveClass = await ctx.db.get(args.liveClassId);
     if (!liveClass) throw new Error("Live class not found");
 
@@ -420,18 +415,7 @@ export const joinLiveClass = mutation({
       throw new Error("This class has already ended or was cancelled");
     }
 
-    // Verify invitation for school-only classes
-    if (liveClass.accessMode === "school-only") {
-      const studentClassId = user?.studentClass;
-      const isUserInvited = liveClass.invitedUsers?.includes(userId) ?? false;
-      const isClassAssigned = liveClass.class && liveClass.class === studentClassId;
-      const isClassInvited = studentClassId && (liveClass.invitedClasses?.includes(studentClassId) ?? false);
-      if (!isUserInvited && !isClassAssigned && !isClassInvited) {
-        throw new Error("You are not invited to this private live class");
-      }
-    }
-
-    // Check if already joined
+    // Check if already joined previously (e.g. before reload or in a past visit)
     const existing = await ctx.db
       .query("liveClassAttendance")
       .withIndex("by_class", (q) => q.eq("liveClass", args.liveClassId))
@@ -439,6 +423,12 @@ export const joinLiveClass = mutation({
       .first();
 
     if (existing) {
+      if (existing.leftAt !== undefined) {
+        await ctx.db.patch(existing._id, {
+          leftAt: undefined,
+          joinedAt: Date.now(),
+        });
+      }
       return existing._id;
     }
 
@@ -973,16 +963,18 @@ export const getLiveClassParticipants = query({
     }
 
     const participants = [];
-    
-    // If the live class is assigned to a school class, get all students from that class
+    const addedStudentIds = new Set<string>();
+
+    // 1. If the live class is assigned to a school class, get all enrolled students
     if (liveClass.class) {
       const classDoc = await ctx.db.get(liveClass.class);
       if (classDoc && classDoc.students) {
         for (const studentId of classDoc.students) {
           const student = await ctx.db.get(studentId);
           if (student) {
+            addedStudentIds.add(student._id);
             const record = activeMap.get(studentId);
-             participants.push({
+            participants.push({
               studentId: student._id,
               name: student.name || student.email || "Student",
               email: student.email || "",
@@ -995,27 +987,29 @@ export const getLiveClassParticipants = query({
           }
         }
       }
-    } else {
-      // Fallback: if no class assigned, just return the active ones in the room
-      for (const record of attendance) {
-        if (record.leftAt !== undefined) continue;
-        const student = await ctx.db.get(record.student);
-        if (student) {
-          participants.push({
-            studentId: student._id,
-            name: student.name || student.email || "Student",
-            email: student.email || "",
-            isOnline: true,
-            isMuted: record.isMuted ?? false,
-            isCameraBlocked: record.isCameraBlocked ?? false,
-            canShareScreen: record.canShareScreen ?? false,
-            requestedScreenShare: record.requestedScreenShare ?? false,
-          });
-        }
+    }
+
+    // 2. Include all other active attendees (e.g. from guest/public links or invited users)
+    for (const record of attendance) {
+      if (addedStudentIds.has(record.student)) continue;
+      const student = await ctx.db.get(record.student);
+      if (student) {
+        addedStudentIds.add(student._id);
+        const isOnline = record.leftAt === undefined;
+        participants.push({
+          studentId: student._id,
+          name: student.name || student.email || "Student",
+          email: student.email || "",
+          isOnline,
+          isMuted: record.isMuted ?? false,
+          isCameraBlocked: record.isCameraBlocked ?? false,
+          canShareScreen: record.canShareScreen ?? false,
+          requestedScreenShare: record.requestedScreenShare ?? false,
+        });
       }
     }
 
-    // Ensure the teacher is in the participants list so they receive WebRTC audio offers
+    // 3. Ensure the teacher is in the participants list so WebRTC audio offers reach them
     const teacherDoc = await ctx.db.get(liveClass.teacher);
     if (teacherDoc && !participants.find((p) => p.studentId === teacherDoc._id)) {
       participants.push({

@@ -523,10 +523,24 @@ export default function LiveRoomPage() {
     }
   };
 
-  // Mark student attendance when in live room and clean up on exit/unload
+  // Mark attendee attendance when in live room and clean up on exit/unload
   useEffect(() => {
-    if (user?.role === "student" && classItem?.status && classItem?.status !== "ended" && classItem?.status !== "cancelled" && approvalStatus?.status === "approved") {
+    const isApprovedOrNotRequired = !approvalStatus || approvalStatus.status === "approved";
+    if (
+      !isCreator &&
+      classItem?.status &&
+      classItem.status !== "ended" &&
+      classItem.status !== "cancelled" &&
+      isApprovedOrNotRequired &&
+      targetClassId
+    ) {
+      // Immediate attendance registration
       joinLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
+
+      // Heartbeat to keep attendance record fresh while in room
+      const heartbeatInterval = setInterval(() => {
+        joinLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
+      }, 45000);
 
       const handleUnload = () => {
         stopStudentAudioInternal();
@@ -536,11 +550,12 @@ export default function LiveRoomPage() {
       window.addEventListener("beforeunload", handleUnload);
 
       return () => {
+        clearInterval(heartbeatInterval);
         window.removeEventListener("beforeunload", handleUnload);
         leaveLiveClassMutation({ liveClassId: targetClassId as any }).catch(console.error);
       };
     }
-  }, [user?.role, classItem?.status, approvalStatus?.status, targetClassId]);
+  }, [isCreator, classItem?.status, approvalStatus?.status, targetClassId]);
 
   // Detect new raised hands (for creator/moderator)
   useEffect(() => {
@@ -1085,6 +1100,13 @@ export default function LiveRoomPage() {
       }).catch(console.error);
     }
   }, [myBlockCameraStatus, isCreator, studentMicOn, studentVideoOn]);
+
+  // ── Auto-sync student audio/video to newly joined participants without page refresh ──
+  useEffect(() => {
+    if ((studentMicOn || studentVideoOn) && participants.length > 0) {
+      updateStudentMediaStream(studentMicOn, studentVideoOn).catch(console.error);
+    }
+  }, [participants.length, studentMicOn, studentVideoOn]);
 
   // Process incoming WebRTC signaling messages
   useEffect(() => {
@@ -1838,7 +1860,7 @@ export default function LiveRoomPage() {
         <section className="flex-1 min-h-[40vh] md:min-h-[300px] flex flex-col bg-black md:bg-zinc-955 p-0 sm:p-2 md:p-6 justify-center items-center relative md:overflow-hidden">
           
           {/* Top-Left Floating Room Info Badge */}
-          <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 flex items-center gap-2 md:gap-3">
+          <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 flex items-center gap-2 md:gap-3 flex-wrap">
             <div className="text-xs font-semibold text-white/90 tracking-wide px-3.5 py-2 rounded-full bg-zinc-900/80 backdrop-blur border border-zinc-800 flex items-center gap-2 shadow-lg">
               <span className="text-zinc-200">{timeStr}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
@@ -1853,6 +1875,14 @@ export default function LiveRoomPage() {
                 <span className="text-[10px] font-bold text-red-400 tracking-wider uppercase">Live</span>
               </div>
             )}
+            <button
+              onClick={() => toggleSidebarTab("interactions")}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-emerald-400 backdrop-blur shadow-lg transition-all"
+              title="Click to view attending students roster"
+            >
+              <Users className="h-3 w-3" />
+              <span>{participants.filter((p: any) => p.isOnline).length} attending</span>
+            </button>
           </div>
 
           {/* Top-Right Floating Status Badges */}
@@ -2243,7 +2273,7 @@ export default function LiveRoomPage() {
                 )}
               >
                 <Users className="h-3.5 w-3.5" />
-                People
+                People ({participants.filter((p: any) => p.isOnline).length})
                 {raisedHands.length > 0 && (
                   <span className="bg-amber-500/15 text-[10px] text-amber-500 px-1.5 py-0.5 rounded-full ml-1 font-semibold animate-pulse border border-amber-500/10">
                     {raisedHands.length}
